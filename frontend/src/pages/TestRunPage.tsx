@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertCircle, ChevronRight, History } from 'lucide-react';
+import { AlertCircle, ChevronRight, FileChartColumn, History } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -16,7 +17,7 @@ import {
 import StatusDot from '@/components/shared/StatusDot';
 import { socket } from '@/services/socket';
 import { testRunsApi } from '@/services/api';
-import { dotStatus, formatDuration, runLabel, runScore, testRunFlowUrl, triggerLabel } from '@/lib/testRuns';
+import { dotStatus, formatDuration, runLabel, runScore, testRunFlowUrl, testRunReportUrl, triggerLabel } from '@/lib/testRuns';
 import { useTabTitle } from '@/workspace/RoutePanel';
 
 const STATUS_BADGES = {
@@ -111,6 +112,14 @@ export function TestRunPage() {
           <span className="text-muted-foreground text-sm">
             {runScore(run)} passed{formatDuration(run.times) ? ` · ${formatDuration(run.times)}` : ''}
           </span>
+          {/* The report is written when the execution finishes */}
+          {run.status !== 'running' && (
+            <Button asChild variant="outline" size="sm" className="ml-auto">
+              <a href={testRunReportUrl(run.id)} target="_blank" rel="noreferrer">
+                <FileChartColumn /> HTML report
+              </a>
+            </Button>
+          )}
         </div>
       </div>
 

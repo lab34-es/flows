@@ -1,8 +1,14 @@
-# Publishes @lab34/flows to npm when a release is created.
+# Publishes @lab34/flows to npm when a version tag (v1.2.3) is pushed, when a
+# release is created for one, or when the workflow is dispatched by hand (or
+# by an agent) against the branch to release — a dispatch run tags the commit
+# it released as v<version> itself, so every published version keeps its tag.
 #
 # The same gates a pull request has to clear are re-run here, against the exact
 # commit being released: a release must not ship code that is untested, below
-# the coverage threshold, or carrying a critical advisory.
+# the coverage threshold, or carrying a critical advisory. The tag has to
+# match the version in package.json, and a version npm already has is skipped
+# rather than failed — so any two of the triggers firing for the same version
+# publish once, not twice.
 #
 # Every job takes its Node version from .nvmrc, so the pipelines, the website
 # build and a local `nvm use` all run the same release. Keep .nvmrc on a Node
@@ -14,6 +20,10 @@ name: Node.js Package
 on:
   release:
     types: [created]
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -76,8 +86,10 @@ jobs:
     # rotate or leak. The trusted publisher configured on npmjs.com names
     # this repository and this workflow file; if either moves, update it
     # there or the exchange is refused.
+    # contents: write is only exercised by dispatch runs, which push the
+    # version tag for the commit they released.
     permissions:
-      contents: read
+      contents: write
       id-token: write
 
     steps:
@@ -102,9 +114,36 @@ jobs:
 
       - run: npm ci
 
+      # A tag names the version it releases: v<package.json version>, nothing
+      # else. A mismatched tag is a mistake worth stopping. Dispatch runs
+      # start from a branch, not a tag — they create the tag at the end.
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="${GITHUB_REF_NAME#refs/tags/}"
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "Tag $TAG does not match package.json version $VERSION" >&2
+            exit 1
+          fi
+
+      # Both triggers can fire for the same version (tag push, then a release
+      # created from the tag): publish only when npm does not have it yet.
+      - name: Check whether this version is already on npm
+        id: on_npm
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "@lab34/flows@$VERSION" version --loglevel=error >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "@lab34/flows@$VERSION is already on npm; skipping the publish." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # prepublishOnly builds the frontend as well, so its dependencies have to
       # be installed here too or the publish dies on a missing vite.
-      - run: npm ci --prefix frontend
+      - if: steps.on_npm.outputs.published == 'false'
+        run: npm ci --prefix frontend
 
       # prepublishOnly builds the UI and compiles src/ into dist/, which is what
       # "files" ships.
@@ -112,4 +151,20 @@ jobs:
       # If this ever fails, re-run with --loglevel=verbose: npm reports a
       # failed token exchange only at verbose level and otherwise falls
       # through to a bare ENEEDAUTH.
-      - run: npm publish --access=public
+      - if: steps.on_npm.outputs.published == 'false'
+        run: npm publish --access=public
+
+      # A dispatch run has no tag yet: give the released commit its
+      # v<version> tag, so the history of published versions stays tagged.
+      # Pushing with GITHUB_TOKEN does not trigger workflows, so this cannot
+      # start a second (tag-push) run of this workflow.
+      - name: Tag the released commit (dispatch runs)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if git ls-remote --exit-code origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists; nothing to do." >> "$GITHUB_STEP_SUMMARY"
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi

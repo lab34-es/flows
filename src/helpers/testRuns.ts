@@ -3,6 +3,7 @@ import path from 'path';
 
 import * as paths from './paths';
 import * as markdownFlows from './markdownFlows';
+import * as testRunReport from './testRunReport';
 import { sensitive } from './reporter';
 
 /**
@@ -435,7 +436,9 @@ const flowFailed = (run, file, { content, error }: { content?: string; error: an
 export { flowFailed };
 
 /**
- * Close the run: it passed only when every flow did.
+ * Close the run: it passed only when every flow did. A finished run also gets
+ * its standalone HTML report written into the folder -- and a report that
+ * cannot be written must never fail the run itself.
  * @param {TestRun} run
  */
 const finalize = (run) => {
@@ -445,6 +448,13 @@ const finalize = (run) => {
   run.summary.times.end = Date.now();
   run.summary.times.duration = run.summary.times.end - run.summary.times.start;
   save(run);
+
+  try {
+    testRunReport.write(run.dir, run.summary);
+  }
+  catch (ex) {
+    console.error('Could not write the report of run %s:', run.id, ex);
+  }
 };
 
 export { finalize };
@@ -800,6 +810,26 @@ const get = async (id): Promise<TestRunSummary> => {
 };
 
 export { get };
+
+/**
+ * One run's standalone HTML report. Runs recorded before reports existed
+ * have no report.html yet; it is rebuilt from the folder and kept.
+ * @param {string} id
+ * @returns {Promise<string>} The report as HTML
+ */
+const report = async (id): Promise<string> => {
+  const dir = await resolveRunDir(id);
+  const file = path.join(dir, testRunReport.REPORT_FILE);
+
+  if (fs.existsSync(file)) {
+    return fs.readFileSync(file, 'utf8');
+  }
+
+  const summary = await get(id);
+  return testRunReport.write(dir, summary);
+};
+
+export { report };
 
 /**
  * One stored flow copy of a run, parsed for rendering: the document's
