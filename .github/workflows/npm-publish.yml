@@ -1,8 +1,12 @@
-# Publishes @lab34/flows to npm when a release is created.
+# Publishes @lab34/flows to npm when a version tag (v1.2.3) is pushed, or a
+# release is created for one.
 #
 # The same gates a pull request has to clear are re-run here, against the exact
 # commit being released: a release must not ship code that is untested, below
-# the coverage threshold, or carrying a critical advisory.
+# the coverage threshold, or carrying a critical advisory. The tag has to
+# match the version in package.json, and a version npm already has is skipped
+# rather than failed — so a tag push followed by a release created from that
+# tag publishes once, not twice.
 #
 # Every job takes its Node version from .nvmrc, so the pipelines, the website
 # build and a local `nvm use` all run the same release. Keep .nvmrc on a Node
@@ -14,6 +18,9 @@ name: Node.js Package
 on:
   release:
     types: [created]
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -102,9 +109,34 @@ jobs:
 
       - run: npm ci
 
+      # A tag names the version it releases: v<package.json version>, nothing
+      # else. A mismatched tag is a mistake worth stopping.
+      - name: Check the tag matches package.json
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="${GITHUB_REF_NAME#refs/tags/}"
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "Tag $TAG does not match package.json version $VERSION" >&2
+            exit 1
+          fi
+
+      # Both triggers can fire for the same version (tag push, then a release
+      # created from the tag): publish only when npm does not have it yet.
+      - name: Check whether this version is already on npm
+        id: on_npm
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "@lab34/flows@$VERSION" version --loglevel=error >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "@lab34/flows@$VERSION is already on npm; skipping the publish." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # prepublishOnly builds the frontend as well, so its dependencies have to
       # be installed here too or the publish dies on a missing vite.
-      - run: npm ci --prefix frontend
+      - if: steps.on_npm.outputs.published == 'false'
+        run: npm ci --prefix frontend
 
       # prepublishOnly builds the UI and compiles src/ into dist/, which is what
       # "files" ships.
@@ -112,4 +144,5 @@ jobs:
       # If this ever fails, re-run with --loglevel=verbose: npm reports a
       # failed token exchange only at verbose level and otherwise falls
       # through to a bare ENEEDAUTH.
-      - run: npm publish --access=public
+      - if: steps.on_npm.outputs.published == 'false'
+        run: npm publish --access=public
