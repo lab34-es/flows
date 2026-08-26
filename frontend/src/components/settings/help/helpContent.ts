@@ -103,8 +103,8 @@ Flows are \`.md\` (or \`.markdown\`) files: that is the only flow format.
   output, memory usage and examples, plus its environment files.
 - **Sidebar footer › Environment** — the environment used for every run.
 - **Top bar › Context folder** — the folder everything is read from and written
-  to, with its git branch next to it and a *sync* button (see *The context
-  folder and git*). Changed files are coloured in the sidebar, the way an
+  to, with its git branch next to it -- a menu to switch, create and fetch
+  branches -- and a *sync* button (see *The context folder and git*). Changed files are coloured in the sidebar, the way an
   editor's explorer does it.
 - **Notebook view** — a flow rendered as a document, with each step block as a
   cell. Press *Run* and the details stream in below each block. It is also
@@ -127,8 +127,9 @@ Flows are \`.md\` (or \`.markdown\`) files: that is the only flow format.
     icon: 'folder',
     title: 'The context folder and git',
     summary: 'Where your flows live, which branch they are on, and how to sync.',
-    keywords: ['context', 'folder', 'directory', 'git', 'branch', 'commit', 'push',
-      'pull', 'sync', 'repository', 'github', 'bitbucket', 'gitlab', 'changes'],
+    keywords: ['context', 'folder', 'directory', 'git', 'branch', 'branches',
+      'checkout', 'switch', 'fetch', 'commit', 'push', 'pull', 'sync',
+      'repository', 'github', 'bitbucket', 'gitlab', 'changes'],
     body: `
 Everything the tool reads and writes lives in one folder: your **context
 directory**. By default that is \`lab34-flows\` in your home folder; pass
@@ -144,7 +145,11 @@ A context folder is usually a git repository shared with your team, so the tool
 treats it as one.
 
 - The **branch** is shown next to the folder name, with arrows counting the
-  commits you have to pull (↓) and to push (↑).
+  commits you have to pull (↓) and to push (↑). Click it to switch to another
+  branch, to **create** one, or to **fetch** every remote — branches your team
+  pushed appear under *On remotes only*, and picking one checks it out locally,
+  tracking the remote. Git refuses to switch when uncommitted work would be
+  lost; commit or stash it first.
 - **Changed files are coloured** in the sidebar, with a letter at the end of the
   row: *M* modified, *U* untracked, *A* added, *D* deleted, *R* renamed. A
   folder takes the colour of whatever changed inside it, however deep — so a

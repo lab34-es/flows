@@ -98,3 +98,27 @@ export const commit = async (body: { message?: string, paths?: string[] } = {}) 
  * @returns {Promise<{output: string}>}
  */
 export const push = async () => git.push(await paths.contextRoot());
+
+/**
+ * The branches of the context directory's repository.
+ * @returns {Promise<git.GitBranches>}
+ */
+export const branches = async () => git.branches(await paths.contextRoot());
+
+/**
+ * Switch the context directory to another branch, creating it when asked.
+ * @param {Object} body - { branch, create, from }
+ * @returns {Promise<{output: string, branch: string}>}
+ */
+export const checkout = async (
+  body: { branch?: string, create?: boolean, from?: string } = {}
+) => git.checkout(await paths.contextRoot(), body.branch || '', {
+  create: Boolean(body.create),
+  from: body.from
+});
+
+/**
+ * Update every remote's branches.
+ * @returns {Promise<{output: string}>}
+ */
+export const fetch = async () => git.fetch(await paths.contextRoot());

@@ -102,6 +102,10 @@ export const contextApi = {
   commit: (message, paths) =>
     api.post('/api/context/git/commit', { message, paths }, { timeout: GIT_TIMEOUT }),
   push: () => api.post('/api/context/git/push', {}, { timeout: GIT_TIMEOUT }),
+  branches: () => api.get('/api/context/git/branches'),
+  checkout: (branch, options = {}) =>
+    api.post('/api/context/git/checkout', { branch, ...options }, { timeout: GIT_TIMEOUT }),
+  fetch: () => api.post('/api/context/git/fetch', {}, { timeout: GIT_TIMEOUT }),
 };
 
 export const environmentApi = {
