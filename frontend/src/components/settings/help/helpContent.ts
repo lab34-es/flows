@@ -1158,11 +1158,6 @@ of waiting for a final report.
 | \`--debug\` | Print environment variables and Node.js paths. |
 | \`--help\` | Show the help. |
 
-Applications are plain Node.js modules, so extend \`NODE_PATH\` to npm's root for
-them to resolve the library:
-
-    export NODE_PATH=$(npm root -g)             # Linux / macOS
-    set NODE_PATH=%AppData%\\npm\\node_modules     # Windows
 `,
   },
 
