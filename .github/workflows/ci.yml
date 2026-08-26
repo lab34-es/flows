@@ -163,17 +163,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build the package
-        run: npm run build
-
-      - name: Check the CLI starts from the compiled output
-        run: node dist/cli.js --help
-
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 
+      # The frontend is built first on purpose: the UI ships inside the
+      # package, and copy-assets can only fold frontend/dist into dist/frontend
+      # once Vite has written it.
       - name: Build the frontend
         run: npm run build:frontend
+
+      - name: Build the package
+        run: npm run build
+
+      - name: Check the UI was bundled into the package
+        run: test -f dist/frontend/index.html
+
+      - name: Check the CLI starts from the compiled output
+        run: node dist/cli.js --help
 
   badge:
     name: Refresh the coverage badge

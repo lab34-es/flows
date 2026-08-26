@@ -48,8 +48,20 @@ jobs:
       - name: Audit (frontend)
         run: npm audit --audit-level=critical --prefix frontend
 
+      # The UI ships inside the package, so it has to be built before the
+      # package: copy-assets folds frontend/dist into dist/frontend, and skips
+      # it with a warning when it is not there yet.
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Build the frontend
+        run: npm run build:frontend
+
       - name: Build
         run: npm run build
+
+      - name: Check the UI was bundled into the package
+        run: test -f dist/frontend/index.html
 
       - name: Check the CLI starts from the compiled output
         run: node dist/cli.js --help
@@ -88,7 +100,12 @@ jobs:
 
       - run: npm ci
 
-      # prepublishOnly compiles src/ into dist/, which is what "files" ships.
+      # prepublishOnly builds the frontend as well, so its dependencies have to
+      # be installed here too or the publish dies on a missing vite.
+      - run: npm ci --prefix frontend
+
+      # prepublishOnly builds the UI and compiles src/ into dist/, which is what
+      # "files" ships.
       # Publishing over OIDC also attaches provenance to the release.
       # If this ever fails, re-run with --loglevel=verbose: npm reports a
       # failed token exchange only at verbose level and otherwise falls
