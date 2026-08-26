@@ -200,6 +200,11 @@ export function FlowPage() {
           steps: parsed.data.steps,
           errors: parsed.data.errors,
           title: parsed.data.title || current.title,
+          description: parsed.data.description,
+          // The property list and the Xray chip read the frontmatter, so
+          // they have to come from the same re-parse as the steps
+          properties: parsed.data.properties,
+          xray: parsed.data.xray,
         } : current));
       } catch (ex) {
         setSaveError(ex.response?.data?.error || ex.message);
@@ -307,6 +312,9 @@ export function FlowPage() {
         steps: parsed.data.steps,
         errors: parsed.data.errors,
         title: parsed.data.title || current.title,
+        description: parsed.data.description,
+        properties: parsed.data.properties,
+        xray: parsed.data.xray,
       }));
       if (parsed.data.errors?.length) {
         setTab('document');
