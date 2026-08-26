@@ -336,6 +336,20 @@ describe('/api/test-runs', () => {
     expect(res.status).toBe(404);
   });
 
+  test('GET /:id/report answers the report as HTML', async () => {
+    (testRuns.report as jest.Mock).mockResolvedValue('<!DOCTYPE html><html></html>');
+    const res = await request(app).get('/api/test-runs/r1/report');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/html');
+    expect(res.text).toContain('<!DOCTYPE html>');
+    expect(testRuns.report).toHaveBeenCalledWith('r1');
+  });
+
+  test('GET /:id/report maps a missing run to 404', async () => {
+    (testRuns.report as jest.Mock).mockRejectedValue(new Error('Test run not found'));
+    expect((await request(app).get('/api/test-runs/nope/report')).status).toBe(404);
+  });
+
   test('GET /:id/flow passes the id and the file through', async () => {
     (testRuns.getFlow as jest.Mock).mockResolvedValue({ title: 'A', results: {} });
     const res = await request(app).get('/api/test-runs/r1/flow').query({ path: 'payments/a.md' });
