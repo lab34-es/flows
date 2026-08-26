@@ -78,9 +78,10 @@ const jsonLine = (value, max = 2000) => {
 /* ------------------------------------------------------------ collecting */
 
 /**
- * The evidence of one failed flow, read from its stored copy: every step
- * with how it went, and what the failing steps had to say (assertion
- * errors, execution errors, the response that was asserted on).
+ * The details of one flow, read from its stored copy: every step with how
+ * it went and how long it took, and -- for the steps that failed -- what
+ * they had to say (assertion errors, execution errors, the response that
+ * was asserted on).
  *
  * A copy that is missing or does not parse must not take the report down --
  * the run summary's own error message is evidence enough.
@@ -89,7 +90,7 @@ const jsonLine = (value, max = 2000) => {
  * @param {TestRunFlowSummary} entry - The flow as run.json carries it
  * @returns {{tags: string[], steps: Array<Object>, evidence: Array<Object>}}
  */
-const failureDetails = (dir, entry) => {
+const flowDetails = (dir, entry) => {
   const details: { tags: string[]; steps: any[]; evidence: any[] } = { tags: [], steps: [], evidence: [] };
 
   if (entry.error) {
@@ -178,6 +179,37 @@ const dot = (flow: TestRunFlowSummary) => {
   return `<span class="dot" style="background:${color}" title="${escapeHtml(flow.title || flow.file)}"></span>`;
 };
 
+/** The step lines of a flow: mark, number, name and how long it took. */
+const stepLines = (steps) => steps
+  .map(step => [
+    '<div class="step">',
+    `<span class="mark" style="color:${COLORS[step.status]}">${MARKS[step.status]}</span>`,
+    `<span class="no">${step.no}</span>`,
+    `<span class="text ${step.status}">${escapeHtml(step.name)}</span>`,
+    '</div>'
+  ].join(''))
+  .join('\n');
+
+/** One flow inside an expanded suite: its outcome, then its steps. */
+const flowBlock = (entry: TestRunFlowSummary, details) => {
+  const status = entry.status === 'passed' ? 'passed'
+    : entry.status === 'failed' ? 'failed' : 'skipped';
+  const meta = duration(entry.times && entry.times.duration)
+    || (status === 'skipped' ? 'not run' : '');
+  const steps = stepLines(details.steps);
+
+  return [
+    '<div class="flow">',
+    '<div class="flow-head">',
+    `<span class="mark" style="color:${COLORS[status]}">${MARKS[status]}</span>`,
+    `<span class="flow-name">${escapeHtml(entry.title || entry.file)}</span>`,
+    meta ? `<span class="meta">${escapeHtml(meta)}</span>` : '',
+    '</div>',
+    steps ? `<div class="steps">\n${steps}\n</div>` : '',
+    '</div>'
+  ].filter(Boolean).join('\n');
+};
+
 /** One expandable failure card. */
 const failureCard = (entry: TestRunFlowSummary, details) => {
   const tags = details.tags
@@ -188,15 +220,7 @@ const failureCard = (entry: TestRunFlowSummary, details) => {
     .filter(Boolean)
     .join(' · ');
 
-  const steps = details.steps
-    .map(step => [
-      '<div class="step">',
-      `<span class="mark" style="color:${COLORS[step.status]}">${MARKS[step.status]}</span>`,
-      `<span class="no">${step.no}</span>`,
-      `<span class="text ${step.status}">${escapeHtml(step.name)}</span>`,
-      '</div>'
-    ].join(''))
-    .join('\n');
+  const steps = stepLines(details.steps);
 
   const evidence = details.evidence
     .map(item => `<div><span class="key">${escapeHtml(item.label)}</span> ${escapeHtml(item.text)}</div>`)
@@ -240,6 +264,10 @@ const buildHtml = (summary: TestRunSummary, dir: string) => {
     suites.get(suite)!.push(flow);
   });
 
+  // Each copy is read once, whether the flow shows up as a failure card, in
+  // its suite, or both
+  const details = new Map(flows.map(flow => [flow.file, flowDetails(dir, flow)]));
+
   const failures = flows.filter(flow => flow.status === 'failed');
   const status = summary.status === 'running' ? 'RUNNING' : summary.status.toUpperCase();
   const statusColor = summary.status === 'passed' ? COLORS.passed
@@ -265,7 +293,7 @@ const buildHtml = (summary: TestRunSummary, dir: string) => {
     '<div class="section">',
     `<div class="section-title" style="color:${COLORS.failed}">Failures — ${failures.length}</div>`,
     '<div class="failures">',
-    failures.map(entry => failureCard(entry, failureDetails(dir, entry))).join('\n'),
+    failures.map(entry => failureCard(entry, details.get(entry.file))).join('\n'),
     '</div>',
     '</div>'
   ].join('\n') : '';
@@ -280,11 +308,16 @@ const buildHtml = (summary: TestRunSummary, dir: string) => {
         ...(members.length - ok - ko ? [`${members.length - ok - ko} not run`] : [])
       ].join(', ');
       return [
-        '<div class="suite">',
+        '<details class="suite">',
+        '<summary>',
         `<span class="suite-name">${escapeHtml(suite)}</span>`,
         `<span class="dots">${members.map(dot).join('')}</span>`,
         `<span class="suite-summary">${escapeHtml(summaryText)}</span>`,
-        '</div>'
+        '</summary>',
+        '<div class="suite-body">',
+        members.map(entry => flowBlock(entry, details.get(entry.file))).join('\n'),
+        '</div>',
+        '</details>'
       ].join('\n');
     })
     .join('\n');
@@ -352,13 +385,25 @@ body { margin: 0; background: #E9E7E4; color: #201F1D;
   font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.6;
   overflow-x: auto; }
 .console .key { color: #B68235; }
-.suite { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center;
-  background: #FFFFFF; border: 1px solid #E2DFDB; padding: 12px 20px; margin-bottom: 8px; }
+.suite { background: #FFFFFF; border: 1px solid #E2DFDB; margin-bottom: 8px; }
 .suite:last-child { margin-bottom: 0; }
+.suite > summary { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center;
+  padding: 12px 20px; cursor: pointer; list-style: none; }
+.suite > summary::-webkit-details-marker { display: none; }
+.suite > summary::after { content: '▸'; font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; color: #B68235; }
+.suite[open] > summary { border-bottom: 1px solid #EEEBE7; }
+.suite[open] > summary::after { content: '▾'; }
 .suite-name { font-size: 14px; font-weight: 500; width: 130px; }
 .dots { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; min-width: 140px; }
 .dot { width: 12px; height: 12px; display: inline-block; }
 .suite-summary { font-size: 13px; color: #9B9797; }
+.suite-body { padding: 14px 20px; display: flex; flex-direction: column; gap: 14px; }
+.flow-head { display: flex; align-items: baseline; gap: 10px; }
+.flow-head .mark { font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12.5px; width: 14px; flex-shrink: 0; }
+.flow-name { font-weight: 600; font-size: 13.5px; }
+.flow .steps { margin: 6px 0 0 26px; }
 .footer { padding: 14px clamp(16px, 3.5vw, 40px); border-top: 1px solid #D8D5D1;
   display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between;
   font-size: 12px; color: #9B9797; }
@@ -392,7 +437,7 @@ ${failuresSection}
 ${suiteRows}
 </div>
 <div class="footer">
-<span>lab34/flows · generated ${utc(Date.now())}</span><span>each square = one flow · tap a failure to expand evidence</span>
+<span>lab34/flows · generated ${utc(Date.now())}</span><span>each square = one flow · tap a row to expand its steps</span>
 </div>
 </div>
 </div>

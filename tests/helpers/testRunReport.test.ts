@@ -131,6 +131,30 @@ describe('the report of a passed run', () => {
     // Nothing failed, so there is no failures section
     expect(html).not.toContain('Failures —');
   });
+
+  test('every suite expands to its flows, their steps and their timings', async () => {
+    const run = await testRuns.create({
+      trigger: 'folder', environment: 'local', flows: [
+        { file: 'payments/pay.md', title: 'Pay with card' },
+        { file: 'accounts/close.md', title: 'Close an account' }
+      ]
+    });
+    testRuns.flowFinished(run, 'payments/pay.md', { content: MARKDOWN, flow: passedFlow() });
+    testRuns.finalize(run);
+
+    const html = await testRuns.report(run.id);
+
+    // The suite rows are expandable
+    expect(html).toContain('<details class="suite">');
+    // A passed flow shows its steps and how long each of them took
+    expect(html).toContain('Pay with card');
+    expect(html).toContain('calculator add · 1.0 s');
+    // The step the run never reached is there too, as skipped
+    expect(html).toContain('calculator subtract');
+    // A flow that never ran still gets its line
+    expect(html).toContain('Close an account');
+    expect(html).toContain('not run');
+  });
 });
 
 describe('the report of a failed run', () => {
