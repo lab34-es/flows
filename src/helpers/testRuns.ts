@@ -453,7 +453,7 @@ const finalize = (run) => {
     testRunReport.write(run.dir, run.summary);
   }
   catch (ex) {
-    console.error(`Could not write the report of run ${run.id}:`, ex);
+    console.error('Could not write the report of run %s:', run.id, ex);
   }
 };
 
