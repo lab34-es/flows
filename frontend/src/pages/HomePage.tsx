@@ -4,6 +4,7 @@ import { AppWindow, ArrowRight, BookOpen, FileText, Play, Workflow } from 'lucid
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import EnvironmentsCard from '@/components/home/EnvironmentsCard';
 import { useAppState } from '@/context/AppStateContext';
 import { flowUrl } from '@/lib/flows';
 
@@ -101,6 +102,8 @@ export function HomePage() {
           </CardContent>
         </Card>
       </div>
+
+      <EnvironmentsCard />
 
       <div className="text-muted-foreground space-y-1 text-xs">
         <p>Example applications (calculator, httpbin, jsonplaceholder) and example flows are seeded on first run.</p>

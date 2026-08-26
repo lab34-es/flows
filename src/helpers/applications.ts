@@ -87,7 +87,7 @@ const loadAll = () => {
 export { loadAll };
 
 /**
- * Return list of paths of *.env files present in the given path. 
+ * Return list of paths of *.env files present in the given path.
  * @param {string} pathToSearch
  * @returns {
 *  string[]
@@ -106,20 +106,207 @@ const listEnvFiles = pathToSearch => {
 };
 
 /**
- * Gets a unique list of all possible environments based on the .env files
- * present of all applications
+ * Return list of paths of *.env.example files present in the given path.
+ * Templates carry the variables an environment needs, without their secret
+ * values, so they can be committed and shared where the .env files cannot.
+ * @param {string} pathToSearch
+ * @returns {string[]}
+ */
+const listEnvTemplates = pathToSearch => {
+  const envDir = path.join(pathToSearch, 'env');
+
+  if (!fs.existsSync(envDir)) {
+    return [];
+  }
+
+  return fs.readdirSync(envDir)
+    .filter(file => fs.statSync(path.join(envDir, file)).isFile() && file.endsWith('.env.example'))
+    .map(file => path.join(envDir, file));
+};
+
+/**
+ * Gets a unique list of all possible environments based on the .env files —
+ * and the .env.example templates — present of all applications. Counting the
+ * templates lets an environment appear in the selector before every tester
+ * has created their own .env files for it.
  * @returns {Promise<string[]>} - Promise that resolves to a sorted array of unique environment names
  */
 const allPossibleEnvironments = () => {
   return parseApplications()
     .then(apps => {
-      const envs = apps.map(app => app.envFiles.map(env => env.name));
+      const envs = apps.map(app => [
+        ...app.envFiles.map(env => env.name),
+        ...app.envTemplates.map(template => template.name)
+      ]);
       return [...new Set(envs.flat())];
     })
     .then(envs => envs.filter(env => env && env.trim() !== '').sort());
 };
 
 export { allPossibleEnvironments };
+
+/**
+ * An environment is named by its file, so the name must be a plain file-name
+ * stem: no separators, no leading dot.
+ * @param {string} name
+ * @returns {string} The trimmed, usable name
+ */
+const environmentNameOf = (name) => {
+  const trimmed = (name || '').trim();
+
+  if (!trimmed) {
+    throw new Error('Environment name is required');
+  }
+
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(trimmed) || trimmed.endsWith('.env') || trimmed.endsWith('.example')) {
+    throw new Error('Invalid environment name');
+  }
+
+  return trimmed;
+};
+
+/**
+ * The env-files status of every application against every known environment:
+ * which .env files exist, which are missing but have a committed
+ * .env.example to create them from, and which variables of the template an
+ * existing file is still missing. This is what the home page card renders.
+ * @returns {Promise<{environments: string[], applications: Array<Object>, summary: Object}>}
+ */
+const environmentsStatus = async () => {
+  const parsed = await parseApplications();
+  const environments = await allPossibleEnvironments();
+
+  const summary = { total: 0, missing: 0, creatable: 0, incomplete: 0 };
+
+  const applications = parsed.map(app => {
+    const status: Record<string, any> = {};
+
+    environments.forEach(envName => {
+      const envFile = app.envFiles.find(env => env.name === envName);
+      const template = app.envTemplates.find(tpl => tpl.name === envName);
+
+      // Variables the template declares that the real file does not carry yet
+      const missingKeys = envFile && template
+        ? template.contents
+          .map(entry => entry.key)
+          .filter(key => !envFile.contents.some(entry => entry.key === key))
+        : [];
+
+      summary.total += 1;
+      if (!envFile) {
+        summary.missing += 1;
+        if (template) { summary.creatable += 1; }
+      }
+      else if (missingKeys.length) {
+        summary.incomplete += 1;
+      }
+
+      status[envName] = {
+        exists: Boolean(envFile),
+        hasTemplate: Boolean(template),
+        file: `env/${envName}.env`,
+        template: template ? `env/${envName}.env.example` : null,
+        missingKeys
+      };
+    });
+
+    return {
+      name: app.name,
+      slug: app.slug,
+      environments: status
+    };
+  });
+
+  return { environments, applications, summary };
+};
+
+export { environmentsStatus };
+
+/**
+ * Create every missing .env file that has a committed .env.example next to
+ * it, copying the template as it is. The tester then only fills in the
+ * secrets. Narrow with `environment` and/or `application` to act on one.
+ * @param {Object} [options]
+ * @param {string} [options.environment] - Only this environment
+ * @param {string} [options.application] - Only this application
+ * @returns {Promise<Array<{application: string, environment: string, path: string}>>} The files created
+ */
+type EnvFilesScope = { environment?: string, application?: string };
+
+const createMissingEnvFiles = async ({ environment, application }: EnvFilesScope = {}) => {
+  const parsed = await parseApplications();
+  const created: { application: string, environment: string, path: string }[] = [];
+
+  parsed.forEach(app => {
+    if (application && app.slug !== application) { return; }
+
+    app.envTemplates.forEach(template => {
+      if (environment && template.name !== environment) { return; }
+      if (app.envFiles.some(env => env.name === template.name)) { return; }
+
+      const envFile = path.join(app.path, 'env', `${template.name}.env`);
+      fs.mkdirSync(path.dirname(envFile), { recursive: true });
+      fs.writeFileSync(envFile, fs.readFileSync(template.path, 'utf8'), 'utf8');
+
+      created.push({ application: app.slug, environment: template.name, path: envFile });
+    });
+  });
+
+  return created;
+};
+
+export { createMissingEnvFiles };
+
+/**
+ * Add an environment to every application at once: create its .env file
+ * wherever it is missing, so nobody writes twenty files by hand. Each file
+ * starts from the application's .env.example for that environment when there
+ * is one; otherwise from the keys of `baseEnvironment` with empty values;
+ * otherwise as an empty file to fill in.
+ * @param {string} name - The new environment's name
+ * @param {string} [baseEnvironment] - Environment to copy the keys from
+ * @returns {Promise<Array<{application: string, environment: string, path: string}>>} The files created
+ */
+const addEnvironmentToAll = async (name, baseEnvironment?) => {
+  const trimmed = environmentNameOf(name);
+
+  const parsed = await parseApplications();
+  const created: { application: string, environment: string, path: string }[] = [];
+
+  parsed.forEach(app => {
+    if (app.envFiles.some(env => env.name === trimmed)) { return; }
+
+    const template = app.envTemplates.find(tpl => tpl.name === trimmed);
+    const base = baseEnvironment && app.envFiles.find(env => env.name === baseEnvironment);
+
+    let content;
+    if (template) {
+      content = fs.readFileSync(template.path, 'utf8');
+    }
+    else if (base) {
+      // The keys of the base environment, values left to fill in
+      const keys = Object.keys(dotenv.parse(fs.readFileSync(base.path)));
+      content = [
+        `# Environment "${trimmed}", keys copied from ${baseEnvironment}.env — fill in the values.`,
+        ...keys.map(key => `${key}=`),
+        ''
+      ].join('\n');
+    }
+    else {
+      content = `# Environment "${trimmed}" for ${app.name}. Add the variables this application needs here.\n`;
+    }
+
+    const envFile = path.join(app.path, 'env', `${trimmed}.env`);
+    fs.mkdirSync(path.dirname(envFile), { recursive: true });
+    fs.writeFileSync(envFile, content, 'utf8');
+
+    created.push({ application: app.slug, environment: trimmed, path: envFile });
+  });
+
+  return created;
+};
+
+export { addEnvironmentToAll };
 
 /**
  * Given a value, return a masked value.
@@ -257,6 +444,18 @@ const parseApplications = async () => {
       };
     });
 
+    // List env templates (.env.example): the committed contract of what each
+    // environment needs, used to offer creating the missing .env files
+    const envTemplatesWithPaths = listEnvTemplates(appPath).map(templateFile => {
+      const fileName = path.basename(templateFile);
+      const envName = fileName.replace(/\.env\.example$/i, '');
+      return {
+        name: envName,
+        path: templateFile,
+        contents: loadEnvFile(templateFile)
+      };
+    });
+
     // if index file exists load methods
     let methods: any[] = [];
     const errors: Record<string, any>[] = [];
@@ -351,6 +550,7 @@ const parseApplications = async () => {
       description: parsedDocs.description,
       readme,
       envFiles: envFilesWithPaths,
+      envTemplates: envTemplatesWithPaths,
       methods: Array.from(methodsByName.values()),
       errors
     };

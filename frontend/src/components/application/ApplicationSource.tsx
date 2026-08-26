@@ -28,6 +28,10 @@ const extensionOf = (filePath) => (filePath.split('.').pop() || '').toLowerCase(
 const templateFor = (filePath, slug) => {
   const ext = extensionOf(filePath);
 
+  if (ext === 'env') {
+    return `# Environment file for ${slug}. Add the variables this application needs here.\n`;
+  }
+
   if (ext === 'ts' || ext === 'js') {
     return [
       '/**',
@@ -84,9 +88,12 @@ const dropKeys = (map, target) => Object.fromEntries(
 /**
  * "Source" view of an application: a VS Code-like explorer listing its files
  * — where they can be created, renamed and deleted — next to the Monaco
- * editor used for flows.
+ * editor used for flows. `initialFile` pre-selects a file on open (deep links
+ * from the home page's Environments card), even one that does not exist yet.
  */
-export function ApplicationSource({ slug, onSaved }) {
+export function ApplicationSource({ slug, initialFile = null, onSaved }: {
+  slug: any, initialFile?: string | null, onSaved?: () => void
+}) {
   const { theme } = useTheme();
 
   const [files, setFiles] = useState<any[]>([]);
@@ -105,6 +112,18 @@ export function ApplicationSource({ slug, onSaved }) {
     return list;
   }, [slug]);
 
+  // A missing env file starts from its committed .env.example when there is
+  // one, so the tester only fills in the values
+  const envExampleFor = useCallback(async (filePath) => {
+    if (!/^env\/.+\.env$/.test(filePath)) { return null; }
+    try {
+      const response = await applicationsApi.getFile(slug, `${filePath}.example`);
+      return response.data.exists ? response.data.content : null;
+    } catch {
+      return null;
+    }
+  }, [slug]);
+
   const openFile = useCallback(async (file, currentDrafts) => {
     setSelected(file.path);
     setError(null);
@@ -115,13 +134,13 @@ export function ApplicationSource({ slug, onSaved }) {
       const response = await applicationsApi.getFile(slug, file.path);
       const content = response.data.exists
         ? response.data.content
-        : templateFor(file.path, slug);
+        : (await envExampleFor(file.path)) ?? templateFor(file.path, slug);
       setOriginals((prev) => ({ ...prev, [file.path]: response.data.exists ? content : null }));
       setDrafts((prev) => ({ ...prev, [file.path]: content }));
     } catch (ex) {
       setError(ex.response?.data?.error || ex.message);
     }
-  }, [slug]);
+  }, [slug, envExampleFor]);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,16 +155,24 @@ export function ApplicationSource({ slug, onSaved }) {
     applicationsApi.listFiles(slug)
       .then((response) => {
         if (cancelled) { return; }
-        const list = response.data || [];
+        let list = response.data || [];
+
+        // A deep-linked file that does not exist yet is still listed and
+        // selected, so the editor opens ready to create it
+        if (initialFile && !list.some((file) => file.path === initialFile)) {
+          list = [...list, { path: initialFile, exists: false }];
+        }
+
         setFiles(list);
-        const first = list.find((file) => file.exists) || list[0];
+        const requested = initialFile && list.find((file) => file.path === initialFile);
+        const first = requested || list.find((file) => file.exists) || list[0];
         if (first) { openFile(first, {}); }
       })
       .catch((ex) => !cancelled && setError(ex.response?.data?.error || ex.message))
       .finally(() => !cancelled && setLoading(false));
 
     return () => { cancelled = true; };
-  }, [slug, openFile]);
+  }, [slug, initialFile, openFile]);
 
   const dirtyFor = useCallback((filePath) =>
     drafts[filePath] !== undefined && drafts[filePath] !== originals[filePath],

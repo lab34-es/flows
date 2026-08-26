@@ -172,10 +172,15 @@ const processor = async (flow, opts) => {
 
         // Stop if the file does not exist
         if (application !== 'tester' && !fs.existsSync(envFile)) {
+          // A committed template means the file only needs creating: point
+          // there instead of leaving the tester to guess the variables
+          const templateHint = fs.existsSync(`${envFile}.example`)
+            ? ` A template exists at ${envFile}.example — create the missing env files from the Environments card on the home page.`
+            : '';
           flow.execution.status = 'error';
           flow.execution.error = {
             name: 'MissingEnvironmentFile',
-            message: `Missing environment file for ${application} at ${envFile}`,
+            message: `Missing environment file for ${application} at ${envFile}.${templateHint}`,
             code: 3
           };
           flow.reporter.execution();

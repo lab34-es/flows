@@ -386,6 +386,74 @@ describe('/api/environment/all-possible', () => {
   });
 });
 
+describe('GET /api/environment/status', () => {
+  test('returns the env-files matrix', async () => {
+    const status = { environments: ['local'], applications: [], summary: { total: 0, missing: 0, creatable: 0, incomplete: 0 } };
+    (apps.environmentsStatus as jest.Mock).mockResolvedValue(status);
+    const res = await request(app).get('/api/environment/status');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(status);
+  });
+
+  test('a failure maps to 500 with a generic message', async () => {
+    (apps.environmentsStatus as jest.Mock).mockRejectedValue(new Error('boom'));
+    const res = await request(app).get('/api/environment/status');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Failed to fetch environments status' });
+  });
+});
+
+describe('POST /api/environment/create-missing', () => {
+  test('creates the missing files, passing the narrowing through', async () => {
+    const created = [{ application: 'a', environment: 'prod', path: '/x/prod.env' }];
+    (apps.createMissingEnvFiles as jest.Mock).mockResolvedValue(created);
+
+    const res = await request(app)
+      .post('/api/environment/create-missing')
+      .send({ environment: 'prod', application: 'a' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, created });
+    expect(apps.createMissingEnvFiles).toHaveBeenCalledWith({ environment: 'prod', application: 'a' });
+  });
+
+  test('a failure maps to 500 with a generic message', async () => {
+    (apps.createMissingEnvFiles as jest.Mock).mockRejectedValue(new Error('boom'));
+    const res = await request(app).post('/api/environment/create-missing').send({});
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Failed to create missing env files' });
+  });
+});
+
+describe('POST /api/environment/add', () => {
+  test('adds the environment to every application', async () => {
+    const created = [{ application: 'a', environment: 'staging', path: '/x/staging.env' }];
+    (apps.addEnvironmentToAll as jest.Mock).mockResolvedValue(created);
+
+    const res = await request(app)
+      .post('/api/environment/add')
+      .send({ name: 'staging', baseEnvironment: 'local' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, created });
+    expect(apps.addEnvironmentToAll).toHaveBeenCalledWith('staging', 'local');
+  });
+
+  test('an invalid name maps to 400 with the message', async () => {
+    (apps.addEnvironmentToAll as jest.Mock).mockRejectedValue(new Error('Invalid environment name'));
+    const res = await request(app).post('/api/environment/add').send({ name: '../evil' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Invalid environment name' });
+  });
+
+  test('any other failure maps to 500', async () => {
+    (apps.addEnvironmentToAll as jest.Mock).mockRejectedValue(new Error('disk gone'));
+    const res = await request(app).post('/api/environment/add').send({ name: 'staging' });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'disk gone' });
+  });
+});
+
 describe('/api/context', () => {
   test('returns the directory and its git state', async () => {
     (contextHelper.info as jest.Mock).mockResolvedValue({

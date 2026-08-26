@@ -106,6 +106,12 @@ export const contextApi = {
 
 export const environmentApi = {
   getAllPossible: () => api.get('/api/environment/all-possible'),
+  // The env-files matrix the home page card renders: which .env files each
+  // application has, which are missing, and which have a template to start from
+  getStatus: () => api.get('/api/environment/status'),
+  createMissing: (options = {}) => api.post('/api/environment/create-missing', options),
+  add: (name, baseEnvironment) =>
+    api.post('/api/environment/add', { name, baseEnvironment: baseEnvironment || undefined }),
 };
 
 export const settingsApi = {
