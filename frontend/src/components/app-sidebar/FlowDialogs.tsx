@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,10 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { flowsApi, settingsApi } from '@/services/api';
 import { newFlowTemplate } from '@/lib/templates';
+import { folderUrl } from '@/lib/flows';
 import { useAppState } from '@/context/AppStateContext';
+import { useWorkspace } from '@/workspace/WorkspaceContext';
+import { parseRoute } from '@/workspace/routes';
 
 const joinPath = (parent, name) => (parent ? `${parent}/${name}` : name);
 
@@ -38,8 +40,7 @@ const FLOW_EXTENSION = /\.(md|markdown)$/i;
  * way the file already exists — and is reachable — whatever happens next.
  */
 export function FlowDialogs({ action, onClose }) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { openTab, retargetTabs, closeTabs } = useWorkspace();
   const { refreshTree } = useAppState();
   const [name, setName] = useState('');
   const [error, setError] = useState<any>(null);
@@ -81,7 +82,7 @@ export function FlowDialogs({ action, onClose }) {
 
   const openFlow = (path) => {
     onClose();
-    navigate(`/flows/view?path=${encodeURIComponent(path)}`);
+    openTab(`/flows/view?path=${encodeURIComponent(path)}`);
   };
 
   const handleCreateFlow = async () => {
@@ -168,16 +169,31 @@ export function FlowDialogs({ action, onClose }) {
       await refreshTree();
       onClose();
 
-      // Follow the renamed flow (or the flow open inside the renamed folder)
-      // so the current page does not point at a path that no longer exists
-      if (location.pathname === '/flows/view') {
-        const openPath = new URLSearchParams(location.search).get('path') || '';
-        if (!action.isFolder && openPath.endsWith(`/${from}`)) {
-          navigate(`/flows/view?path=${encodeURIComponent(response.data.path)}`);
-        } else if (action.isFolder && openPath.includes(`/${from}/`)) {
-          navigate(`/flows/view?path=${encodeURIComponent(openPath.replace(`/${from}/`, `/${to}/`))}`);
+      // Follow the rename in every tab showing the flow (or a flow inside
+      // the renamed folder, or the folder's own table), so no tab is left
+      // pointing at a path that no longer exists
+      retargetTabs((route) => {
+        const { pathname, searchParams } = parseRoute(route);
+
+        if (pathname === '/flows/view') {
+          const openPath = searchParams.get('path') || '';
+          if (!action.isFolder && openPath.endsWith(`/${from}`)) {
+            return `/flows/view?path=${encodeURIComponent(response.data.path)}`;
+          }
+          if (action.isFolder && openPath.includes(`/${from}/`)) {
+            return `/flows/view?path=${encodeURIComponent(openPath.replace(`/${from}/`, `/${to}/`))}`;
+          }
         }
-      }
+
+        if (pathname === '/flows/folder' && action.isFolder) {
+          const rel = searchParams.get('path') || '';
+          if (rel === from || rel.startsWith(`${from}/`)) {
+            return folderUrl(`${to}${rel.slice(from.length)}`);
+          }
+        }
+
+        return null;
+      });
     } catch (ex) {
       setError(ex.response?.data?.error || ex.message);
       setBusy(false);
@@ -192,15 +208,24 @@ export function FlowDialogs({ action, onClose }) {
       await refreshTree();
       onClose();
 
-      // If the deleted flow (or an ancestor folder) is currently open,
-      // leave the dead page
-      if (location.pathname === '/flows/view') {
-        const openPath = new URLSearchParams(location.search).get('path') || '';
+      // Any tab showing the deleted flow — or anything from inside a
+      // deleted folder — closes with it
+      closeTabs((route) => {
+        const { pathname, searchParams } = parseRoute(route);
         const suffix = `/${action.targetPath}`;
-        if (openPath.endsWith(suffix) || openPath.includes(`${suffix}/`)) {
-          navigate('/');
+
+        if (pathname === '/flows/view') {
+          const openPath = searchParams.get('path') || '';
+          return openPath.endsWith(suffix) || openPath.includes(`${suffix}/`);
         }
-      }
+
+        if (pathname === '/flows/folder' && action.isFolder) {
+          const rel = searchParams.get('path') || '';
+          return rel === action.targetPath || rel.startsWith(`${action.targetPath}/`);
+        }
+
+        return false;
+      });
     } catch (ex) {
       setError(ex.response?.data?.error || ex.message);
       setBusy(false);
@@ -258,7 +283,7 @@ export function FlowDialogs({ action, onClose }) {
                     <button
                       type="button"
                       className="underline underline-offset-2"
-                      onClick={() => { onClose(); navigate('/settings'); }}
+                      onClick={() => { onClose(); openTab('/settings'); }}
                     >
                       Open settings
                     </button>

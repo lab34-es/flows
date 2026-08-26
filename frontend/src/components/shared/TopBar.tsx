@@ -1,5 +1,4 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { CircleHelp, Globe, Settings } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -14,14 +13,15 @@ import {
 } from '@/components/ui/select';
 import ContextIndicator from '@/components/shared/ContextIndicator';
 import { useAppState } from '@/context/AppStateContext';
+import { useActiveLocation, useWorkspace } from '@/workspace/WorkspaceContext';
 
 /* The bar over every page. On the left, which folder the app is working in
    and its git state; on the right, the three controls that belong to the whole
    app rather than to any one page: which environment the flows run against,
    the help, and the settings. */
 export function TopBar() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { openTab } = useWorkspace();
+  const location = useActiveLocation();
   const { environments, environment, setEnvironment } = useAppState();
 
   const onSettings = location.pathname.startsWith('/settings');
@@ -50,7 +50,7 @@ export function TopBar() {
         <Button
           variant={onHelp ? 'secondary' : 'ghost'}
           size="sm"
-          onClick={() => navigate('/settings/help')}
+          onClick={() => openTab('/settings/help')}
           title="How flows, steps and applications work"
         >
           <CircleHelp /> Help
@@ -59,7 +59,7 @@ export function TopBar() {
         <Button
           variant={onSettings && !onHelp ? 'secondary' : 'ghost'}
           size="sm"
-          onClick={() => navigate('/settings')}
+          onClick={() => openTab('/settings')}
           title="AI, Xray and UI settings"
         >
           <Settings /> Settings

@@ -49,9 +49,9 @@ export default defineConfig([
     },
   },
   {
-    // shadcn-style ui components and context providers intentionally export
-    // helpers (variants, hooks) next to their components
-    files: ['src/components/ui/**/*.tsx', 'src/context/**/*.tsx'],
+    // shadcn-style ui components, context providers and the workspace layer
+    // intentionally export helpers (variants, hooks) next to their components
+    files: ['src/components/ui/**/*.tsx', 'src/context/**/*.tsx', 'src/workspace/**/*.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },

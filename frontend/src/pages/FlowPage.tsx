@@ -17,6 +17,7 @@ import { useAppState } from '@/context/AppStateContext';
 import { useExecutions } from '@/context/ExecutionContext';
 import { useTheme } from '@/context/ThemeContext';
 import { MONACO_FONT_FAMILY } from '@/lib/monaco';
+import { useTabTitle } from '@/workspace/RoutePanel';
 
 const RUN_STATUS_META = {
   starting: { label: 'Starting…', variant: 'info', Icon: Loader2, iconClass: 'animate-spin' },
@@ -47,6 +48,9 @@ export function FlowPage() {
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<any>(null);
+
+  // The document's own title on the tab, once it is known
+  useTabTitle(flowData?.title || null);
   const [tab, setTab] = useState('document');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [savingProperties, setSavingProperties] = useState(false);

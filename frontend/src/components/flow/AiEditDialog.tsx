@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Loader2, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { flowsApi, settingsApi } from '@/services/api';
+import { useWorkspace } from '@/workspace/WorkspaceContext';
 
 const EXAMPLES = [
   'Add a step that checks the response time is under 500ms',
@@ -27,7 +27,7 @@ const EXAMPLES = [
  * user reviews it and hits Save.
  */
 export function AiEditDialog({ open, onOpenChange, content, onApply }) {
-  const navigate = useNavigate();
+  const { openTab } = useWorkspace();
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<any>(null);
@@ -107,7 +107,7 @@ export function AiEditDialog({ open, onOpenChange, content, onApply }) {
               <button
                 type="button"
                 className="underline underline-offset-2"
-                onClick={() => { onOpenChange(false); navigate('/settings'); }}
+                onClick={() => { onOpenChange(false); openTab('/settings'); }}
               >
                 Open settings
               </button>
