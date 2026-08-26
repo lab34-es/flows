@@ -65,7 +65,12 @@ beforeAll(() => {
   writeFlow('checkout/cart.md', {
     title: 'Cart',
     owner: 'ana',
-    priority: 5
+    priority: 5,
+    xray: {
+      testKey: 'BOP-1769',
+      status: 'Done',
+      folder: '/ST/TLOC - 148'
+    }
   }, 1);
 });
 
@@ -88,6 +93,34 @@ describe('bases.defaultDisplayName', () => {
     expect(bases.defaultDisplayName('note.nombre_comun')).toBe('Nombre comun');
     expect(bases.defaultDisplayName('note.zonaUsdaMin')).toBe('Zona Usda Min');
     expect(bases.defaultDisplayName('file.name')).toBe('Name');
+  });
+
+  it('reads a nested property as its whole path', () => {
+    expect(bases.defaultDisplayName('note.xray.testKey')).toBe('Xray Test Key');
+  });
+});
+
+describe('bases.viewSlug / bases.findView', () => {
+  it('slugs a view name', () => {
+    expect(bases.viewSlug('All flows')).toBe('all-flows');
+    expect(bases.viewSlug('more than 80!')).toBe('more-than-80');
+  });
+
+  it('gives two views that slug alike different slugs', () => {
+    const document = bases.normalizeDocument({
+      views: [{ name: 'Smoke tests' }, { name: 'Smoke  tests' }]
+    });
+    expect(document.views.map(view => view.slug)).toEqual(['smoke-tests', 'smoke-tests-2']);
+  });
+
+  it('finds a view by name, by case, or by slug', () => {
+    const { views } = bases.normalizeDocument({ views: [{ name: 'All flows' }, { name: 'Smoke tests' }] });
+
+    expect(bases.findView(views, 'Smoke tests')!.name).toBe('Smoke tests');
+    expect(bases.findView(views, 'smoke TESTS')!.name).toBe('Smoke tests');
+    expect(bases.findView(views, 'smoke-tests')!.name).toBe('Smoke tests');
+    expect(bases.findView(views, '')!.name).toBe('All flows');
+    expect(bases.findView(views, 'nope')).toBeNull();
   });
 });
 
@@ -251,6 +284,66 @@ describe('bases.query', () => {
       'file.name', 'file.path', 'flow.steps',
       'note.owner', 'note.priority', 'note.title'
     ]));
+  });
+
+  it('offers the fields of an embedded frontmatter object as columns', async () => {
+    const result = await bases.query({ folder: 'checkout' });
+
+    expect(result.availableProperties).toEqual(expect.arrayContaining([
+      'note.xray', 'note.xray.testKey', 'note.xray.status', 'note.xray.folder'
+    ]));
+
+    const cart = result.rows[0];
+    expect(cart.values['note.xray.testKey']).toBe('BOP-1769');
+    expect(cart.values['note.xray.status']).toBe('Done');
+    expect(cart.values['note.xray']).toEqual({
+      testKey: 'BOP-1769',
+      status: 'Done',
+      folder: '/ST/TLOC - 148'
+    });
+  });
+
+  it('reads a nested property that is not there as empty', async () => {
+    const result = await bases.query({
+      folder: 'payments',
+      document: { views: [{ type: 'table', name: 'All', order: ['note.xray.testKey'] }] }
+    });
+
+    expect(result.rows.every(row => row.values['note.xray.testKey'] === null)).toBe(true);
+  });
+
+  it('shows only the top-level properties when the view has no order', async () => {
+    const result = await bases.query({
+      folder: 'checkout',
+      document: { views: [{ type: 'table', name: 'Everything' }] }
+    });
+    expect(result.columns.map(column => column.id)).toContain('note.xray');
+    expect(result.columns.map(column => column.id)).not.toContain('note.xray.testKey');
+  });
+
+  it('filters on a nested property', async () => {
+    const result = await bases.query({
+      folder: '',
+      document: { views: [{ type: 'table', name: 'Xrayed', filters: { and: ['xray.status == "Done"'] } }] }
+    });
+
+    expect(result.rows.map(row => row.name)).toEqual(['cart.md']);
+  });
+
+  it('returns the rows in the order the view sorts them', async () => {
+    const result = await bases.query({
+      folder: '',
+      document: {
+        views: [{ type: 'table', name: 'By priority', sort: [{ property: 'priority', direction: 'DESC' }] }]
+      }
+    });
+
+    expect(result.rows.map(row => row.name)).toEqual(['fraud.md', 'cart.md', 'partial.md']);
+  });
+
+  it('picks the view by its slug too', async () => {
+    const document = { views: [{ type: 'table', name: 'First' }, { type: 'list', name: 'Second one' }] };
+    expect((await bases.query({ folder: '', view: 'second-one', document })).view.name).toBe('Second one');
   });
 
   it('resolves display names from the properties map', async () => {

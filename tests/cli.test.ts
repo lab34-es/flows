@@ -10,7 +10,12 @@ jest.mock('../src/helpers/markdownFlows');
 jest.mock('../src/helpers/runner/v1');
 jest.mock('../src/helpers/testRuns', () => ({
   copyFileName: jest.fn(async () => 'a.md'),
-  single: jest.fn(async () => ({ run: { id: 'run-1' }, onFinished: jest.fn(), discard: jest.fn() }))
+  single: jest.fn(async () => ({ run: { id: 'run-1' }, onFinished: jest.fn(), discard: jest.fn() })),
+  runViewFromCli: jest.fn()
+}));
+jest.mock('../src/helpers/bases', () => ({
+  ...jest.requireActual('../src/helpers/bases'),
+  load: jest.fn()
 }));
 jest.mock('../src/helpers/reporter', () => ({ get: jest.fn(() => ({ server: { emit: jest.fn() } })) }));
 jest.mock('../src/helpers/cli', () => ({ logo: jest.fn(), wisdom: jest.fn(), isInteractive: false }));
@@ -27,6 +32,7 @@ import * as flows from '../src/helpers/flows';
 import * as markdownFlows from '../src/helpers/markdownFlows';
 import * as runner from '../src/helpers/runner/v1';
 import * as testRuns from '../src/helpers/testRuns';
+import * as bases from '../src/helpers/bases';
 import * as api from '../src/api';
 
 /** Import cli.ts fresh and let its async main() settle. */
@@ -47,6 +53,14 @@ beforeEach(() => {
   jest.spyOn(fs, 'existsSync').mockReturnValue(true);
   jest.spyOn(fs, 'readFileSync').mockReturnValue('# t\n\n```step\napplication: a\nmethod: b\n```\n' as any);
   (markdownFlows.toFlow as jest.Mock).mockReturnValue({ title: 't', steps: [] });
+  (bases.load as jest.Mock).mockResolvedValue(bases.normalizeDocument({
+    views: [{ type: 'table', name: 'All flows' }, { type: 'table', name: 'Smoke tests' }]
+  }));
+  (testRuns.runViewFromCli as jest.Mock).mockResolvedValue({
+    id: 'run-9',
+    status: 'passed',
+    flows: [{ file: 'a.md', status: 'passed' }, { file: 'b.md', status: 'passed' }]
+  });
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -235,6 +249,78 @@ describe('cli --file', () => {
     await runCli();
 
     expect(errored()).toContain('Error running flow');
+  });
+});
+
+describe('cli --view', () => {
+  test('requires an environment', async () => {
+    ARGV = { view: 'smoke-tests' };
+    await runCli();
+    expect(errored()).toContain('No environment specified');
+    expect(testRuns.runViewFromCli).not.toHaveBeenCalled();
+  });
+
+  test('runs every flow of the view, by slug', async () => {
+    ARGV = { view: 'smoke-tests', env: 'local' };
+    await runCli();
+
+    expect(testRuns.runViewFromCli).toHaveBeenCalledWith({
+      folder: '',
+      view: 'Smoke tests',
+      environment: 'local'
+    });
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  test('scopes the view to a folder', async () => {
+    ARGV = { view: 'All flows', folder: 'payments', env: 'staging' };
+    await runCli();
+
+    expect(testRuns.runViewFromCli).toHaveBeenCalledWith(
+      expect.objectContaining({ folder: 'payments', view: 'All flows' })
+    );
+  });
+
+  test('--view on its own runs the first view of views.yaml', async () => {
+    ARGV = { view: true, env: 'local' };
+    await runCli();
+
+    expect(testRuns.runViewFromCli).toHaveBeenCalledWith(
+      expect.objectContaining({ view: 'All flows' })
+    );
+  });
+
+  test('a view that is not there lists the ones that are', async () => {
+    ARGV = { view: 'nope', env: 'local' };
+    await runCli();
+
+    expect(errored()).toContain('View not found: nope');
+    expect(errored()).toContain('all-flows, smoke-tests');
+    expect(testRuns.runViewFromCli).not.toHaveBeenCalled();
+  });
+
+  test('a failed flow makes the command exit with it', async () => {
+    ARGV = { view: 'smoke-tests', env: 'local' };
+    (testRuns.runViewFromCli as jest.Mock).mockResolvedValue({
+      id: 'run-9',
+      status: 'failed',
+      flows: [{ file: 'a.md', status: 'passed' }, { file: 'b.md', status: 'failed', error: 'boom' }]
+    });
+
+    await runCli();
+
+    expect(logged()).toContain('1 passed, 1 failed');
+    expect(logged()).toContain('failed: b.md — boom');
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  test('a run that cannot start is reported', async () => {
+    ARGV = { view: 'smoke-tests', env: 'local' };
+    (testRuns.runViewFromCli as jest.Mock).mockRejectedValue(new Error('No flows to run'));
+
+    await runCli();
+
+    expect(errored()).toContain('No flows to run');
   });
 });
 

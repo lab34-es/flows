@@ -412,6 +412,9 @@ const processor = async (flow, opts) => {
  * @param {Object} opts
  * @param {String} opts.environment
  * @param {Boolean} opts.cli
+ * @param {Boolean} [opts.exitOnFailure] - false to hand a failure back to the
+ *                   caller instead of exiting the process, which is what a
+ *                   CLI run of several flows needs
  * @param {Function} [opts.onFinished] - Called exactly once when the run is
  *                   over (passed or failed), with the executed flow. This is
  *                   how test runs get recorded, so it runs after the lock is
@@ -475,8 +478,15 @@ const run = async (flow, opts, release) => {
   catch {
     release();
     await settle();
-    // The processor already reported the failure; exit with it, but only
-    // now that the run is on disk
+
+    // A caller running several flows in a row (`--view`) asks to stay alive:
+    // it reads the run summary and decides the exit code once every flow is
+    // in. On its own, a CLI run exits with the failure -- but only now that
+    // the run is on disk
+    if (opts.exitOnFailure === false) {
+      return { execution: flow.execution };
+    }
+
     process.exit(1);
   }
 };

@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import BaseList from '@/components/base/BaseList';
 import BaseTable from '@/components/base/BaseTable';
+import CliCommandDialog from '@/components/base/CliCommandDialog';
 import FilterEditor from '@/components/base/FilterEditor';
 import FormulasDialog from '@/components/base/FormulasDialog';
 import PropertiesMenu from '@/components/base/PropertiesMenu';
@@ -386,6 +387,12 @@ export function FolderPage() {
           >
             <Play /> Run all{environment ? ` · ${environment}` : ''}
           </Button>
+
+          <CliCommandDialog
+            view={activeView}
+            folder={folder}
+            matched={rows.length}
+          />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

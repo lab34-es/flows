@@ -104,9 +104,15 @@ walkthrough.
 ```bash
 lab34-flows --server                                  # web UI on http://localhost:3001
 lab34-flows --file flows/my-flow.md --env production  # run a flow headlessly
+lab34-flows --view smoke-tests --env production       # run every flow a saved view matches
 lab34-flows --capabilities                            # list available applications and methods
 lab34-flows --help
 ```
+
+`--view` runs a whole folder view, evaluated when the command runs — a flow
+added later that its filters keep joins the run on its own, which is what makes
+it worth writing into a pipeline. The **CLI** button of a folder view copies the
+exact command for what is on screen.
 
 Full reference: [Running flows](https://flows.lab34.es/docs/running/) and
 [Command line](https://flows.lab34.es/docs/cli/).
