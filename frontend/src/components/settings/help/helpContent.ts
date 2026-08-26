@@ -166,6 +166,74 @@ your flows travel with the rest of your code.
 `,
   },
   {
+    id: 'env-files',
+    category: 'basics',
+    icon: 'key',
+    title: 'Environment files and first-time setup',
+    summary: 'One env file per application per environment — and how to create twenty of them in one click.',
+    keywords: ['env', 'environment', 'setup', 'onboarding', 'configuration', 'template', 'example',
+      'missing', 'bootstrap', 'first run', 'new tester', 'create missing', 'add environment'],
+    body: `
+Every run loads one env file per application, chosen by the environment
+selected in the sidebar footer:
+
+    applications/<app>/env/<environment>.env
+
+That file holds whatever the application needs to reach that environment —
+\`BASE_URL\`, tokens, database credentials — so env files are **never
+committed**: keep them git-ignored. An environment appears in the selector as
+soon as any application declares it, and a flow can only run against it when
+every application the flow uses has the file.
+
+### The onboarding problem
+
+Those two rules multiply: with twenty applications, running the suite in
+production means twenty \`production.env\` files — and, since none of them is
+in the repository, a newcomer used to have to write every one by hand,
+guessing the variables. The pieces below exist to remove exactly that pain.
+
+### 1. Commit templates: \`.env.example\`
+
+Next to where each env file belongs, commit a template with the variable
+**names** and empty (or safe) values:
+
+    applications/<app>/env/production.env.example
+
+Templates carry no secrets, so they belong in the repository: they are the
+committed contract of what each environment needs. An environment declared
+only by templates already shows up in the selector.
+
+### 2. The Environments card
+
+The home page has an **Environments** card summarising every application
+against every environment — green when its env file exists, red when it is
+missing, amber when the file exists but lacks variables its template
+declares (hover a cell to see which). Every cell links straight to the file
+in the application's Source view; a missing file opens pre-filled from its
+template, ready to create.
+
+Two buttons finish the job:
+
+- **Create missing files from templates** writes every absent \`.env\` from
+  its \`.env.example\` in one click — then you only fill in the secrets.
+- **Add environment to every application** creates \`env/<name>.env\`
+  everywhere at once when you stand up a new environment, copying the
+  variable names (never the values) from an environment you pick.
+
+### The setup ritual, then
+
+1. Clone the team's context repository — flows, applications and templates.
+2. Open the home page and expand **Environments**.
+3. Press **Create missing files from templates**.
+4. Fill in the secrets, guided by the amber cells and their tooltips.
+
+A run that hits a missing env file fails with a message pointing at the
+template and at this card, so a half-configured context tells you how to
+finish the job. What goes *inside* the files — secret masking, the
+PostgreSQL variables — is covered in *Environments and secrets*.
+`,
+  },
+  {
     id: 'properties',
     category: 'basics',
     icon: 'file',
@@ -1058,8 +1126,8 @@ complete YAML automation end to end.
     category: 'integrations',
     icon: 'key',
     title: 'Environments and secrets',
-    summary: 'One env file per application per environment — nothing in the repo.',
-    keywords: ['environment', 'env', 'secrets', 'credentials', 'staging', 'production', 'postgres', 'database', 'template', 'example', 'onboarding'],
+    summary: 'What goes inside the env files: credentials, and the PostgreSQL variables.',
+    keywords: ['environment', 'env', 'secrets', 'credentials', 'staging', 'production', 'postgres', 'database'],
     body: `
 Credentials are never stored in the flows. Each application keeps one env file
 per environment, in its own folder:
@@ -1068,26 +1136,12 @@ per environment, in its own folder:
 
 The environment selected in the sidebar footer is the one every run uses, and
 the *Applications* page lets you edit those files — variable by variable, or as
-raw text — without leaving the UI.
+raw text — without leaving the UI. Values whose key smells like a secret
+(\`TOKEN\`, \`PASSWORD\`, \`SECRET\`…) are shown masked.
 
-### Templates: \`.env.example\`
-
-Because env files hold secrets, they stay out of git — which used to mean a
-new tester had to write every one of them by hand. Commit a template next to
-where each env file belongs instead:
-
-    applications/<app>/env/<environment>.env.example
-
-A template carries the variable **names** (values empty or safe defaults),
-so it is the committed contract of what that environment needs. An
-environment declared only by templates already shows up in the selector.
-
-The **Environments** card on the home page reads all of this: a table with
-one row per application shows which env files exist, which are missing (and
-have a template to start from), and which are missing variables their
-template declares. From there you can open any file directly in the Source
-view, create every missing file from its template in one click, or add a new
-environment to all applications at once.
+Creating the files themselves — the committed \`.env.example\` templates, the
+home page's **Environments** card, and the one-click bootstrap of a fresh
+clone — is covered in *Environment files and first-time setup*, under Basics.
 
 ### PostgreSQL
 
