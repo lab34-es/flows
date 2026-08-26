@@ -14,7 +14,7 @@ import { sensitive } from './reporter';
  *
  * Every run is a folder of the context directory:
  *
- *   test-runs/<date_time>/
+ *   test-runs/<date_time>-<environment>/
  *     run.json                    # the summary the UI lists
  *     <flow relative path>.md     # a copy of each executed flow
  *
@@ -69,16 +69,32 @@ export { runsRoot };
 /* ------------------------------------------------------------- utilities */
 
 /**
- * The folder name of a run: its local start time, filesystem-safe and
- * sortable. 2026-08-20_14-30-05
- * @param {Date} date
+ * An environment name as a run folder can carry it: only the characters
+ * resolveRunDir accepts, so the name never has to be escaped or decoded.
+ * @param {string} environment
  * @returns {string}
  */
-const formatRunId = (date) => {
+const environmentSlug = (environment) => String(environment || '')
+  .trim()
+  .replace(/[^A-Za-z0-9._-]+/g, '-')
+  .replace(/^[-.]+|[-.]+$/g, '');
+
+export { environmentSlug };
+
+/**
+ * The folder name of a run: its local start time followed by the
+ * environment it ran against, filesystem-safe and sortable.
+ * 2026-08-20_14-30-05-staging
+ * @param {Date} date
+ * @param {string} [environment]
+ * @returns {string}
+ */
+const formatRunId = (date, environment?) => {
   const pad = (value) => String(value).padStart(2, '0');
   const day = [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-');
   const time = [pad(date.getHours()), pad(date.getMinutes()), pad(date.getSeconds())].join('-');
-  return `${day}_${time}`;
+  const suffix = environmentSlug(environment);
+  return suffix ? `${day}_${time}-${suffix}` : `${day}_${time}`;
 };
 
 export { formatRunId };
@@ -288,7 +304,7 @@ const create = async ({ trigger, environment, folder, view, flows, io }: {
   fs.mkdirSync(root, { recursive: true });
 
   // Two runs within the same second get suffixed folders
-  const base = formatRunId(new Date());
+  const base = formatRunId(new Date(), environment);
   let id = base;
   let attempt = 2;
   while (fs.existsSync(path.join(root, id))) {

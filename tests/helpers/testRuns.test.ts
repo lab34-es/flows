@@ -71,9 +71,15 @@ describe('testRuns.create', () => {
     expect(summary.flows).toEqual([{ file: 'a.md', title: 'A', status: 'pending' }]);
   });
 
-  test('the id reads as a date and a time', async () => {
+  test('the id reads as a date, a time and the environment', async () => {
     const run = await testRuns.create({ trigger: 'cli', environment: 'local', flows: [] });
-    expect(run.id).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
+    expect(run.id).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-local$/);
+  });
+
+  test('an environment the filesystem could not carry is slugged', async () => {
+    const run = await testRuns.create({ trigger: 'cli', environment: 'pre prod/eu', flows: [] });
+    expect(run.id).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-pre-prod-eu$/);
+    expect(fs.existsSync(path.join(RUNS_DIR, run.id, 'run.json'))).toBe(true);
   });
 
   test('two runs in the same second get different folders', async () => {
