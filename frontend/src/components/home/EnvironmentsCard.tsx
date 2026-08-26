@@ -151,7 +151,10 @@ export function EnvironmentsCard() {
     <Card>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer select-none">
+          {/* Header and content live inside the Collapsible, so the Card's
+              own gap does not separate them: the header pads itself instead,
+              closing the collapsed card cleanly below the description */}
+          <CardHeader className="cursor-pointer select-none pb-4">
             <CardTitle className="flex items-center gap-2 text-base">
               <ChevronDown className={`text-muted-foreground size-4 shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
               <Layers className="text-muted-foreground size-4" /> Environments
