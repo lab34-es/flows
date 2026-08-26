@@ -23,9 +23,9 @@ jobs:
     name: Verify the release commit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -81,21 +81,23 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Deliberately no registry-url: it makes setup-node write an
       # _authToken line into .npmrc, filled with a placeholder when no token
       # is supplied. npm falls back to that placeholder whenever the OIDC
       # exchange fails, so the job would publish a bogus credential and
       # report a confusing 404. The default registry is npmjs.org anyway.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
 
-      # OIDC publishing arrived in npm 11.5.1, which is newer than the npm
-      # bundled with our Node line. Without this, npm never attempts the
-      # exchange and fails looking for a token with ENEEDAUTH.
+      # OIDC publishing needs npm 11.5.1 or newer; without it npm never
+      # attempts the exchange and fails looking for a token with ENEEDAUTH.
+      # Node 24 already bundles an npm well past that, so this is belt and
+      # braces: it keeps the job on the newest npm regardless of what the
+      # runner ships.
       - run: npm install -g npm@latest
 
       - run: npm ci
