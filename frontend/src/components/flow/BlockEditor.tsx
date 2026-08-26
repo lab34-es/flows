@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, Plus } from 'lucide-react';
 
 import Markdown from '@/components/shared/Markdown';
 import BlockSource from '@/components/flow/BlockSource';
@@ -44,6 +44,9 @@ interface BlockEditorProps {
 
 const LIST_LINE = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))([ \t]+)(\[[ xX]\][ \t]+)?/;
 const QUOTE_LINE = /^([ \t]*>[ \t]?)(.*)$/;
+
+/** Drop target meaning "after the last block" — the tail of the document. */
+const END_DROP_ID = '__end__';
 
 /** The Markdown the caret edits: a step block is edited through its YAML. */
 const sourceOf = (block: Block): string => (isStepBlock(block) ? stepBody(block.text) : block.text);
@@ -150,6 +153,10 @@ const RenderedBlock = React.memo(function RenderedBlock({ text }: { text: string
  *   step or a code block it gets selected instead, and the next Backspace (or
  *   Delete) removes it.
  * - Arrows walk from block to block, entering each one's source.
+ *
+ * Blocks also move as a whole, the way notebook cells do: each block shows a
+ * small toolbar on hover — arrows to move it one place up or down, and a grip
+ * to drag it anywhere — and Alt+↑/↓ moves the selected block from the keyboard.
  */
 export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: BlockEditorProps) {
   const [doc, setDoc] = useState(() => parseDocument(value));
@@ -165,6 +172,9 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
     index: number;
     position: { top: number; left: number };
   } | null>(null);
+  // The block being dragged by its grip, and where it would land if dropped
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{ id: string; where: 'above' | 'below' } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -179,6 +189,9 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
   // Read inside the handlers, which must not be re-created on every keystroke
   const docRef = useRef(doc);
   const editingRef = useRef(editingId);
+  // Written directly by the drag handlers: dragover fires before a state
+  // update from dragstart would have made it back into a re-render
+  const dragIdRef = useRef<string | null>(null);
 
   useEffect(() => { docRef.current = doc; }, [doc]);
   useEffect(() => { editingRef.current = editingId; }, [editingId]);
@@ -315,6 +328,54 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
     if (!target) return;
     startEdit(target.id, where === 'end' ? sourceOf(target).length : 0);
   }, [startEdit]);
+
+  /**
+   * Reorder: take the block at `from` out and put it back in at `to`. The
+   * blank lines between blocks stay with their positions rather than with
+   * their blocks, so the move shows up in the file as exactly the lines
+   * that moved — and the file keeps ending the way it ended.
+   */
+  const applyMove = useCallback((blocks: Block[], from: number, to: number) => {
+    const seps = blocks.map((block) => block.sep);
+    const next = [...blocks];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+
+    commit(next.map((block, index) => ({ ...block, sep: seps[index] })));
+    selectBlock(moved.id);
+  }, [commit, selectBlock]);
+
+  /** Move a block one place up or down — the toolbar arrows and Alt+↑/↓. */
+  const moveBlockBy = useCallback((id: string, delta: -1 | 1) => {
+    const { blocks } = dropPending(docRef.current.blocks);
+    const from = blocks.findIndex((block) => block.id === id);
+    const to = from + delta;
+
+    // Nowhere to go: keep the (possibly pruned) blocks as the document
+    if (from < 0 || to < 0 || to >= blocks.length) {
+      commit(blocks);
+      return;
+    }
+    applyMove(blocks, from, to);
+  }, [applyMove, commit, dropPending]);
+
+  /** Put the dragged block above or below another one, or at the very end. */
+  const moveBlockTo = useCallback((sourceId: string, targetId: string, where: 'above' | 'below') => {
+    const { blocks } = dropPending(docRef.current.blocks);
+    const from = blocks.findIndex((block) => block.id === sourceId);
+    const at = targetId === END_DROP_ID
+      ? blocks.length
+      : blocks.findIndex((block) => block.id === targetId);
+
+    let to = targetId !== END_DROP_ID && where === 'below' ? at + 1 : at;
+    if (from < to) to -= 1;
+
+    if (from < 0 || at < 0 || to === from) {
+      commit(blocks);
+      return;
+    }
+    applyMove(blocks, from, to);
+  }, [applyMove, commit, dropPending]);
 
   /**
    * Open an empty paragraph at `index`, and put the caret in it.
@@ -714,6 +775,12 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
       (event.currentTarget as HTMLElement).blur();
       return;
     }
+    // Alt+↑/↓ moves the block itself; the bare arrows move the caret
+    if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && event.altKey) {
+      event.preventDefault();
+      moveBlockBy(blockId, event.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
     if (event.key === 'ArrowUp' && index > 0) {
       event.preventDefault();
       moveTo(index - 1, 'end');
@@ -723,7 +790,64 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
       event.preventDefault();
       moveTo(index + 1, 'start');
     }
-  }, [insertBlockAt, moveTo, removeBlockAt, startEdit]);
+  }, [insertBlockAt, moveBlockBy, moveTo, removeBlockAt, startEdit]);
+
+  /* ----------------------------- drag & drop ----------------------------- */
+
+  const handleDragStart = useCallback((event: React.DragEvent<HTMLElement>, id: string) => {
+    event.dataTransfer.effectAllowed = 'move';
+    // Firefox will not start a drag that carries no data
+    event.dataTransfer.setData('text/plain', '');
+
+    // The whole block is what travels with the pointer, not just the grip
+    const wrapper = event.currentTarget.closest('[data-block-id]');
+    if (wrapper instanceof HTMLElement) event.dataTransfer.setDragImage(wrapper, 24, 16);
+
+    dragIdRef.current = id;
+    setDragId(id);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    dragIdRef.current = null;
+    setDragId(null);
+    setDropAt(null);
+  }, []);
+
+  /** Above or below `id`, from where the pointer sits over it. */
+  const dropSide = (event: React.DragEvent<HTMLElement>, id: string): 'above' | 'below' => {
+    if (id === END_DROP_ID) return 'below';
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY >= rect.top + rect.height / 2 ? 'below' : 'above';
+  };
+
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLElement>, id: string) => {
+    if (!dragIdRef.current) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    if (id === dragIdRef.current) {
+      setDropAt(null);
+      return;
+    }
+    const where = dropSide(event, id);
+    setDropAt((current) =>
+      current && current.id === id && current.where === where ? current : { id, where }
+    );
+  }, []);
+
+  const handleDrop = useCallback((event: React.DragEvent<HTMLElement>, id: string) => {
+    const source = dragIdRef.current;
+    if (!source) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const where = dropSide(event, id);
+    dragIdRef.current = null;
+    setDragId(null);
+    setDropAt(null);
+
+    if (id !== source) moveBlockTo(source, id, where);
+  }, [moveBlockTo]);
 
   /* ------------------------------ rendering ------------------------------ */
 
@@ -753,13 +877,60 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
    */
   const renderGap = (index: number) => (
     <div
-      className="flow-block-gap"
+      // While a block is being dragged the gaps step out of the way, so the
+      // blocks under them are what the pointer is over
+      className={cn('flow-block-gap', dragId && 'flow-block-gap-inert')}
       title="Write here"
       // Taking the mousedown keeps the caret where it is until the new block
       // has one of its own — a blur in between would close the block first
       onMouseDown={(event) => { event.preventDefault(); insertBlockAt(index); }}
     >
       <Plus className="flow-block-gap-hint" aria-hidden="true" />
+    </div>
+  );
+
+  /**
+   * The notebook-cell toolbar at the top-right of a hovered block: move it
+   * one place up or down, or take the grip and drag it anywhere. The arrows
+   * take the mousedown so the caret stays where it is; the grip cannot, or
+   * the browser would never start the drag.
+   */
+  const renderTools = (block: Block, index: number) => (
+    <div className="flow-block-tools" onClick={(event) => event.stopPropagation()}>
+      <div
+        role="button"
+        aria-label="Drag to move this block"
+        title="Drag to move"
+        draggable
+        className="flow-block-tool flow-block-drag"
+        onMouseDown={(event) => event.stopPropagation()}
+        onDragStart={(event) => handleDragStart(event, block.id)}
+        onDragEnd={handleDragEnd}
+      >
+        <GripVertical className="size-3.5" aria-hidden="true" />
+      </div>
+      <button
+        type="button"
+        aria-label="Move this block up"
+        title="Move up (Alt+↑)"
+        className="flow-block-tool"
+        disabled={index === 0}
+        onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
+        onClick={(event) => { event.stopPropagation(); moveBlockBy(block.id, -1); }}
+      >
+        <ArrowUp className="size-3.5" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-label="Move this block down"
+        title="Move down (Alt+↓)"
+        className="flow-block-tool"
+        disabled={index === doc.blocks.length - 1}
+        onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
+        onClick={(event) => { event.stopPropagation(); moveBlockBy(block.id, 1); }}
+      >
+        <ArrowDown className="size-3.5" aria-hidden="true" />
+      </button>
     </div>
   );
 
@@ -835,8 +1006,17 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
               data-block-id={block.id}
               data-block-kind={kind}
               tabIndex={editing ? -1 : 0}
-              className={cn('flow-block', editing && 'flow-block-editing', selected && 'flow-block-selected')}
+              className={cn(
+                'flow-block',
+                editing && 'flow-block-editing',
+                selected && 'flow-block-selected',
+                dragId === block.id && 'flow-block-dragging',
+                dropAt?.id === block.id &&
+                  (dropAt.where === 'above' ? 'flow-block-drop-above' : 'flow-block-drop-below')
+              )}
               {...extra}
+              onDragOver={(event) => handleDragOver(event, block.id)}
+              onDrop={(event) => handleDrop(event, block.id)}
               onKeyDown={(event) => handleBlockKeyDown(event, index, block.id)}
               onFocus={(event) => {
                 // Focus on the block itself — rather than on the textarea
@@ -847,14 +1027,21 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
                 if (isBlockElement(event.target, block.id)) setSelectedId(null);
               }}
             >
+              {renderTools(block, index)}
               {content}
             </div>
           </React.Fragment>
         );
       })}
 
-      {/* Room to keep writing under the document, the way a page has a bottom */}
-      <div className="flow-block-tail" onMouseDown={(event) => { event.preventDefault(); appendBlock(); }}>
+      {/* Room to keep writing under the document, the way a page has a bottom
+          — and the place to drop a block being dragged past the last one */}
+      <div
+        className={cn('flow-block-tail', dropAt?.id === END_DROP_ID && 'flow-block-tail-drop')}
+        onMouseDown={(event) => { event.preventDefault(); appendBlock(); }}
+        onDragOver={(event) => handleDragOver(event, END_DROP_ID)}
+        onDrop={(event) => handleDrop(event, END_DROP_ID)}
+      >
         {!doc.blocks.length && (
           <p className="text-muted-foreground text-sm">
             This flow is empty. Click here and start writing — press <kbd>/</kbd> for headings,

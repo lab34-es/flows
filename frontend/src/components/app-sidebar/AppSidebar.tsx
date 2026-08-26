@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AppWindow,
   ArrowUpRight,
@@ -44,13 +43,14 @@ import { useAppState } from '@/context/AppStateContext';
 import { flowsApi } from '@/services/api';
 import { folderUrl } from '@/lib/flows';
 import { dotStatus, runLabel, runScore, testRunUrl } from '@/lib/testRuns';
+import { useActiveLocation, useWorkspace } from '@/workspace/WorkspaceContext';
 
 // The sidebar shows the freshest runs; the Test runs page has them all
 const SIDEBAR_RUNS = 10;
 
 export function AppSidebar() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { openTab } = useWorkspace();
+  const location = useActiveLocation();
   const { tree, treeLoading, refreshTree, applications, applicationsLoading, testRuns } = useAppState();
 
   const [action, setAction] = useState<any>(null);
@@ -100,7 +100,7 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" onClick={() => navigate('/')}>
+            <SidebarMenuButton size="lg" onClick={() => openTab('/')}>
               {/* The tool's own mark: ink panel, bone stroke, brand radius. */}
               <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-md">
                 <Workflow className="size-4" />
@@ -155,7 +155,7 @@ export function AppSidebar() {
             asChild
             className="hover:text-sidebar-accent-foreground cursor-pointer"
           >
-            <button type="button" onClick={() => navigate(folderUrl(''))} title="Open all flows as a table">
+            <button type="button" onClick={() => openTab(folderUrl(''))} title="Open all flows as a table">
               Flows
             </button>
           </SidebarGroupLabel>
@@ -202,7 +202,7 @@ export function AppSidebar() {
             asChild
             className="hover:text-sidebar-accent-foreground cursor-pointer"
           >
-            <button type="button" onClick={() => navigate('/test-runs')} title="Open all test runs">
+            <button type="button" onClick={() => openTab('/test-runs')} title="Open all test runs">
               Test runs
             </button>
           </SidebarGroupLabel>
@@ -218,11 +218,18 @@ export function AppSidebar() {
                   <SidebarMenuItem key={run.id}>
                     <SidebarMenuButton
                       isActive={location.pathname.startsWith(testRunUrl(run.id))}
-                      onClick={() => navigate(testRunUrl(run.id))}
+                      onClick={() => openTab(testRunUrl(run.id))}
                       title={`${runLabel(run)} · ${run.environment}${run.view ? ` · ${run.view}` : ''}`}
+                      className="pr-9"
                     >
                       <StatusDot status={dotStatus(run.status)} />
-                      <span>{runLabel(run)}</span>
+                      <span className="shrink-0 whitespace-nowrap">{runLabel(run)}</span>
+                      {/* The environment the run went against, as its folder name carries it */}
+                      {run.environment && (
+                        <span className="text-muted-foreground font-mono text-xs">
+                          {run.environment}
+                        </span>
+                      )}
                     </SidebarMenuButton>
                     <SidebarMenuBadge>{runScore(run)}</SidebarMenuBadge>
                   </SidebarMenuItem>
@@ -269,7 +276,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={app.slug}>
                     <SidebarMenuButton
                       isActive={location.pathname === `/applications/${app.slug}`}
-                      onClick={() => navigate(`/applications/${app.slug}`)}
+                      onClick={() => openTab(`/applications/${app.slug}`)}
                       title={app.description || app.name}
                     >
                       <AppWindow className="text-muted-foreground" />

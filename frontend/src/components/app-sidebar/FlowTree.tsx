@@ -1,5 +1,4 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
   FileText,
@@ -35,17 +34,18 @@ import {
 import StatusDot from '@/components/shared/StatusDot';
 import { useExecutions } from '@/context/ExecutionContext';
 import { flowUrl, folderUrl } from '@/lib/flows';
+import { useActiveLocation, useWorkspace } from '@/workspace/WorkspaceContext';
 import { cn } from '@/lib/utils';
 
 function FolderNode({ node, onAction, children }) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { openTab } = useWorkspace();
+  const location = useActiveLocation();
   // folders start collapsed: the tree opens as a short list of top-level
   // folders instead of every flow in the repository at once
   const [open, setOpen] = React.useState(false);
 
   const isActive = location.pathname === '/flows/folder' &&
-    new URLSearchParams(location.search).get('path') === node.relativePath;
+    location.searchParams.get('path') === node.relativePath;
 
   return (
     <SidebarMenuItem>
@@ -65,7 +65,7 @@ function FolderNode({ node, onAction, children }) {
 
           <SidebarMenuButton
             isActive={isActive}
-            onClick={() => navigate(folderUrl(node.relativePath))}
+            onClick={() => openTab(folderUrl(node.relativePath))}
             title={`Open ${node.relativePath} as a table`}
           >
             <Folder className="text-muted-foreground" />
@@ -80,7 +80,7 @@ function FolderNode({ node, onAction, children }) {
             </SidebarMenuAction>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start">
-            <DropdownMenuItem onClick={() => navigate(folderUrl(node.relativePath))}>
+            <DropdownMenuItem onClick={() => openTab(folderUrl(node.relativePath))}>
               <Table2 /> Open as table
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -115,13 +115,13 @@ function FolderNode({ node, onAction, children }) {
 }
 
 function FlowNode({ node, onAction }) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { openTab } = useWorkspace();
+  const location = useActiveLocation();
   const { statusFor } = useExecutions();
 
   const url = flowUrl(node);
   const isActive = location.pathname === '/flows/view' &&
-    new URLSearchParams(location.search).get('path') === node.path;
+    location.searchParams.get('path') === node.path;
 
   const status = statusFor(node.path);
 
@@ -129,7 +129,7 @@ function FlowNode({ node, onAction }) {
     <SidebarMenuItem>
       <SidebarMenuButton
         isActive={isActive}
-        onClick={() => navigate(url)}
+        onClick={() => openTab(url)}
         title={node.relativePath}
       >
         <StatusDot status={status} />

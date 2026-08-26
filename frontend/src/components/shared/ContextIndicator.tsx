@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { ArrowDown, ArrowUp, FolderOpen, GitBranch, RefreshCw } from 'lucide-react';
+import { FolderOpen, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import BranchMenu from '@/components/shared/BranchMenu';
 import GitSyncDialog from '@/components/shared/GitSyncDialog';
 import { useAppState } from '@/context/AppStateContext';
-import { trackingLabel } from '@/lib/git';
 
 /**
  * Which folder the app is working in -- and, when that folder is a git
- * repository, which branch and how dirty it is. The sync button next to the
- * name opens the git panel.
+ * repository, which branch and how dirty it is. The branch is a menu of its
+ * own (see BranchMenu); the sync button next to it opens the git panel.
  *
  * Everything the app reads and writes lives under this one directory, so it
  * belongs on screen at all times rather than behind a settings page.
@@ -33,25 +33,7 @@ export function ContextIndicator() {
         {contextInfo?.path || 'lab34/flows'}
       </span>
 
-      {git && (
-        <span
-          className="text-muted-foreground ml-1 hidden items-center gap-1 font-mono text-xs sm:inline-flex"
-          title={trackingLabel(git)}
-        >
-          <GitBranch className="size-3" />
-          <span className="max-w-40 truncate">{git.branch}</span>
-          {git.behind > 0 && (
-            <span className="text-info inline-flex items-center">
-              <ArrowDown className="size-3" />{git.behind}
-            </span>
-          )}
-          {git.ahead > 0 && (
-            <span className="text-warning inline-flex items-center">
-              <ArrowUp className="size-3" />{git.ahead}
-            </span>
-          )}
-        </span>
-      )}
+      <BranchMenu />
 
       <Button
         size="icon-sm"
