@@ -55,7 +55,7 @@ export const query = (ctx, query: string, values?: any[]): Promise<pg.QueryResul
     
     if (ctx.env.PGPASSWORD) {
       dbConfig.password = ctx.env.PGPASSWORD;
-      debug('Authentication: Database password: %s', ctx.env.PGPASSWORD);
+      debug('Authentication: Database password: [REDACTED]');
     }
     
     if (ctx.env.PGHOST) {
