@@ -10,14 +10,18 @@ import * as applications from './helpers/applications';
  * 
  * Usage:
  *   node cli.js --file <path-to-flow-file> --env <environment> [--debug] [--help]
+ *   node cli.js --view <view> --env <environment> [--folder <folder>]
  *   node cli.js --capabilities
  *   node cli.js --server
  *
  * Options:
  *   --file         Path to the flow definition file (.md)
+ *   --view         Name (or slug) of a view of views.yaml: every flow it
+ *                  matches runs, in one test run
+ *   --folder       Folder of the flows tree the view is scoped to
  *   --context      Context directory
  *   --capabilities List all available capabilities from the contents of ~/flows
- *   --env          Environment to run the flow in (required for --file)
+ *   --env          Environment to run the flow in (required for --file/--view)
  *   --server       Start the web server with built frontend and API
  *   --debug        Print debug information including environment variables
  *   --help         Show this help message
@@ -27,6 +31,7 @@ import * as applications from './helpers/applications';
  *
  * Examples:
  *   node cli.js --file flows/my-flow.md --env production
+ *   node cli.js --view smoke-tests --env production
  *   node cli.js --server
  */
 
@@ -46,6 +51,7 @@ import * as cli from './helpers/cli';
 import * as reporter from './helpers/reporter';
 import * as flows from './helpers/flows';
 import * as testRuns from './helpers/testRuns';
+import * as bases from './helpers/bases';
 
 /**
  * Print error message and exit with error code
@@ -66,14 +72,20 @@ Lab34 Flows CLI Tool v${packageJson.version}
 
 Usage:
   lab34-flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
+  lab34-flows --view <view> --env <environment> [--folder <folder>]
   lab34-flows --server [--context=<context>]
 
 Options:
-  --file          Path to the flow definition file (.md markdown flow) (required if not using --server)
+  --file          Path to the flow definition file (.md markdown flow) (required if not using --view or --server)
+  --view          Name (or slug) of a view of views.yaml. Every flow the view
+                  matches runs, in the order the view sorts them, as one test
+                  run. The view is evaluated now, so flows added since the
+                  command was written down are picked up too
+  --folder        Folder of the flows tree the view is scoped to (default: all flows)
   --capabilities  List all available capabilities from the contents of ~/flows
   --server        Start the web server with built frontend and API
-  --env           Environment to run the flow in (required for --file)
-  --context       Context directory for server mode (optional)
+  --env           Environment to run the flow in (required for --file and --view)
+  --context       Context directory (optional)
   --debug         Print debug information including environment variables
   --help          Show this help message
 
@@ -82,6 +94,8 @@ model and API keys are configured there, under Settings.
 
 Examples:
   lab34-flows --context my/context/folder --file flows/my-flow.md --env production
+  lab34-flows --context my/context/folder --view all-flows --env production
+  lab34-flows --context my/context/folder --view smoke --folder payments --env staging
   lab34-flows --context my/context/folder --capabilities
   lab34-flows --server --context=myproject
   `);
@@ -136,6 +150,9 @@ function printDebugInfo() {
 function parseArguments() {
   return {
     file: argv.file || null,
+    // `--view` on its own means "the first view of views.yaml"
+    view: argv.view === undefined ? null : (typeof argv.view === 'string' ? argv.view : ''),
+    folder: typeof argv.folder === 'string' ? argv.folder : '',
     ai: argv.ai || null, // Removed: kept only to show a helpful error
     capabilities: argv.capabilities || false,
     server: argv.server || false,
@@ -217,6 +234,57 @@ async function runFlow(flowConfig, options) {
 }
 
 /**
+ * Run every flow a saved view matches, as one test run.
+ *
+ * The view is evaluated here and now: what runs is whatever matches its
+ * filters today, which is why a command written down in a pipeline keeps
+ * picking up flows added afterwards.
+ *
+ * @param {Object} options - { view, folder, env, debug }
+ */
+async function runView({ view, folder, env }) {
+  // Keeps the applications' editor support pointing at this installation
+  await bootstrap.ensureTypeScriptConfig();
+
+  cli.logo(packageJson.version);
+  cli.wisdom();
+
+  const document = await bases.load();
+  const target = bases.findView(document.views, view);
+
+  if (!target) {
+    exitWithError(
+      `View not found: ${view}. ${document.views.length} available: ` +
+      document.views.map(candidate => candidate.slug).join(', ')
+    );
+    return;
+  }
+
+  console.log(`View: ${target.name} (${target.slug})`);
+  console.log(`Folder: ${folder || 'every flow'}`);
+  console.log(`Environment: ${env}`);
+
+  let summary;
+  try {
+    summary = await testRuns.runViewFromCli({ folder, view: target.name, environment: env });
+  }
+  catch (error) {
+    exitWithError(error.message);
+    return;
+  }
+
+  const passed = summary.flows.filter(flow => flow.status === 'passed');
+  const failed = summary.flows.filter(flow => flow.status !== 'passed');
+
+  console.log(`\n${'═'.repeat(60)}`);
+  console.log(`${target.name}: ${passed.length} passed, ${failed.length} failed`);
+  failed.forEach(flow => console.log(`  failed: ${flow.file}${flow.error ? ` — ${flow.error}` : ''}`));
+  console.log(`Recorded as test run ${summary.id}`);
+
+  process.exit(summary.status === 'passed' ? 0 : 1);
+}
+
+/**
  * Start the web server with built frontend and API
  *
  * The UI is built ahead of time and shipped inside the package, so this only
@@ -269,6 +337,14 @@ async function main() {
   } else if (args.server) {
     // Start the web server
     await startServer();
+  } else if (args.view !== null) {
+    // Run a whole view: every flow its filters match
+    if (!args.env) {
+      exitWithError('No environment specified. Use --env <environment>');
+      return;
+    }
+
+    await runView({ view: args.view, folder: args.folder, env: args.env });
   } else if (args.file) {
     // For file mode, environment is required
     if (!args.env) {
@@ -309,7 +385,7 @@ async function main() {
     // Run the flow
     await runFlow(flowConfig, options);
   } else {
-    exitWithError('No flow source specified. Use either --file <path-to-flow-file> or --server');
+    exitWithError('No flow source specified. Use --file <path-to-flow-file>, --view <view> or --server');
   }
 }
 

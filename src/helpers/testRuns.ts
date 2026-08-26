@@ -512,12 +512,8 @@ export { single };
 /* --------------------------------------------------------- folder runs */
 
 /**
- * Run a set of flows as one test run: what "Run all" on a folder view does.
- *
- * The flows are executed one at a time -- the runner cannot do two at once --
- * in the order given. The promise resolves as soon as the run exists; the
- * execution itself continues in the background and lands in run.json (and on
- * the socket) as it goes.
+ * Everything a folder run needs before it can start: the flows to execute,
+ * in the order they will run, and the name of the view that chose them.
  *
  * @param {Object} options
  * @param {Array<string>} [options.files] - Relative paths inside the flows
@@ -526,15 +522,13 @@ export { single };
  * @param {string} [options.folder] - Folder the run was started from
  * @param {string} [options.view] - Name of the view whose filters apply
  * @param {string} options.environment
- * @param {Object} [options.io] - Socket.IO server
- * @returns {Promise<TestRunSummary>}
+ * @returns {Promise<{targets: Array<Object>, view: string|undefined}>}
  */
-const startFolderRun = async ({ files, folder = '', view, environment, io }: {
+const prepareFolderRun = async ({ files, folder = '', view, environment }: {
   files?: string[];
   folder?: string;
   view?: string;
   environment: string;
-  io?: any;
 }) => {
   if (!environment) {
     throw new Error('Invalid request: "environment" is required');
@@ -585,59 +579,111 @@ const startFolderRun = async ({ files, folder = '', view, environment, io }: {
     });
   }
 
+  return { targets, view: viewName };
+};
+
+export { prepareFolderRun };
+
+/**
+ * Execute the flows of a run, one at a time -- the runner cannot do two at
+ * once -- and close the run when the last one is in.
+ *
+ * @param {TestRun} run
+ * @param {Array<Object>} targets - [{ file, content, title }]
+ * @param {Object} options
+ * @param {string} options.environment
+ * @param {boolean} [options.cli] - Report on the terminal rather than the socket
+ * @returns {Promise<void>}
+ */
+const executeFolderRun = async (run: TestRun, targets, { environment, cli = false }: {
+  environment: string;
+  cli?: boolean;
+}) => {
+  for (const target of targets) {
+    flowStarted(run, target.file);
+
+    if (cli) {
+      console.log(`\n${'─'.repeat(60)}\n${target.title} — ${target.file}\n${'─'.repeat(60)}`);
+    }
+
+    let flowAsJson;
+    try {
+      flowAsJson = markdownFlows.toFlow(target.content);
+    }
+    catch (ex) {
+      flowFailed(run, target.file, { content: target.content, error: ex });
+      continue;
+    }
+
+    const flowRunner = require(`./runner/v${flowAsJson.version || '1'}`);
+
+    let resolveFinished;
+    const finished = new Promise<void>(resolve => { resolveFinished = resolve; });
+
+    const started = await flowRunner.run(flowAsJson, {
+      environment,
+      cli,
+      reporter: { cli, server: run.io },
+      // One failing flow must not take the rest of the run with it: the
+      // caller reads the summary and decides what the failure means
+      exitOnFailure: false,
+      // The runner calls this after the lock is released, so the next
+      // flow of the loop can start
+      onFinished: async (flow) => {
+        try {
+          flowFinished(run, target.file, { content: target.content, flow });
+        }
+        finally {
+          resolveFinished();
+        }
+      }
+    });
+
+    // Someone else grabbed the runner between two flows
+    if (!started) {
+      flowFailed(run, target.file, { content: target.content, error: new Error('Another flow was already running') });
+      continue;
+    }
+
+    await finished;
+  }
+
+  finalize(run);
+};
+
+export { executeFolderRun };
+
+/**
+ * Run a set of flows as one test run: what "Run all" on a folder view does.
+ *
+ * The promise resolves as soon as the run exists; the execution itself
+ * continues in the background and lands in run.json (and on the socket) as it
+ * goes.
+ *
+ * @param {Object} options - As prepareFolderRun takes them, plus:
+ * @param {Object} [options.io] - Socket.IO server
+ * @returns {Promise<TestRunSummary>}
+ */
+const startFolderRun = async ({ files, folder = '', view, environment, io }: {
+  files?: string[];
+  folder?: string;
+  view?: string;
+  environment: string;
+  io?: any;
+}) => {
+  const { targets, view: viewName } = await prepareFolderRun({ files, folder, view, environment });
+
   const runner = require('./runner/v1');
   if (runner.isRunning()) {
     throw new Error('Another flow is already running. Wait for it to finish.');
   }
 
+  const apps = require('./applications');
   await apps.loadAll();
 
   const run = await create({ trigger: 'folder', environment, folder, view: viewName, flows: targets, io });
 
-  void (async () => {
-    for (const target of targets) {
-      flowStarted(run, target.file);
-
-      let flowAsJson;
-      try {
-        flowAsJson = markdownFlows.toFlow(target.content);
-      }
-      catch (ex) {
-        flowFailed(run, target.file, { content: target.content, error: ex });
-        continue;
-      }
-
-      const flowRunner = require(`./runner/v${flowAsJson.version || '1'}`);
-
-      let resolveFinished;
-      const finished = new Promise<void>(resolve => { resolveFinished = resolve; });
-
-      const started = await flowRunner.run(flowAsJson, {
-        environment,
-        reporter: { cli: false, server: io },
-        // The runner calls this after the lock is released, so the next
-        // flow of the loop can start
-        onFinished: async (flow) => {
-          try {
-            flowFinished(run, target.file, { content: target.content, flow });
-          }
-          finally {
-            resolveFinished();
-          }
-        }
-      });
-
-      // Someone else grabbed the runner between two flows
-      if (!started) {
-        flowFailed(run, target.file, { content: target.content, error: new Error('Another flow was already running') });
-        continue;
-      }
-
-      await finished;
-    }
-
-    finalize(run);
-  })().catch(ex => {
+  void executeFolderRun(run, targets, { environment }).catch(ex => {
     console.error('Test run failed:', ex);
     finalize(run);
   });
@@ -646,6 +692,43 @@ const startFolderRun = async ({ files, folder = '', view, environment, io }: {
 };
 
 export { startFolderRun };
+
+/**
+ * Run every flow a view matches, from the CLI, and wait for the last one.
+ *
+ * The view is evaluated when the run starts rather than when the command was
+ * written down, so a flow added afterwards is picked up on its own -- that is
+ * the whole point of running a view instead of a list of files.
+ *
+ * @param {Object} options
+ * @param {string} [options.folder] - Folder of the flows tree to scope the view to
+ * @param {string} [options.view] - Name (or slug) of the view; the first one by default
+ * @param {string} options.environment
+ * @returns {Promise<TestRunSummary>} The finished run
+ */
+const runViewFromCli = async ({ folder = '', view, environment }: {
+  folder?: string;
+  view?: string;
+  environment: string;
+}) => {
+  const { targets, view: viewName } = await prepareFolderRun({ folder, view, environment });
+
+  const runner = require('./runner/v1');
+  if (runner.isRunning()) {
+    throw new Error('Another flow is already running. Wait for it to finish.');
+  }
+
+  const apps = require('./applications');
+  await apps.loadAll();
+
+  const run = await create({ trigger: 'cli', environment, folder, view: viewName, flows: targets });
+
+  await executeFolderRun(run, targets, { environment, cli: true });
+
+  return run.summary;
+};
+
+export { runViewFromCli };
 
 /* --------------------------------------------------------------- reading */
 

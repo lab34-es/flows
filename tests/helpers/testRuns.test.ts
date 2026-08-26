@@ -16,8 +16,19 @@ jest.mock('../../src/helpers/paths', () => ({
   findFiles: () => []
 }));
 
+// What a folder/CLI run reaches for lazily: the applications it needs
+// loaded, the view that picks the flows, and the runner that executes them.
+jest.mock('../../src/helpers/applications', () => ({
+  allPossibleEnvironments: jest.fn(async () => ['local', 'staging']),
+  loadAll: jest.fn(async () => {})
+}));
+jest.mock('../../src/helpers/bases', () => ({ query: jest.fn() }));
+jest.mock('../../src/helpers/runner/v1', () => ({ run: jest.fn(), isRunning: jest.fn(() => false) }));
+
 import * as testRuns from '../../src/helpers/testRuns';
 import * as markdownFlows from '../../src/helpers/markdownFlows';
+import * as bases from '../../src/helpers/bases';
+import * as runner from '../../src/helpers/runner/v1';
 
 const CONTEXT = mockContext;
 const RUNS_DIR = path.join(CONTEXT, 'test-runs');
@@ -212,6 +223,90 @@ describe('testRuns recording', () => {
     expect(summary.trigger).toBe('cli');
     expect(summary.status).toBe('passed');
     expect(fs.existsSync(path.join(RUNS_DIR, record.run.id, 'a.md'))).toBe(true);
+  });
+});
+
+describe('testRuns.runViewFromCli', () => {
+  const FLOWS_DIR = path.join(CONTEXT, 'flows');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    fs.mkdirSync(path.join(FLOWS_DIR, 'payments'), { recursive: true });
+    fs.writeFileSync(path.join(FLOWS_DIR, 'payments', 'card.md'), MARKDOWN, 'utf8');
+    fs.writeFileSync(path.join(FLOWS_DIR, 'payments', 'cash.md'), MARKDOWN, 'utf8');
+
+    (bases.query as jest.Mock).mockResolvedValue({
+      view: { name: 'Smoke tests' },
+      rows: [{ relativePath: 'payments/card.md' }, { relativePath: 'payments/cash.md' }]
+    });
+
+    // Every flow passes unless a test says otherwise
+    (runner.run as jest.Mock).mockImplementation(async (flow, options) => {
+      await options.onFinished(executedFlow());
+      return { execution: { status: 'passed' } };
+    });
+  });
+
+  afterEach(() => {
+    fs.rmSync(FLOWS_DIR, { recursive: true, force: true });
+  });
+
+  test('runs every flow the view matches and waits for the last one', async () => {
+    const summary = await testRuns.runViewFromCli({ folder: 'payments', view: 'Smoke tests', environment: 'local' });
+
+    expect(bases.query).toHaveBeenCalledWith({ folder: 'payments', view: 'Smoke tests' });
+    expect(runner.run).toHaveBeenCalledTimes(2);
+    expect(summary.trigger).toBe('cli');
+    expect(summary.view).toBe('Smoke tests');
+    expect(summary.status).toBe('passed');
+    expect(summary.flows.map(flow => flow.file)).toEqual(['payments/card.md', 'payments/cash.md']);
+
+    // The run is closed on disk, not only in memory
+    const stored = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, summary.id, 'run.json'), 'utf8'));
+    expect(stored.status).toBe('passed');
+    expect(fs.existsSync(path.join(RUNS_DIR, summary.id, 'payments', 'card.md'))).toBe(true);
+  });
+
+  test('reports on the terminal and never exits on a failing flow', async () => {
+    await testRuns.runViewFromCli({ view: 'Smoke tests', environment: 'local' });
+
+    expect(runner.run).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ cli: true, exitOnFailure: false, environment: 'local' })
+    );
+  });
+
+  test('a failing flow does not stop the ones after it', async () => {
+    (runner.run as jest.Mock).mockImplementationOnce(async (flow, options) => {
+      await options.onFinished(executedFlow('failed'));
+      return { execution: { status: 'error' } };
+    });
+
+    const summary = await testRuns.runViewFromCli({ view: 'Smoke tests', environment: 'local' });
+
+    expect(runner.run).toHaveBeenCalledTimes(2);
+    expect(summary.status).toBe('failed');
+    expect(summary.flows.map(flow => flow.status)).toEqual(['failed', 'passed']);
+  });
+
+  test('refuses an environment that does not exist', async () => {
+    await expect(testRuns.runViewFromCli({ view: 'Smoke tests', environment: 'nope' }))
+      .rejects.toThrow('Invalid environment: nope');
+  });
+
+  test('refuses a view that matches no flow', async () => {
+    (bases.query as jest.Mock).mockResolvedValue({ view: { name: 'Smoke tests' }, rows: [] });
+
+    await expect(testRuns.runViewFromCli({ view: 'Smoke tests', environment: 'local' }))
+      .rejects.toThrow('No flows to run');
+  });
+
+  test('waits rather than crossing another run', async () => {
+    (runner.isRunning as jest.Mock).mockReturnValue(true);
+
+    await expect(testRuns.runViewFromCli({ view: 'Smoke tests', environment: 'local' }))
+      .rejects.toThrow('Another flow is already running');
   });
 });
 

@@ -16,6 +16,8 @@ export interface ViewSort {
 export interface View {
   type: 'table' | 'list';
   name: string;
+  /** The name as the CLI's --view takes it: lowercase, dash separated */
+  slug: string;
   filters: any;
   order: string[];
   sort: ViewSort[];
@@ -85,6 +87,10 @@ const FILE_PROPERTIES = ['file.name', 'file.basename', 'file.path', 'file.folder
 const FLOW_PROPERTIES = ['flow.title', 'flow.description', 'flow.steps',
   'flow.hasErrors'];
 
+// How deep the fields of an embedded frontmatter object are offered as
+// columns of their own
+const MAX_PROPERTY_DEPTH = 4;
+
 const DEFAULT_VIEW = {
   type: 'table',
   name: 'All flows',
@@ -108,20 +114,65 @@ const normalizeProperty = (id) => {
 export { normalizeProperty };
 
 /**
+ * One segment of a property id, as a person would write it.
+ * @param {string} part
+ * @returns {string}
+ */
+const humanize = (part) => String(part)
+  .replace(/[_-]+/g, ' ')
+  .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+  .replace(/^\w/, letter => letter.toUpperCase());
+
+/**
  * The label a column falls back to when `properties` gives it no displayName:
  * the bare property name, with separators turned into spaces.
  * @param {string} id - A normalized column id
  * @returns {string}
  */
 const defaultDisplayName = (id) => {
-  const bare = String(id).split('.').slice(1).join('.') || String(id);
-  return bare
-    .replace(/[_-]+/g, ' ')
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/^\w/, letter => letter.toUpperCase());
+  const segments = String(id).split('.').slice(1);
+  // A nested frontmatter field reads as its whole path -- "xray.testKey" is
+  // "Xray Test Key", which still tells the two "testKey" columns of a
+  // document apart
+  return (segments.length ? segments : [String(id)]).map(humanize).join(' ');
 };
 
 export { defaultDisplayName };
+
+/**
+ * The name of a view as the CLI takes it: what `--view` is given, and what
+ * the "Copy CLI command" dialog writes out.
+ * @param {string} name
+ * @returns {string}
+ */
+const viewSlug = (name) => String(name ?? '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
+export { viewSlug };
+
+/**
+ * The view a `--view` (or `?view=`) argument means: its exact name, its name
+ * however it was capitalized, or its slug.
+ * @param {Array<Object>} views - Normalized views
+ * @param {string} wanted
+ * @returns {Object|null} null when nothing matches
+ */
+const findView = (views, wanted) => {
+  const needle = String(wanted ?? '').trim();
+  if (!needle) { return views[0] || null; }
+
+  const slug = viewSlug(needle);
+
+  return views.find(view => view.name === needle)
+    || views.find(view => view.name.toLowerCase() === needle.toLowerCase())
+    || (slug ? views.find(view => view.slug === slug) : null)
+    || null;
+};
+
+export { findView };
 
 /**
  * The tags of a flow, out of its frontmatter: a list, or a comma/space
@@ -171,11 +222,27 @@ const normalizeDocument = (raw): BasesDocument => {
   const rawViews = (Array.isArray(source.views) ? source.views : [])
     .filter(view => view && typeof view === 'object' && !Array.isArray(view));
 
+  // Two views can be named so alike that they slug the same; the second one
+  // gets a number, the way a duplicated file does
+  const takenSlugs = new Set<string>();
+  const uniqueSlug = (name, index) => {
+    const base = viewSlug(name) || `view-${index + 1}`;
+    let slug = base;
+    let attempt = 2;
+    while (takenSlugs.has(slug)) {
+      slug = `${base}-${attempt}`;
+      attempt += 1;
+    }
+    takenSlugs.add(slug);
+    return slug;
+  };
+
   // A document with no usable view still opens: it falls back to the default
   const views = (rawViews.length ? rawViews : [DEFAULT_VIEW])
     .map((view, index) => ({
       type: view.type === 'list' ? 'list' : 'table',
       name: String(view.name ?? '').trim() || `View ${index + 1}`,
+      slug: uniqueSlug(String(view.name ?? '').trim() || `View ${index + 1}`, index),
       filters: view.filters ?? null,
       order: (Array.isArray(view.order) ? view.order : [])
         .map(normalizeProperty)
@@ -497,6 +564,59 @@ const serialize = (value) => {
 };
 
 /**
+ * Read a frontmatter property by its path.
+ *
+ * A key that literally holds a dot wins, so a document that really does have
+ * a "xray.testKey" key keeps working; otherwise the path is walked, which is
+ * what turns an embedded object into the `note.xray.testKey` column.
+ *
+ * @param {Object} meta - Frontmatter
+ * @param {string} key - The column id without its `note.` namespace
+ * @returns {*} null when nothing is there
+ */
+const readNoteValue = (meta, key) => {
+  if (!meta || typeof meta !== 'object') { return null; }
+  if (Object.prototype.hasOwnProperty.call(meta, key)) { return meta[key]; }
+
+  let current = meta;
+
+  for (const segment of String(key).split('.')) {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) { return null; }
+    if (!Object.prototype.hasOwnProperty.call(current, segment)) { return null; }
+    current = current[segment];
+  }
+
+  return current === undefined ? null : current;
+};
+
+/**
+ * Every column id a flow's frontmatter offers: its own keys, and the keys of
+ * any embedded object below them -- `xray: { testKey: ... }` is offered as
+ * `note.xray` and as `note.xray.testKey`.
+ *
+ * A list is a value rather than a group of columns, so arrays are not walked.
+ *
+ * @param {*} meta - Frontmatter, or an object inside it
+ * @param {Set<string>} into - Collected ids
+ * @param {string} [prefix] - The id of the object being walked
+ * @param {number} [depth]
+ */
+const collectNoteProperties = (meta, into: Set<string>, prefix = 'note', depth = 0) => {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) { return; }
+
+  Object.keys(meta).forEach(key => {
+    const id = `${prefix}.${key}`;
+    into.add(id);
+
+    // Deeper than this and a column id stops being something anyone would
+    // want to read in a table header
+    if (depth + 1 < MAX_PROPERTY_DEPTH) {
+      collectNoteProperties(meta[key], into, id, depth + 1);
+    }
+  });
+};
+
+/**
  * Read one column out of a scope, never throwing: a formula that fails
  * renders as null and reports the reason.
  * @param {string} columnId - A normalized column id
@@ -509,8 +629,7 @@ const readColumn = (columnId, scope) => {
 
   try {
     if (namespace === 'note') {
-      const meta = scope.note || {};
-      return { value: Object.prototype.hasOwnProperty.call(meta, key) ? meta[key] : null, error: null };
+      return { value: readNoteValue(scope.note || {}, key), error: null };
     }
     if (namespace === 'file' || namespace === 'flow') {
       const source = scope[namespace] || {};
@@ -528,13 +647,113 @@ const readColumn = (columnId, scope) => {
   return { value: null, error: null };
 };
 
+/* -------------------------------------------------------------- ordering */
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?/;
+
+/**
+ * Whether a value counts as empty -- the same rule the filters use.
+ * @param {*} value
+ * @returns {boolean}
+ */
+const isEmpty = (value) => {
+  if (value === null || value === undefined) { return true; }
+  if (typeof value === 'string') { return value.trim() === ''; }
+  if (Array.isArray(value)) { return value.length === 0; }
+  if (typeof value === 'object') { return Object.keys(value).length === 0; }
+  return false;
+};
+
+const asNumber = (value) => {
+  if (typeof value === 'number') { return Number.isNaN(value) ? null : value; }
+  if (typeof value === 'boolean') { return value ? 1 : 0; }
+  if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+    return Number(value);
+  }
+  return null;
+};
+
+const asDate = (value) => {
+  if (typeof value !== 'string' || !ISO_DATE_RE.test(value.trim())) { return null; }
+  const date = new Date(value.trim());
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const asText = (value) => {
+  if (value === null || value === undefined) { return ''; }
+  if (typeof value === 'boolean') { return value ? 'Yes' : 'No'; }
+  if (Array.isArray(value)) { return value.map(asText).join(', '); }
+  if (typeof value === 'object') { return JSON.stringify(value); }
+  return String(value);
+};
+
+/**
+ * Order two values: numbers numerically, dates chronologically, everything
+ * else as case-insensitive text. Empty values always sort last, whatever the
+ * direction, so a half-filled column still reads top-down.
+ *
+ * The UI's lib/properties compares the same way -- a view has one order,
+ * whether it is read on screen or run from the CLI.
+ *
+ * @param {*} left
+ * @param {*} right
+ * @returns {number}
+ */
+const compareValues = (left, right) => {
+  const leftEmpty = isEmpty(left);
+  const rightEmpty = isEmpty(right);
+  if (leftEmpty || rightEmpty) {
+    if (leftEmpty && rightEmpty) { return 0; }
+    return leftEmpty ? 1 : -1;
+  }
+
+  const leftNumber = asNumber(left);
+  const rightNumber = asNumber(right);
+  if (leftNumber !== null && rightNumber !== null) {
+    return Math.sign(leftNumber - rightNumber);
+  }
+
+  const leftDate = asDate(left);
+  const rightDate = asDate(right);
+  if (leftDate && rightDate) {
+    return Math.sign(leftDate.getTime() - rightDate.getTime());
+  }
+
+  return asText(left).toLowerCase().localeCompare(asText(right).toLowerCase());
+};
+
+export { compareValues };
+
+/**
+ * Put the rows of a view in its own order. The first sort entry that
+ * separates two flows decides, so stacked sorts read as "by priority, then by
+ * owner".
+ *
+ * @param {Array<Object>} rows
+ * @param {Array<Object>} sort - [{ property, direction }]
+ * @returns {Array<Object>} A new array
+ */
+const sortRows = (rows, sort) => {
+  if (!sort || !sort.length) { return rows; }
+
+  return [...rows].sort((left, right) => {
+    for (const entry of sort) {
+      const comparison = compareValues(left.values[entry.property], right.values[entry.property]);
+      if (comparison !== 0) { return entry.direction === 'DESC' ? -comparison : comparison; }
+    }
+    return 0;
+  });
+};
+
 /* -------------------------------------------------------- the evaluation */
 
 /**
  * Run a view over a folder of flows.
  *
- * Filtering and formulas happen here, where the expression engine lives;
- * ordering, searching and column widths are presentation, and stay in the UI.
+ * Filtering, formulas and the view's own ordering happen here, so a view
+ * lists the same flows in the same order whether it is read on screen or run
+ * from the CLI. Searching and column widths are presentation, and stay in the
+ * UI.
  *
  * @param {Object} options
  * @param {string} options.folder - Folder path relative to the flows dir ('' = all)
@@ -549,7 +768,7 @@ const query = async ({ folder = '', view: viewName, document }: {
 } = {}) => {
   const doc = document ? normalizeDocument(document) : await load();
 
-  const view = doc.views.find(candidate => candidate.name === viewName) || doc.views[0];
+  const view = findView(doc.views, viewName) || doc.views[0];
 
   const entries = await collectFlows(folder);
   const errors: string[] = [];
@@ -566,7 +785,7 @@ const query = async ({ folder = '', view: viewName, document }: {
   // offer them without a second request
   const noteProperties = new Set<string>();
   matching.forEach(({ scope }) => {
-    Object.keys(scope.note || {}).forEach(key => noteProperties.add(`note.${key}`));
+    collectNoteProperties(scope.note, noteProperties);
   });
 
   const availableProperties = [
@@ -577,10 +796,14 @@ const query = async ({ folder = '', view: viewName, document }: {
   ];
 
   // Values are computed for every available column, not only the visible
-  // ones, so showing a column is instant and sorting never needs the server
+  // ones, so showing a column is instant and sorting never needs the server.
+  // A column the view asks for is read even when no listed flow carries it,
+  // so the table shows it as empty rather than dropping it
+  const valueColumns = [...new Set([...availableProperties, ...view.order])];
+
   const rows = matching.map(({ entry, scope }) => {
     const values: Record<string, any> = {};
-    availableProperties.forEach(columnId => {
+    valueColumns.forEach(columnId => {
       const { value, error } = readColumn(columnId, scope);
       values[columnId] = serialize(value);
       if (error && !errors.includes(error)) { errors.push(error); }
@@ -596,9 +819,14 @@ const query = async ({ folder = '', view: viewName, document }: {
     };
   });
 
+  const ordered = sortRows(rows, view.sort);
+
   // A view with no explicit order shows whatever the flows actually carry
+  // Without an explicit order only the top-level properties are shown: the
+  // fields inside an embedded object are there to be picked, not to fill a
+  // table nobody asked for
   const columns = (view.order.length ? view.order : availableProperties.filter(
-    id => id === 'file.name' || noteProperties.has(id)
+    id => id === 'file.name' || (noteProperties.has(id) && id.split('.').length === 2)
   )).map(id => ({
     id,
     displayName: (doc.properties[id] && doc.properties[id].displayName) || defaultDisplayName(id),
@@ -611,12 +839,16 @@ const query = async ({ folder = '', view: viewName, document }: {
     // How many flows the folder holds before any filter, so the UI can say
     // "12 of 40"
     total: entries.length,
-    views: doc.views.map(candidate => ({ name: candidate.name, type: candidate.type })),
+    views: doc.views.map(candidate => ({
+      name: candidate.name,
+      slug: candidate.slug,
+      type: candidate.type
+    })),
     properties: doc.properties,
     formulas: doc.formulas,
     columns,
     availableProperties,
-    rows,
+    rows: ordered,
     errors
   };
 };

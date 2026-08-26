@@ -200,6 +200,11 @@ sorts numerically, \`true\` / \`false\` renders as a checkbox, a list renders as
 chips, and an ISO date sorts chronologically. Adding a property asks which kind
 of value to start from, and from then on the value itself is the type.
 
+A property can hold an object, and its fields are addressed with a dot:
+\`xray.testKey\` reads \`testKey\` inside \`xray\`. Folder views offer those
+fields as columns of their own, so an embedded block does not have to be read
+as raw JSON.
+
 Properties are what folder views filter and sort on — see *Folder views*.
 `,
   },
@@ -241,10 +246,15 @@ applies to whichever folder is open. Which one a folder was last opened with
 is remembered in your browser, so \`views.yaml\` holds no folder references.
 
 - **Properties** — the columns, and their order. Renaming one here writes a
-  \`displayName\`, which every view then follows.
+  \`displayName\`, which every view then follows. A property holding an object
+  also offers its fields: \`xray: { testKey: … }\` is there as
+  \`note.xray.testKey\`, a column of its own.
 - **Sort** — stack several: the first that separates two flows wins.
 - **Filter** — see *Filters and formulas*.
 - **⋯ › Formulas** — columns worked out from the others.
+- **Run all** — executes the flows the view is showing, as one test run.
+- **CLI** — the command that runs this same view from a terminal or a
+  pipeline; see *Command line*.
 `,
   },
   {
@@ -1140,24 +1150,39 @@ of waiting for a final report.
     icon: 'terminal',
     title: 'Command line',
     summary: 'Run flows headlessly — the CI/CD side of the tool.',
-    keywords: ['cli', 'terminal', 'ci', 'cd', 'server', 'debug', 'npm', 'install', 'flags'],
+    keywords: ['cli', 'terminal', 'ci', 'cd', 'server', 'debug', 'npm', 'install', 'flags', 'view'],
     body: `
     npm install -g @lab34/flows
 
     lab34-flows --help
     lab34-flows --server
     lab34-flows --file <path-to-flow-file> --env <environment> [--debug]
+    lab34-flows --view <view> --env <environment> [--folder <folder>]
     lab34-flows --capabilities
 
 | Flag | What it does |
 |-|-|
-| \`--file\` | Path to the flow (\`.md\`). Required unless \`--server\`. |
-| \`--env\` | Environment to run in. Required with \`--file\`. |
+| \`--file\` | Path to the flow (\`.md\`). Required unless \`--view\` or \`--server\`. |
+| \`--view\` | Name or slug of a view of \`views.yaml\`: every flow it matches runs. |
+| \`--folder\` | Folder of the flows tree \`--view\` is scoped to. |
+| \`--env\` | Environment to run in. Required with \`--file\` and \`--view\`. |
 | \`--server\` | Start the web UI on http://localhost:3001. |
 | \`--context\` | Use another context directory instead of \`~/lab34-flows\`. |
 | \`--debug\` | Print environment variables and Node.js paths. |
 | \`--help\` | Show the help. |
 
+### Running a whole view
+
+\`--view\` runs every flow a saved view matches, one after the other, as a
+single test run — the **CLI** button of a folder view writes the exact command
+for what is on screen:
+
+    lab34-flows --context ~/lab34-flows --env staging --view smoke-tests
+
+The view is evaluated **when the command runs**, not when it was written down,
+so a flow added later that its filters keep is picked up without touching your
+pipeline. Every flow runs even when one fails, and the command exits with a
+non-zero code if any of them did.
 `,
   },
 

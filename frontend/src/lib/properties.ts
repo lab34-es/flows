@@ -37,15 +37,30 @@ export function bareName(id) {
 }
 
 /**
+ * One segment of a property id, as a person would write it.
+ * @param {string} part
+ * @returns {string}
+ */
+function humanize(part) {
+  return String(part)
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+/**
  * The label a column falls back to when views.yaml gives it no displayName.
+ *
+ * A field of an embedded frontmatter object reads as its whole path, so
+ * `note.xray.testKey` is "Xray Test Key" — which still tells apart the two
+ * "testKey" columns a document can have.
+ *
  * @param {string} id
  * @returns {string}
  */
 export function defaultDisplayName(id) {
-  return bareName(id)
-    .replace(/[_-]+/g, ' ')
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/^\w/, (letter) => letter.toUpperCase());
+  const bare = bareName(id);
+  return bare.split('.').map(humanize).join(' ');
 }
 
 /**
