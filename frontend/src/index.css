@@ -263,9 +263,10 @@
   @apply flex flex-col;
 }
 /* Blocks bleed one step into the gutter so the hover and the selection
-   ring read as bands of the page rather than as boxes around the text */
+   ring read as bands of the page rather than as boxes around the text.
+   Positioned, so the block toolbar and the drop indicator hang off them */
 .flow-block {
-  @apply -mx-2 rounded-md px-2 py-0.5;
+  @apply relative -mx-2 rounded-md px-2 py-0.5;
 }
 .flow-block:not(.flow-block-editing):hover {
   @apply bg-muted/40;
@@ -296,7 +297,12 @@
    between them, so the gutter itself becomes the place to write: it takes no
    room of its own, and shows a rule and a "+" when the pointer is over it */
 .flow-block-gap {
-  @apply relative h-0;
+  /* Above the (positioned) blocks, so the whole band stays clickable */
+  @apply relative z-10 h-0;
+}
+/* A drag needs the pointer over the blocks, not over the bands between them */
+.flow-block-gap-inert {
+  @apply pointer-events-none;
 }
 .flow-block-gap::before {
   @apply absolute inset-x-0 -inset-y-1 cursor-text content-[''];
@@ -310,6 +316,46 @@
 .flow-block-gap:hover::after,
 .flow-block-gap:hover .flow-block-gap-hint {
   @apply opacity-100;
+}
+/* The notebook-cell toolbar at the top-right of a block: move up, move down,
+   and a grip to drag the block anywhere. It exists only while the block is
+   hovered or selected, floating just over the block's top edge */
+.flow-block-tools {
+  @apply bg-card absolute -top-3 right-2 z-20 hidden items-center gap-0.5 rounded-md border p-0.5 shadow-sm;
+}
+.flow-block:hover > .flow-block-tools,
+.flow-block-selected > .flow-block-tools {
+  @apply flex;
+}
+.flow-block-tool {
+  @apply text-muted-foreground hover:bg-muted hover:text-foreground flex size-6 cursor-pointer items-center justify-center rounded;
+}
+.flow-block-tool:disabled {
+  @apply pointer-events-none opacity-40;
+}
+.flow-block-drag {
+  @apply cursor-grab active:cursor-grabbing;
+}
+/* The block being dragged, and the line where it would land */
+.flow-block-dragging {
+  @apply opacity-40;
+}
+.flow-block-drop-above::before,
+.flow-block-drop-below::before,
+.flow-block-tail-drop::before {
+  @apply bg-primary pointer-events-none absolute inset-x-0 z-20 h-0.5 rounded-full content-[''];
+}
+.flow-block-drop-above::before {
+  @apply -top-px;
+}
+.flow-block-drop-below::before {
+  @apply -bottom-px;
+}
+.flow-block-tail-drop {
+  @apply relative;
+}
+.flow-block-tail-drop::before {
+  @apply top-0;
 }
 /* Somewhere to click under the last block, so a document always has an end
    to keep writing at */
