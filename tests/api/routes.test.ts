@@ -451,4 +451,59 @@ describe('/api/context/git', () => {
     const res = await request(app).post('/api/context/git/push');
     expect(res.status).toBe(400);
   });
+
+  test('branches answers with the list the menu draws', async () => {
+    (contextHelper.branches as jest.Mock).mockResolvedValue({
+      current: 'main',
+      local: [{ name: 'main', current: true, upstream: 'origin/main', remote: null, local: null }],
+      remote: []
+    });
+
+    const res = await request(app).get('/api/context/git/branches');
+
+    expect(res.status).toBe(200);
+    expect(res.body.current).toBe('main');
+    expect(res.body.local).toHaveLength(1);
+  });
+
+  test('checkout passes the branch and how to reach it through', async () => {
+    (contextHelper.checkout as jest.Mock).mockResolvedValue({
+      output: "Switched to a new branch 'feature'",
+      branch: 'feature'
+    });
+
+    const res = await request(app)
+      .post('/api/context/git/checkout')
+      .send({ branch: 'feature', create: true, from: 'main' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      success: true,
+      output: "Switched to a new branch 'feature'",
+      branch: 'feature'
+    });
+    expect(contextHelper.checkout).toHaveBeenCalledWith({
+      branch: 'feature',
+      create: true,
+      from: 'main'
+    });
+  });
+
+  test('a checkout git refuses is a 400 carrying its reason', async () => {
+    (contextHelper.checkout as jest.Mock).mockRejectedValue(
+      new Error('Your local changes would be overwritten')
+    );
+
+    const res = await request(app).post('/api/context/git/checkout').send({ branch: 'other' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Your local changes would be overwritten' });
+  });
+
+  test('fetch answers with what git printed', async () => {
+    (contextHelper.fetch as jest.Mock).mockResolvedValue({ output: '* [new branch] theirs' });
+    const res = await request(app).post('/api/context/git/fetch');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, output: '* [new branch] theirs' });
+  });
 });

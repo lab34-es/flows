@@ -305,3 +305,177 @@ describe('run', () => {
     await expect(git.run(['rev-parse', '--verify', 'nope'], repo)).rejects.toThrow();
   });
 });
+
+describe('splitRemoteBranch', () => {
+  test('cuts the name at the remote it belongs to', () => {
+    expect(git.splitRemoteBranch('origin/main', ['origin']))
+      .toEqual({ remote: 'origin', local: 'main' });
+    // A branch name may itself contain slashes
+    expect(git.splitRemoteBranch('origin/feature/login', ['origin']))
+      .toEqual({ remote: 'origin', local: 'feature/login' });
+  });
+
+  test('prefers the longest remote that matches', () => {
+    expect(git.splitRemoteBranch('origin/backup/main', ['origin', 'origin/backup']))
+      .toEqual({ remote: 'origin/backup', local: 'main' });
+  });
+
+  test('ignores a remote HEAD and anything from an unknown remote', () => {
+    expect(git.splitRemoteBranch('origin/HEAD', ['origin'])).toBeNull();
+    expect(git.splitRemoteBranch('upstream/main', ['origin'])).toBeNull();
+  });
+});
+
+describe('branches', () => {
+  test('lists the local branches, newest work first, and marks the current one', async () => {
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+    await git.checkout(repo, 'feature', { create: true });
+    write(repo, 'two.md', '# two');
+    await git.commit(repo, 'second');
+
+    const list = await git.branches(repo);
+
+    expect(list.current).toBe('feature');
+    expect(list.local.map(branch => branch.name)).toEqual(['feature', 'main']);
+    expect(list.local[0].current).toBe(true);
+    expect(list.local[1].current).toBe(false);
+    expect(list.remote).toEqual([]);
+  });
+
+  test('a branch that only a remote has is listed apart, under its local name', async () => {
+    const remote = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flows-remote-')));
+    await git.run(['init', '--bare', '--initial-branch=main', remote], os.tmpdir());
+    await git.run(['remote', 'add', 'origin', remote], repo);
+
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+    await git.push(repo);
+
+    // Someone else's branch: pushed, then gone from this working copy
+    await git.checkout(repo, 'theirs', { create: true });
+    write(repo, 'two.md', '# two');
+    await git.commit(repo, 'second');
+    await git.push(repo);
+    await git.checkout(repo, 'main');
+    await git.run(['branch', '-D', 'theirs'], repo);
+
+    const list = await git.branches(repo);
+
+    expect(list.local.map(branch => branch.name)).toEqual(['main']);
+    expect(list.local[0].upstream).toBe('origin/main');
+    expect(list.remote.map(branch => branch.name)).toEqual(['origin/theirs']);
+    expect(list.remote[0].local).toBe('theirs');
+    expect(list.remote[0].remote).toBe('origin');
+
+    fs.rmSync(remote, { recursive: true, force: true });
+  });
+
+  test('a repository with no commits has no branches to offer', async () => {
+    await expect(git.branches(repo)).resolves.toEqual({ current: null, local: [], remote: [] });
+  });
+});
+
+describe('checkout', () => {
+  test('creates a branch and switches to it', async () => {
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+
+    const result = await git.checkout(repo, 'feature/login', { create: true });
+
+    expect(result.branch).toBe('feature/login');
+    expect((await git.info(repo))!.branch).toBe('feature/login');
+  });
+
+  test('switches back to a branch that already exists', async () => {
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+    await git.checkout(repo, 'feature', { create: true });
+
+    await git.checkout(repo, 'main');
+
+    expect((await git.info(repo))!.branch).toBe('main');
+  });
+
+  test('refuses to create a branch that is already there', async () => {
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+    await git.checkout(repo, 'feature', { create: true });
+    await git.checkout(repo, 'main');
+
+    await expect(git.checkout(repo, 'feature', { create: true }))
+      .rejects.toThrow('already exists');
+  });
+
+  test('refuses a name git would not accept, or one that reads as an option', async () => {
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+
+    await expect(git.checkout(repo, '')).rejects.toThrow('required');
+    await expect(git.checkout(repo, 'has space')).rejects.toThrow('not a valid branch name');
+    await expect(git.checkout(repo, '--orphan')).rejects.toThrow('not a valid branch name');
+    await expect(git.checkout(repo, 'bad..name')).rejects.toThrow('not a valid branch name');
+  });
+
+  test('picking a remote-only branch checks it out as a local one that tracks it', async () => {
+    const remote = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flows-remote-')));
+    await git.run(['init', '--bare', '--initial-branch=main', remote], os.tmpdir());
+    await git.run(['remote', 'add', 'origin', remote], repo);
+
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+    await git.push(repo);
+    await git.checkout(repo, 'theirs', { create: true });
+    await git.push(repo);
+    await git.checkout(repo, 'main');
+    await git.run(['branch', '-D', 'theirs'], repo);
+
+    const result = await git.checkout(repo, 'origin/theirs');
+
+    expect(result.branch).toBe('theirs');
+    const state = await git.info(repo);
+    expect(state!.branch).toBe('theirs');
+    expect(state!.upstream).toBe('origin/theirs');
+
+    fs.rmSync(remote, { recursive: true, force: true });
+  });
+});
+
+describe('fetch', () => {
+  test('brings in a branch pushed to the remote by someone else', async () => {
+    const remote = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flows-remote-')));
+    await git.run(['init', '--bare', '--initial-branch=main', remote], os.tmpdir());
+    await git.run(['remote', 'add', 'origin', remote], repo);
+
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+    await git.push(repo);
+
+    // A second clone stands in for the rest of the team
+    const other = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flows-other-')));
+    await git.run(['clone', remote, other], os.tmpdir());
+    await git.run(['config', 'user.email', 'test@example.com'], other);
+    await git.run(['config', 'user.name', 'Test'], other);
+    await git.run(['config', 'commit.gpgsign', 'false'], other);
+    await git.checkout(other, 'theirs', { create: true });
+    write(other, 'two.md', '# two');
+    await git.commit(other, 'second');
+    await git.push(other);
+
+    expect((await git.branches(repo)).remote).toEqual([]);
+
+    await git.fetch(repo);
+
+    expect((await git.branches(repo)).remote.map(branch => branch.local)).toEqual(['theirs']);
+
+    fs.rmSync(remote, { recursive: true, force: true });
+    fs.rmSync(other, { recursive: true, force: true });
+  });
+
+  test('a repository with no remote has nothing to fetch, and says so quietly', async () => {
+    write(repo, 'one.md', '# one');
+    await git.commit(repo, 'first');
+
+    await expect(git.fetch(repo)).resolves.toEqual({ output: '' });
+  });
+});

@@ -121,3 +121,28 @@ describe('pull, commit and push', () => {
     expect(git.commit).toHaveBeenCalledWith(CONTEXT, '', []);
   });
 });
+
+describe('branches, checkout and fetch', () => {
+  test('all act on the context directory', async () => {
+    (git.branches as jest.Mock).mockResolvedValue({ current: 'main', local: [], remote: [] });
+    (git.fetch as jest.Mock).mockResolvedValue({ output: 'fetched' });
+    (git.checkout as jest.Mock).mockResolvedValue({ output: 'switched', branch: 'feature' });
+
+    await expect(context.branches()).resolves.toEqual({ current: 'main', local: [], remote: [] });
+    expect(git.branches).toHaveBeenCalledWith(CONTEXT);
+
+    await expect(context.fetch()).resolves.toEqual({ output: 'fetched' });
+    expect(git.fetch).toHaveBeenCalledWith(CONTEXT);
+
+    await context.checkout({ branch: 'feature', create: true, from: 'main' });
+    expect(git.checkout).toHaveBeenCalledWith(CONTEXT, 'feature', { create: true, from: 'main' });
+  });
+
+  test('a checkout with nothing to switch to still reaches git, which validates it', async () => {
+    (git.checkout as jest.Mock).mockResolvedValue({ output: '', branch: '' });
+
+    await context.checkout();
+
+    expect(git.checkout).toHaveBeenCalledWith(CONTEXT, '', { create: false, from: undefined });
+  });
+});

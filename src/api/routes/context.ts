@@ -37,4 +37,30 @@ router.post('/git/push', (req, res) => {
     .catch(error => sendError(res, error));
 });
 
+// The branches to choose from: local ones, and the ones only a remote has
+// { current, local: [...], remote: [...] }
+router.get('/git/branches', (req, res) => {
+  context.branches()
+    .then(result => res.send(result))
+    .catch(error => sendError(res, error, 500));
+});
+
+// Switch branches. { branch, create?, from? }
+router.post('/git/checkout', (req, res) => {
+  context.checkout({
+    branch: req.body.branch,
+    create: req.body.create,
+    from: req.body.from
+  })
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
+// Update the remote-tracking branches, without touching the working copy
+router.post('/git/fetch', (req, res) => {
+  context.fetch()
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
 export default router;
