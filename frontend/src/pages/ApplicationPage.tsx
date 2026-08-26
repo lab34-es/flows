@@ -194,7 +194,11 @@ export function ApplicationPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const highlightedMethod = searchParams.get('method');
-  const { refreshApplications } = useAppState();
+  // Deep links to the Source view (?view=source&file=env/x.env) land on the
+  // editor with that file selected — how the home page opens env files
+  const requestedView = searchParams.get('view');
+  const requestedFile = searchParams.get('file');
+  const { refreshApplications, refreshEnvironments } = useAppState();
 
   const [app, setApp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -231,11 +235,17 @@ export function ApplicationPage() {
     if (highlightedMethod) { setView('document'); }
   }, [highlightedMethod, slug]);
 
-  // The Document view must reflect files saved from the Source view
+  useEffect(() => {
+    if (requestedView === 'source') { setView('source'); }
+  }, [requestedView, requestedFile, slug]);
+
+  // The Document view must reflect files saved from the Source view — and a
+  // saved env file may declare a new environment for the selector
   const handleSourceSaved = useCallback(() => {
     fetchApp({ silent: true });
     refreshApplications();
-  }, [fetchApp, refreshApplications]);
+    refreshEnvironments();
+  }, [fetchApp, refreshApplications, refreshEnvironments]);
 
   const defaultTab = useMemo(() => (highlightedMethod ? 'methods' : 'readme'), [highlightedMethod]);
 
@@ -292,7 +302,7 @@ export function ApplicationPage() {
 
       {view === 'source' ? (
         <div className="min-h-0 flex-1">
-          <ApplicationSource slug={slug} onSaved={handleSourceSaved} />
+          <ApplicationSource slug={slug} initialFile={requestedFile} onSaved={handleSourceSaved} />
         </div>
       ) : (
       <div className="min-h-0 flex-1 overflow-auto">

@@ -269,6 +269,23 @@ describe('applications.parseApplications', () => {
     const [app] = await apps.parseApplications();
     expect(app.envFiles.map(e => e.name)).toEqual(['local']);
   });
+
+  test('a .env.example is a template, not an env file', async () => {
+    write('calculator/env/local.env', 'A=1\n');
+    write('calculator/env/prod.env.example', 'A=\nTOKEN=\n');
+
+    const [app] = await apps.parseApplications();
+
+    expect(app.envFiles.map(e => e.name)).toEqual(['local']);
+    expect(app.envTemplates.map(t => t.name)).toEqual(['prod']);
+    expect(app.envTemplates[0].contents.map(c => c.key)).toEqual(['A', 'TOKEN']);
+  });
+
+  test('an application with no env folder reports no templates', async () => {
+    write('calculator/index.ts', CALC_INDEX);
+    const [app] = await apps.parseApplications();
+    expect(app.envTemplates).toEqual([]);
+  });
 });
 
 describe('applications.allPossibleEnvironments', () => {
@@ -280,9 +297,123 @@ describe('applications.allPossibleEnvironments', () => {
     expect(await apps.allPossibleEnvironments()).toEqual(['local', 'prod']);
   });
 
+  test('counts environments only declared by a template', async () => {
+    write('a/env/local.env', 'A=1\n');
+    write('a/env/prod.env.example', 'A=\n');
+
+    expect(await apps.allPossibleEnvironments()).toEqual(['local', 'prod']);
+  });
+
   test('is empty when nothing declares an environment', async () => {
     write('a/index.ts', 'export const nothing = 1;');
     expect(await apps.allPossibleEnvironments()).toEqual([]);
+  });
+});
+
+describe('applications.environmentsStatus', () => {
+  test('reports each application against each environment', async () => {
+    write('a/env/local.env', 'A=1\n');
+    write('a/env/prod.env.example', 'A=\nTOKEN=\n');
+    write('b/env/local.env', 'B=1\n');
+
+    const status = await apps.environmentsStatus();
+
+    expect(status.environments).toEqual(['local', 'prod']);
+
+    const a = status.applications.find(app => app.slug === 'a')!;
+    expect(a.environments.local).toMatchObject({ exists: true, hasTemplate: false, missingKeys: [] });
+    expect(a.environments.prod).toMatchObject({
+      exists: false,
+      hasTemplate: true,
+      file: 'env/prod.env',
+      template: 'env/prod.env.example'
+    });
+
+    const b = status.applications.find(app => app.slug === 'b')!;
+    expect(b.environments.prod).toMatchObject({ exists: false, hasTemplate: false });
+
+    expect(status.summary).toEqual({ total: 4, missing: 2, creatable: 1, incomplete: 0 });
+  });
+
+  test('flags an env file missing variables of its template', async () => {
+    write('a/env/prod.env', 'A=1\n');
+    write('a/env/prod.env.example', 'A=\nTOKEN=\n');
+
+    const status = await apps.environmentsStatus();
+    const a = status.applications[0];
+
+    expect(a.environments.prod.exists).toBe(true);
+    expect(a.environments.prod.missingKeys).toEqual(['TOKEN']);
+    expect(status.summary.incomplete).toBe(1);
+  });
+});
+
+describe('applications.createMissingEnvFiles', () => {
+  test('creates every missing env file from its template, verbatim', async () => {
+    write('a/env/prod.env.example', 'A=\nTOKEN=\n');
+    write('b/env/prod.env.example', 'B=\n');
+    write('b/env/prod.env', 'B=already-there\n');
+
+    const created = await apps.createMissingEnvFiles();
+
+    expect(created).toEqual([
+      { application: 'a', environment: 'prod', path: path.join(appsDir, 'a/env/prod.env') }
+    ]);
+    expect(fs.readFileSync(path.join(appsDir, 'a/env/prod.env'), 'utf8')).toBe('A=\nTOKEN=\n');
+    // The existing file is never replaced
+    expect(fs.readFileSync(path.join(appsDir, 'b/env/prod.env'), 'utf8')).toBe('B=already-there\n');
+  });
+
+  test('narrows to one environment and one application', async () => {
+    write('a/env/prod.env.example', 'A=\n');
+    write('a/env/staging.env.example', 'A=\n');
+    write('b/env/prod.env.example', 'B=\n');
+
+    const created = await apps.createMissingEnvFiles({ environment: 'prod', application: 'a' });
+
+    expect(created.map(c => `${c.application}/${c.environment}`)).toEqual(['a/prod']);
+    expect(fs.existsSync(path.join(appsDir, 'a/env/staging.env'))).toBe(false);
+    expect(fs.existsSync(path.join(appsDir, 'b/env/prod.env'))).toBe(false);
+  });
+});
+
+describe('applications.addEnvironmentToAll', () => {
+  test('creates the env file in every application that lacks it', async () => {
+    write('a/env/local.env', 'A=1\nTOKEN=abc\n');
+    write('b/env/staging.env', 'B=1\n');
+
+    const created = await apps.addEnvironmentToAll('staging', 'local');
+
+    expect(created.map(c => c.application)).toEqual(['a']);
+
+    const content = fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8');
+    expect(content).toContain('A=');
+    expect(content).toContain('TOKEN=');
+    expect(content).not.toContain('abc');
+  });
+
+  test('prefers the application template over the base environment', async () => {
+    write('a/env/local.env', 'A=1\n');
+    write('a/env/staging.env.example', 'FROM_TEMPLATE=\n');
+
+    await apps.addEnvironmentToAll('staging', 'local');
+
+    expect(fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8')).toBe('FROM_TEMPLATE=\n');
+  });
+
+  test('creates a commented stub when there is nothing to copy from', async () => {
+    write('a/index.ts', 'export const nothing = 1;');
+
+    await apps.addEnvironmentToAll('staging');
+
+    expect(fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8')).toContain('# Environment "staging"');
+  });
+
+  test('rejects names that are not a plain file-name stem', async () => {
+    await expect(apps.addEnvironmentToAll('')).rejects.toThrow('Environment name is required');
+    await expect(apps.addEnvironmentToAll('../evil')).rejects.toThrow('Invalid environment name');
+    await expect(apps.addEnvironmentToAll('.hidden')).rejects.toThrow('Invalid environment name');
+    await expect(apps.addEnvironmentToAll('prod.env')).rejects.toThrow('Invalid environment name');
   });
 });
 

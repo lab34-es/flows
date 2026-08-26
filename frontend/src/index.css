@@ -41,6 +41,7 @@
   --ring: #b68235;
   --success: #3e7a4e;
   --warning: #7d5411;
+  --warning-foreground: #f3f2f2;
   --info: #3a6ea5;
   --sidebar: #edebeb;
   --sidebar-foreground: #201f1d;
@@ -86,6 +87,7 @@
   --ring: #c99a55;
   --success: #7cbe8d;
   --warning: #c99a55;
+  --warning-foreground: #201f1d;
   --info: #7fa9d6;
   --sidebar: #2d2b2b;
   --sidebar-foreground: #f3f2f2;
@@ -140,6 +142,7 @@
   --color-ring: var(--ring);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
