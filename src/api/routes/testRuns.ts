@@ -36,6 +36,14 @@ router.get('/:id', (req, res) => {
     .catch(error => sendError(res, error, 404));
 });
 
+// One run's standalone HTML report, rebuilt on the fly for runs recorded
+// before reports existed
+router.get('/:id/report', (req, res) => {
+  testRuns.report(req.params.id)
+    .then(html => res.type('html').send(html))
+    .catch(error => sendError(res, error, 404));
+});
+
 // One stored flow copy of a run, with its step results. ?path=
 router.get('/:id/flow', (req, res) => {
   testRuns.getFlow(req.params.id, String(req.query.path ?? ''))

@@ -12,6 +12,11 @@ export function testRunFlowUrl(id, file) {
   return `/test-runs/${encodeURIComponent(id)}/flow?path=${encodeURIComponent(file)}`;
 }
 
+/** URL of a run's standalone HTML report (served by the API). */
+export function testRunReportUrl(id) {
+  return `/api/test-runs/${encodeURIComponent(id)}/report`;
+}
+
 /** A run (or run flow) status as the StatusDot understands it. */
 export function dotStatus(status) {
   if (status === 'running' || status === 'pending') { return 'running'; }
