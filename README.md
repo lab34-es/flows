@@ -90,7 +90,7 @@ test:
 
 ## Install
 
-Requires Node.js `>= 20.19.0`.
+Requires Node.js `>= 24.0.0` (the current active LTS line).
 
 ```bash
 npm install -g @lab34/flows

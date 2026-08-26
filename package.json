@@ -13,7 +13,7 @@
     "url": "https://github.com/lab34-es/flows/issues"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-assets.js",
