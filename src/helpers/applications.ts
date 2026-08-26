@@ -296,7 +296,13 @@ const addEnvironmentToAll = async (name, baseEnvironment?) => {
       content = `# Environment "${trimmed}" for ${app.name}. Add the variables this application needs here.\n`;
     }
 
-    const envFile = path.join(app.path, 'env', `${trimmed}.env`);
+    const envDir = path.resolve(app.path, 'env');
+    const envFile = path.resolve(envDir, `${trimmed}.env`);
+
+    if (envFile !== envDir && !envFile.startsWith(envDir + path.sep)) {
+      throw new Error('Invalid environment file path');
+    }
+
     fs.mkdirSync(path.dirname(envFile), { recursive: true });
     fs.writeFileSync(envFile, content, 'utf8');
 
