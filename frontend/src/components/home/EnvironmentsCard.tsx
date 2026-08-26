@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ChevronDown, FilePlus2, Layers, Minus, Plus, TriangleAlert } from 'lucide-react';
+import { Check, ChevronDown, FilePlus2, Layers, Plus, TriangleAlert, X } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,8 @@ function EnvCell({ application, environment }) {
   const cell = application.environments[environment];
   if (!cell) { return null; }
 
+  // Green when the file is there, red when it is not; amber is reserved for
+  // the in-between (the file exists but lacks variables of its template)
   let icon;
   let label;
   if (cell.exists && cell.missingKeys.length === 0) {
@@ -50,10 +52,10 @@ function EnvCell({ application, environment }) {
     icon = <TriangleAlert className="text-warning size-4" />;
     label = `${cell.file} is missing ${cell.missingKeys.length} variable${cell.missingKeys.length > 1 ? 's' : ''} of its template: ${cell.missingKeys.join(', ')}`;
   } else if (cell.hasTemplate) {
-    icon = <FilePlus2 className="text-warning size-4" />;
+    icon = <FilePlus2 className="text-destructive size-4" />;
     label = `${cell.file} is missing — open to create it from ${cell.template}`;
   } else {
-    icon = <Minus className="text-muted-foreground size-4" />;
+    icon = <X className="text-destructive size-4" />;
     label = `${cell.file} is missing and has no template — open to create it`;
   }
 
