@@ -220,9 +220,16 @@ export function AppSidebar() {
                       isActive={location.pathname.startsWith(testRunUrl(run.id))}
                       onClick={() => navigate(testRunUrl(run.id))}
                       title={`${runLabel(run)} · ${run.environment}${run.view ? ` · ${run.view}` : ''}`}
+                      className="pr-9"
                     >
                       <StatusDot status={dotStatus(run.status)} />
-                      <span>{runLabel(run)}</span>
+                      <span className="shrink-0 whitespace-nowrap">{runLabel(run)}</span>
+                      {/* The environment the run went against, as its folder name carries it */}
+                      {run.environment && (
+                        <span className="text-muted-foreground font-mono text-xs">
+                          {run.environment}
+                        </span>
+                      )}
                     </SidebarMenuButton>
                     <SidebarMenuBadge>{runScore(run)}</SidebarMenuBadge>
                   </SidebarMenuItem>
