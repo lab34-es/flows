@@ -46,12 +46,12 @@
     "LICENSE.md"
   ],
   "dependencies": {
-    "@anthropic-ai/sdk": "0.117.1",
-    "@types/node": "24.13.3",
-    "@faker-js/faker": "9.5.0",
+    "@anthropic-ai/sdk": "0.120.0",
+    "@faker-js/faker": "10.6.0",
     "@google/generative-ai": "0.24.1",
+    "@types/node": "26.3.0",
     "ajv": "8.20.0",
-    "axios": "1.19.0",
+    "axios": "1.20.0",
     "cli-highlight": "2.1.11",
     "colors": "1.4.0",
     "cors": "2.8.6",
@@ -59,7 +59,6 @@
     "dotenv": "17.4.2",
     "express": "5.2.1",
     "handlebars": "4.7.9",
-    "is-wsl": "2.2.0",
     "mqtt": "5.15.2",
     "ollama": "0.6.3",
     "pg": "8.23.0",
@@ -67,7 +66,7 @@
     "socket.io": "4.8.3",
     "temp": "0.9.4",
     "typescript": "5.9.3",
-    "uuid": "11.1.1",
+    "uuid": "14.0.2",
     "yaml": "2.9.0",
     "yargs-parser": "22.0.0"
   },
@@ -82,13 +81,13 @@
     "@types/temp": "0.9.4",
     "@types/yargs-parser": "21.0.3",
     "concurrently": "10.0.5",
-    "eslint": "10.8.1",
+    "eslint": "10.9.1",
     "globals": "17.11.0",
     "jest": "30.4.2",
     "nodemon": "3.1.14",
     "supertest": "7.2.2",
     "ts-jest": "29.4.12",
     "tsx": "4.23.12",
-    "typescript-eslint": "8.67.0"
+    "typescript-eslint": "8.68.0"
   }
 }

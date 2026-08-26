@@ -1,28 +1,12 @@
-import isWsl from 'is-wsl';
 import os from 'os';
 import path from 'path';
-import * as shell from './shell';
 import fs from 'fs';
 import yargsParser from 'yargs-parser';
 
 const argv = yargsParser(process.argv.slice(2));
 
-// Cache the Windows home directory when inside WSL
-let winDir;
-
-/**
- * Get the Windows home directory when inside WSL
- * @returns {Promise<string>} The Windows home directory
- */
-const getWslWinHomeDir = async () => {
-  if (winDir) {return winDir;}
-  const windowsHomeRaw = await shell.run('cmd.exe /c "<nul set /p=%UserProfile%" 2>/dev/null', true);
-  winDir = await shell.run(`wslpath "${windowsHomeRaw}"`, true);
-  return winDir;
-};
-
 export const contextDir = async (pathParts) => {
-  const baseDir = isWsl ? await getWslWinHomeDir() : os.homedir();
+  const baseDir = os.homedir();
   let context = argv.context;
 
   let finalPathParts: string[] = [];

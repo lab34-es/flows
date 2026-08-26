@@ -4,8 +4,6 @@
 let ARGV: Record<string, any> = {};
 jest.mock('yargs-parser', () => () => ARGV);
 
-jest.mock('is-wsl', () => false);
-
 import fs from 'fs';
 import os from 'os';
 import path from 'path';

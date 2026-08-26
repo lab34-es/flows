@@ -111,7 +111,7 @@ module.exports = tseslint.config(
 
   // Plain CommonJS tooling scripts
   {
-    files: ['scripts/**/*.js', 'eslint.config.js', 'jest.config.js'],
+    files: ['scripts/**/*.js', 'tests/shims/**/*.js', 'eslint.config.js', 'jest.config.js'],
     extends: [js.configs.recommended],
     languageOptions: {
       sourceType: 'commonjs',

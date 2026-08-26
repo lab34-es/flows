@@ -25,7 +25,12 @@ module.exports = {
   // here. Tests therefore exercise src, not a possibly stale dist.
   moduleNameMapper: {
     '^@lab34/flows$': '<rootDir>/src/index.ts',
-    '^lab34-flows$': '<rootDir>/src/index.ts'
+    '^lab34-flows$': '<rootDir>/src/index.ts',
+
+    // ESM-only packages jest cannot parse; the shims pull them in through
+    // Node's own resolver. See tests/shims/nodeRequire.js.
+    '^@faker-js/faker$': '<rootDir>/tests/shims/faker.js',
+    '^uuid$': '<rootDir>/tests/shims/uuid.js'
   },
 
   testMatch: ['<rootDir>/tests/**/*.test.ts'],
