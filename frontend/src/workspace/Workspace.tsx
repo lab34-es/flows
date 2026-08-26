@@ -8,6 +8,7 @@ import '@/workspace/workspace.css';
 
 import { Button } from '@/components/ui/button';
 import RoutePanel from '@/workspace/RoutePanel';
+import { TabMenuProvider, WorkspaceTab } from '@/workspace/TabContextMenu';
 import { useWorkspace } from '@/workspace/WorkspaceContext';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -111,15 +112,18 @@ export function Workspace() {
 
   return (
     <div className="h-full w-full">
-      <DockviewReact
-        components={components}
-        watermarkComponent={Watermark}
-        theme={dockviewTheme}
-        // Hidden tabs keep their DOM: the editor, its undo history and the
-        // live run output are all still there when the tab comes back.
-        defaultRenderer="always"
-        onReady={onReady}
-      />
+      <TabMenuProvider>
+        <DockviewReact
+          components={components}
+          defaultTabComponent={WorkspaceTab}
+          watermarkComponent={Watermark}
+          theme={dockviewTheme}
+          // Hidden tabs keep their DOM: the editor, its undo history and the
+          // live run output are all still there when the tab comes back.
+          defaultRenderer="always"
+          onReady={onReady}
+        />
+      </TabMenuProvider>
     </div>
   );
 }
