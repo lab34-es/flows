@@ -218,29 +218,17 @@ async function runFlow(flowConfig, options) {
 
 /**
  * Start the web server with built frontend and API
+ *
+ * The UI is built ahead of time and shipped inside the package, so this only
+ * has to boot the API that serves it. Rebuilding from here would need the
+ * project sources and a working directory that has them, neither of which an
+ * installed copy of the tool can count on.
  */
 async function startServer() {
-  console.log('Building frontend...');
-  
-  const { spawn } = require('child_process');
-  
-  // Build the frontend first
-  const buildProcess = spawn('npm', ['run', 'build:frontend'], {
-    stdio: 'inherit',
-    cwd: process.cwd()
-  });
-  
-  buildProcess.on('close', async (code) => {
-    if (code !== 0) {
-      exitWithError('Failed to build frontend');
-    }
-    
-    console.log('Frontend built successfully. Starting server...');
-    
-    // Start the API server which will serve the built frontend
-    const api = require('./api');
-    await api.start();
-  });
+  console.log('Starting server...');
+
+  const api = require('./api');
+  await api.start();
 }
 
 /**

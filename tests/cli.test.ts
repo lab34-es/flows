@@ -101,32 +101,22 @@ describe('cli --ai', () => {
 });
 
 describe('cli --server', () => {
-  test('builds the frontend and then starts the API', async () => {
+  test('starts the API', async () => {
     ARGV = { server: true };
-    const on = jest.fn();
-    spawn.mockReturnValue({ on });
 
     await runCli();
-
-    expect(spawn).toHaveBeenCalledWith('npm', ['run', 'build:frontend'], expect.any(Object));
-
-    // Drive the build's close handler
-    const close = on.mock.calls.find(([event]) => event === 'close')[1];
-    await close(0);
 
     expect(api.start).toHaveBeenCalled();
   });
 
-  test('a failed frontend build is fatal', async () => {
+  // The UI ships pre-built inside the package: an installed copy has neither
+  // the frontend sources nor a working directory it could build them from.
+  test('never shells out to build the frontend', async () => {
     ARGV = { server: true };
-    const on = jest.fn();
-    spawn.mockReturnValue({ on });
 
     await runCli();
-    const close = on.mock.calls.find(([event]) => event === 'close')[1];
-    await close(1);
 
-    expect(errored()).toContain('Failed to build frontend');
+    expect(spawn).not.toHaveBeenCalled();
   });
 });
 

@@ -36,9 +36,15 @@ export const start = async (options: { context?: string } = {}) => {
   // Define API routes first
   defineRoutes(app);
 
-  // Serve static files from the built frontend
-  const frontendDistPath = path.join(__dirname, '../../frontend/dist');
-  if (fs.existsSync(frontendDistPath)) {
+  // Serve static files from the built frontend. Published installs carry the
+  // bundle at dist/frontend (see scripts/copy-assets.js); a source checkout
+  // keeps it where Vite writes it.
+  const frontendDistPath = [
+    path.join(__dirname, '../frontend'),
+    path.join(__dirname, '../../frontend/dist')
+  ].find((candidate) => fs.existsSync(path.join(candidate, 'index.html')));
+
+  if (frontendDistPath) {
     app.use(express.static(frontendDistPath));
     
     // Handle client-side routing - serve index.html for all non-API routes
@@ -53,7 +59,7 @@ export const start = async (options: { context?: string } = {}) => {
       res.sendFile(path.join(frontendDistPath, 'index.html'));
     });
   } else {
-    console.warn('Frontend dist folder not found. Run "npm run build:frontend" first.');
+    console.warn('Frontend bundle not found. Run "npm run build:frontend" first.');
   }
 
   // API error reporter

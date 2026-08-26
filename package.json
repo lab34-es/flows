@@ -1,6 +1,6 @@
 {
   "name": "@lab34/flows",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,7 +32,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "audit:ci": "npm audit --audit-level=critical",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "npm run clean && npm run build:frontend && npm run build"
   },
   "bin": {
     "lab34-flows": "./dist/cli.js"
