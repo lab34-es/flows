@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { applicationsApi } from '@/services/api';
 import { useAppState } from '@/context/AppStateContext';
+import { useWorkspace } from '@/workspace/WorkspaceContext';
+import { parseRoute } from '@/workspace/routes';
 
 /**
  * Dialogs for the application actions of the sidebar.
@@ -26,8 +27,7 @@ import { useAppState } from '@/context/AppStateContext';
  * README and a local environment — and opens it.
  */
 export function ApplicationDialogs({ action, onClose }) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { openTab, retargetTabs } = useWorkspace();
   const { refreshApplications, refreshEnvironments } = useAppState();
 
   const [name, setName] = useState('');
@@ -59,7 +59,7 @@ export function ApplicationDialogs({ action, onClose }) {
       // must know about it when this is the first application
       await refreshEnvironments();
       onClose();
-      navigate(`/applications/${encodeURIComponent(response.data.slug)}`);
+      openTab(`/applications/${encodeURIComponent(response.data.slug)}`);
     } catch (ex) {
       setError(ex.response?.data?.error || ex.message);
       setBusy(false);
@@ -82,9 +82,12 @@ export function ApplicationDialogs({ action, onClose }) {
       await refreshApplications();
       onClose();
 
-      if (location.pathname === `/applications/${action.slug}`) {
-        navigate(`/applications/${encodeURIComponent(response.data.slug)}`);
-      }
+      // Any tab on the old slug follows the application to its new one
+      retargetTabs((route) => (
+        parseRoute(route).pathname === `/applications/${action.slug}`
+          ? `/applications/${encodeURIComponent(response.data.slug)}`
+          : null
+      ));
     } catch (ex) {
       setError(ex.response?.data?.error || ex.message);
       setBusy(false);

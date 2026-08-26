@@ -17,6 +17,7 @@ import StatusDot from '@/components/shared/StatusDot';
 import { socket } from '@/services/socket';
 import { testRunsApi } from '@/services/api';
 import { dotStatus, formatDuration, runLabel, runScore, testRunFlowUrl, triggerLabel } from '@/lib/testRuns';
+import { useTabTitle } from '@/workspace/RoutePanel';
 
 const STATUS_BADGES = {
   running: { label: 'Running…', variant: 'info' },
@@ -35,6 +36,9 @@ export function TestRunPage() {
 
   const [run, setRun] = useState<any>(null);
   const [error, setError] = useState<any>(null);
+
+  // "Aug 20, 14:30" beats the run id on a tab
+  useTabTitle(run ? runLabel(run) : null);
 
   useEffect(() => {
     let cancelled = false;
