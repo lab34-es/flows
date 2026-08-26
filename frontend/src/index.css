@@ -336,6 +336,9 @@
 .flow-block-tool:disabled {
   @apply pointer-events-none opacity-40;
 }
+.flow-block-tool-danger {
+  @apply hover:bg-destructive/10 hover:text-destructive;
+}
 .flow-block-drag {
   @apply cursor-grab active:cursor-grabbing;
 }

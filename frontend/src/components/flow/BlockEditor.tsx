@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, GripVertical, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import Markdown from '@/components/shared/Markdown';
 import BlockSource from '@/components/flow/BlockSource';
 import SlashMenu from '@/components/flow/SlashMenu';
@@ -175,6 +184,8 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
   // The block being dragged by its grip, and where it would land if dropped
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<{ id: string; where: 'above' | 'below' } | null>(null);
+  // The block whose toolbar trash was clicked, while the confirm dialog is up
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -376,6 +387,39 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
     }
     applyMove(blocks, from, to);
   }, [applyMove, commit, dropPending]);
+
+  /**
+   * Delete a block — what the toolbar trash asks for once the dialog has
+   * confirmed it. Unlike the keyboard deletes, the neighbor that takes the
+   * block's place is selected rather than opened for writing.
+   */
+  const deleteBlock = useCallback((id: string) => {
+    const { blocks } = dropPending(docRef.current.blocks);
+    const index = blocks.findIndex((block) => block.id === id);
+    if (index < 0) {
+      commit(blocks);
+      return;
+    }
+
+    const next = [...blocks];
+    next.splice(index, 1);
+
+    if (!next.length) {
+      const fresh = createBlock('', '\n');
+      commit([fresh]);
+      startEdit(fresh.id, 0);
+      return;
+    }
+
+    // Deleting the last block must not delete the way the file ends: the
+    // block before it takes over the closing newline(s)
+    if (index === next.length) {
+      next[index - 1] = { ...next[index - 1], sep: blocks[index].sep };
+    }
+
+    commit(next);
+    selectBlock(next[Math.min(index, next.length - 1)].id);
+  }, [commit, dropPending, selectBlock, startEdit]);
 
   /**
    * Open an empty paragraph at `index`, and put the caret in it.
@@ -853,6 +897,13 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
 
   const stepNumbers = stepIndexes(doc.blocks);
 
+  // What the delete dialog is about, while it is open. A step is named by
+  // its number — deleting one renumbers the cells after it.
+  const deleting = deleteId ? doc.blocks.find((block) => block.id === deleteId) : undefined;
+  const deletingStep = deleting && isStepBlock(deleting)
+    ? (stepNumbers.get(deleting.id) ?? 0) + 1
+    : null;
+
   /** Write at the end of the document — the click target under the last block. */
   const appendBlock = useCallback(() => {
     const blocks = docRef.current.blocks;
@@ -891,9 +942,10 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
 
   /**
    * The notebook-cell toolbar at the top-right of a hovered block: move it
-   * one place up or down, or take the grip and drag it anywhere. The arrows
-   * take the mousedown so the caret stays where it is; the grip cannot, or
-   * the browser would never start the drag.
+   * one place up or down, take the grip and drag it anywhere, or delete it
+   * — behind the confirm dialog. The buttons take the mousedown so the
+   * caret stays where it is; the grip cannot, or the browser would never
+   * start the drag.
    */
   const renderTools = (block: Block, index: number) => (
     <div className="flow-block-tools" onClick={(event) => event.stopPropagation()}>
@@ -930,6 +982,17 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
         onClick={(event) => { event.stopPropagation(); moveBlockBy(block.id, 1); }}
       >
         <ArrowDown className="size-3.5" aria-hidden="true" />
+      </button>
+      <div className="bg-border mx-0.5 h-4 w-px" aria-hidden="true" />
+      <button
+        type="button"
+        aria-label="Delete this block"
+        title="Delete"
+        className="flow-block-tool flow-block-tool-danger"
+        onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
+        onClick={(event) => { event.stopPropagation(); setDeleteId(block.id); }}
+      >
+        <Trash2 className="size-3.5" aria-hidden="true" />
       </button>
     </div>
   );
@@ -1062,6 +1125,37 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
           }}
         />
       )}
+
+      {/* Deleting from the toolbar goes through a confirmation */}
+      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <DialogContent
+          // The block that takes the deleted one's place is what gets the
+          // focus back, not the trash button that no longer exists
+          onCloseAutoFocus={(event: Event) => event.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Delete {deletingStep !== null ? `step ${deletingStep}` : 'this block'}</DialogTitle>
+            <DialogDescription>
+              {deletingStep !== null
+                ? 'The step and its definition will be removed from the flow, and the steps after it will renumber.'
+                : 'The block will be removed from the document.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const id = deleteId;
+                setDeleteId(null);
+                if (id) deleteBlock(id);
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
