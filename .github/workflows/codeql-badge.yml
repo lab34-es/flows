@@ -1,0 +1,66 @@
+# Keep the CodeQL badge in the README alive.
+#
+# CodeQL runs through GitHub's default setup, which has no workflow file and
+# therefore no hosted badge. So, exactly like the coverage badge, this
+# workflow generates .github/badges/codeql.svg — green when master has no
+# open code scanning alerts, red with the count otherwise — and commits it
+# when it changed.
+#
+# Scans finish on their own schedule, not on push, so the badge refreshes
+# daily and after every push to master; run it by hand from the Actions tab
+# whenever an alert was just fixed or dismissed.
+
+name: CodeQL badge
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# One refresh at a time: two runs would race on the badge commit.
+concurrency:
+  group: codeql-badge
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  security-events: read
+
+jobs:
+  badge:
+    name: Refresh the CodeQL badge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Count the open CodeQL alerts on master
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?tool_name=CodeQL&state=open&ref=refs/heads/master&per_page=100" \
+            --paginate --jq '.[].number' | wc -l)
+          echo "Open CodeQL alerts on master: ${count}"
+          echo "CODEQL_OPEN_ALERTS=${count}" >> "$GITHUB_ENV"
+
+      - run: node scripts/codeql-badge.js
+
+      - name: Commit the badge when it changed
+        run: |
+          git add .github/badges/codeql.svg
+          if git diff --cached --quiet; then
+            echo "CodeQL badge unchanged."
+            exit 0
+          fi
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Update the CodeQL badge [skip ci]'
+          git push

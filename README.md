@@ -6,6 +6,7 @@
 
 [![CI](https://github.com/lab34-es/flows/actions/workflows/ci.yml/badge.svg)](https://github.com/lab34-es/flows/actions/workflows/ci.yml)
 [![Coverage](https://raw.githubusercontent.com/lab34-es/flows/master/.github/badges/coverage.svg)](https://github.com/lab34-es/flows/actions/workflows/ci.yml)
+[![CodeQL](https://raw.githubusercontent.com/lab34-es/flows/master/.github/badges/codeql.svg)](https://github.com/lab34-es/flows/security/code-scanning)
 [![npm](https://img.shields.io/npm/v/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
 [![license](https://img.shields.io/npm/l/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
 
