@@ -35,6 +35,26 @@ export interface TestRunFlowSummary {
   error?: string;
 }
 
+/**
+ * Where the HTML report of a finished run was sent, when an integration is
+ * configured to send it somewhere.
+ */
+export interface TestRunUpload {
+  /** The integration that took it */
+  target: 'sharepoint';
+  status: 'uploading' | 'uploaded' | 'failed';
+  /** When it reached this status */
+  at?: number;
+  /** Path of the file inside the destination */
+  path?: string;
+  /** Where a person can open it */
+  url?: string | null;
+  library?: string;
+  site?: string;
+  /** Why it did not work, for a failed upload */
+  error?: string;
+}
+
 /** The run.json document. */
 export interface TestRunSummary {
   id: string;
@@ -45,6 +65,8 @@ export interface TestRunSummary {
   status: 'running' | 'passed' | 'failed';
   times: { start: number; end?: number; duration?: number };
   flows: TestRunFlowSummary[];
+  /** Absent when no integration was asked to take the report anywhere */
+  upload?: TestRunUpload;
 }
 
 /** The in-memory handle the recording functions work on. */
@@ -436,12 +458,70 @@ const flowFailed = (run, file, { content, error }: { content?: string; error: an
 export { flowFailed };
 
 /**
+ * Send the report of a finished run wherever the integrations say it goes,
+ * recording the outcome in the summary as it happens -- so the run page shows
+ * "uploading…" while it is in flight and the destination once it landed.
+ *
+ * Nothing here is allowed to throw: a report that could not be delivered is a
+ * line in run.json, never a failed run.
+ *
+ * @param {TestRun} run
+ * @returns {Promise<void>}
+ */
+const deliverReport = async (run) => {
+  const sharepoint = require('./sharepoint');
+
+  try {
+    const settings = await sharepoint.loadSettings();
+
+    if (!sharepoint.shouldUpload(settings, run.summary)) { return; }
+
+    run.summary.upload = { target: 'sharepoint', status: 'uploading', at: Date.now() };
+    save(run);
+
+    const result = await sharepoint.uploadReport({
+      dir: run.dir,
+      file: testRunReport.REPORT_FILE,
+      summary: run.summary
+    });
+
+    if (!result) {
+      delete run.summary.upload;
+    }
+    else {
+      run.summary.upload = result;
+      if (result.status === 'failed') {
+        console.error('Could not upload the report of run %s: %s', run.id, result.error);
+      }
+    }
+
+    save(run);
+  }
+  catch (ex) {
+    run.summary.upload = {
+      target: 'sharepoint',
+      status: 'failed',
+      at: Date.now(),
+      error: (ex && ex.message) || String(ex)
+    };
+    console.error('Could not upload the report of run %s:', run.id, ex);
+    save(run);
+  }
+};
+
+/**
  * Close the run: it passed only when every flow did. A finished run also gets
  * its standalone HTML report written into the folder -- and a report that
  * cannot be written must never fail the run itself.
+ *
+ * The report is then handed to whichever integration was configured to
+ * receive it; the promise only resolves once that is over, so a CLI run does
+ * not exit halfway through its own upload.
+ *
  * @param {TestRun} run
+ * @returns {Promise<void>}
  */
-const finalize = (run) => {
+const finalize = async (run) => {
   if (run.summary.status !== 'running') { return; }
 
   run.summary.status = run.summary.flows.every(flow => flow.status === 'passed') ? 'passed' : 'failed';
@@ -454,7 +534,10 @@ const finalize = (run) => {
   }
   catch (ex) {
     console.error('Could not write the report of run %s:', run.id, ex);
+    return;
   }
+
+  await deliverReport(run);
 };
 
 export { finalize };
@@ -511,7 +594,7 @@ const single = async ({ trigger, environment, file, title, content, io }: {
     run,
     onFinished: async (flow) => {
       flowFinished(run, file, { content, flow });
-      finalize(run);
+      await finalize(run);
     },
     discard: () => discard(run)
   };
@@ -658,7 +741,7 @@ const executeFolderRun = async (run: TestRun, targets, { environment, cli = fals
     await finished;
   }
 
-  finalize(run);
+  await finalize(run);
 };
 
 export { executeFolderRun };
@@ -695,7 +778,7 @@ const startFolderRun = async ({ files, folder = '', view, environment, io }: {
 
   void executeFolderRun(run, targets, { environment }).catch(ex => {
     console.error('Test run failed:', ex);
-    finalize(run);
+    return finalize(run);
   });
 
   return run.summary;

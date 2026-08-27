@@ -1,12 +1,14 @@
 /**
  * The docs content is the Help section of the tool itself, imported verbatim
- * from the frontend source. Editing the in-app help automatically updates the
- * website on the next deploy — there is no second copy to keep in sync.
+ * from the frontend source: one Markdown file per article, under
+ * `frontend/src/components/help/topics`. Editing the in-app help
+ * automatically updates the website on the next deploy — there is no second
+ * copy to keep in sync.
  */
 import {
   HELP_CATEGORIES,
   HELP_TOPICS,
-} from '../../../frontend/src/components/settings/help/helpContent';
+} from '../../../frontend/src/components/help/helpContent';
 
 export { HELP_CATEGORIES, HELP_TOPICS };
 

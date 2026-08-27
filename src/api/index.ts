@@ -36,10 +36,29 @@ export const start = async (options: { context?: string } = {}) => {
   // Define API routes first
   defineRoutes(app);
 
+  // In development (`npm run dev`) the UI is served by the Vite dev server on
+  // :3000, which proxies /api and /socket.io back here. Serving the stale
+  // frontend/dist bundle from this port too would silently hand out a build
+  // that never picks up frontend edits, so send browsers to Vite instead.
+  const devServerUrl = 'http://localhost:3000';
+  const isDev = process.env.FLOWS_DEV === '1';
+
+  if (isDev) {
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return next();
+      }
+      if (req.path.startsWith('/api')) {
+        return res.status(404).send('API endpoint not found');
+      }
+      return res.redirect(302, `${devServerUrl}${req.originalUrl}`);
+    });
+  }
+
   // Serve static files from the built frontend. Published installs carry the
   // bundle at dist/frontend (see scripts/copy-assets.js); a source checkout
   // keeps it where Vite writes it.
-  const frontendDistPath = [
+  const frontendDistPath = isDev ? undefined : [
     path.join(__dirname, '../frontend'),
     path.join(__dirname, '../../frontend/dist')
   ].find((candidate) => fs.existsSync(path.join(candidate, 'index.html')));
@@ -58,7 +77,7 @@ export const start = async (options: { context?: string } = {}) => {
       }
       res.sendFile(path.join(frontendDistPath, 'index.html'));
     });
-  } else {
+  } else if (!isDev) {
     console.warn('Frontend bundle not found. Run "npm run build:frontend" first.');
   }
 
@@ -70,7 +89,11 @@ export const start = async (options: { context?: string } = {}) => {
 
   server.listen(3001, () => {
     console.log('Server is running on port 3001');
-    console.log('http://localhost:3001');
+    if (isDev) {
+      console.log(`Dev mode: UI is served by Vite on ${devServerUrl}`);
+    } else {
+      console.log('http://localhost:3001');
+    }
   });
 };
 

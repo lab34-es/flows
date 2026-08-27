@@ -27,13 +27,13 @@
 
 Flows is a tool for testing end-to-end flows and behaviours across the systems
 you actually run: HTTP APIs, MQTT topics, PostgreSQL databases and web
-applications. The same flow runs from the web UI while you are writing it, from
+applications. You can run flow from the web UI while you are writing it, from
 the CLI on your machine, and unattended in your CI/CD pipelines.
 
 A flow is a **Markdown document**. You write whatever you want — headings,
 prose, notes — and mark the executable parts as ` ```step ` code blocks. Run
 it, and the request, response, assertions and timings of each step appear right
-below the block that produced them, notebook style.
+below the block that produced them. Like in Python notebooks.
 
 ````markdown
 ---
@@ -106,39 +106,35 @@ lab34-flows --server                                  # web UI on http://localho
 lab34-flows --file flows/my-flow.md --env production  # run a flow headlessly
 lab34-flows --view smoke-tests --env production       # run every flow a saved view matches
 lab34-flows --capabilities                            # list available applications and methods
+lab34-flows --version                                 # print the installed version
 lab34-flows --help
 ```
 
-`--view` runs a whole folder view, evaluated when the command runs — a flow
-added later that its filters keep joins the run on its own, which is what makes
-it worth writing into a pipeline. The **CLI** button of a folder view copies the
-exact command for what is on screen.
+A `--view` is an scopped list of flows that matches criterias you specify via the UI.
+You can get the exact cli command to run scopped filters via the UI.
 
 Full reference: [Running flows](https://flows.lab34.es/docs/running/) and
 [Command line](https://flows.lab34.es/docs/cli/).
 
 ## Documentation
 
-Everything — step blocks, replacers, properties, integrations, troubleshooting —
-lives at **[flows.lab34.es/docs](https://flows.lab34.es/docs/)**. The same
-articles ship inside the app's Help section, so the website and the tool never
-disagree.
-
-The docs source lives in [`website/`](website/).
+You can access the entire documentation at  at **[flows.lab34.es/docs](https://flows.lab34.es/docs/)**. 
+The same articles ship inside the app's Help section.
 
 ## Development
 
 The package is written in TypeScript and published as CommonJS: `src/` compiles
 into `dist/`, which is what `npm publish` ships, together with the type
-declarations. The web UI (`frontend/`) is TypeScript too.
+declarations. The web UI (`frontend/`) is TypeScript too (react/mui/joy)
 
 ```bash
 npm install              # CLI, API and helpers
 npm run install:frontend # web UI
 
-npm run dev              # API on :3001, restarted on change (tsx, no build step)
-npm run frontend         # web UI on :3000
-npm run dev:full         # both at once
+npm run dev              # API on :3001 + web UI on :3000, both live-reloading
+                         # open http://localhost:3000 (:3001 redirects there)
+npm run dev:api          # API only, restarted on change (tsx, no build step)
+npm run frontend         # web UI only, Vite dev server with HMR on :3000
 
 npm run build            # compile src/ -> dist/ and copy the bundled examples
 npm run typecheck        # tsc over src/ and tests/, no emit

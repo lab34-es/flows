@@ -3,6 +3,7 @@ const router = express.Router();
 
 import * as ai from '../../helpers/ai';
 import * as jira from '../../helpers/jira';
+import * as sharepoint from '../../helpers/sharepoint';
 
 const sendError = (res, error, status = 400) => {
   const message = (error && error.message) || String(error);
@@ -77,6 +78,29 @@ router.get('/jira/pull', (req, res) => {
 // Stop the running pull. Whatever it already wrote stays on disk.
 router.delete('/jira/pull', (req, res) => {
   res.send(jira.cancelPull());
+});
+
+// SharePoint settings. The client secret lives in the context's .env and is
+// never sent back to the client.
+router.get('/sharepoint', (req, res) => {
+  sharepoint.getSettings()
+    .then(settings => res.send(settings))
+    .catch(error => sendError(res, error, 500));
+});
+
+// { enabled, tenantId, clientId, clientSecret, siteUrl, libraryName,
+//   folderPath, fileName, uploadOn }
+router.put('/sharepoint', (req, res) => {
+  sharepoint.saveSettings(req.body)
+    .then(settings => res.send(settings))
+    .catch(error => sendError(res, error));
+});
+
+// Use the stored credentials for real: sign in, find the site and the library
+router.post('/sharepoint/test', (req, res) => {
+  sharepoint.test()
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
 });
 
 export default router;

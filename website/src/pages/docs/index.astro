@@ -1,49 +1,50 @@
 ---
-import DocsLayout from '../../layouts/DocsLayout.astro';
-import { groupedTopics, withBase } from '../../lib/help.js';
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { groupedTopics, withBase } from "../../lib/help.js";
 
 const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'CollectionPage',
-  name: 'lab34/flows documentation',
-  description:
-    'Everything about writing, running and integrating lab34/flows: the same articles the tool ships in its Help section.',
-  url: new URL(Astro.url.pathname, Astro.site).href,
-  inLanguage: 'en',
-  isPartOf: {
-    '@type': 'WebSite',
-    name: 'lab34/flows',
-    url: new URL(withBase('/'), Astro.site).href,
-  },
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "lab34/flows documentation",
+    description:
+        "Everything about writing, running and integrating lab34/flows: the same articles the tool ships in its Help section.",
+    url: new URL(Astro.url.pathname, Astro.site).href,
+    inLanguage: "en",
+    isPartOf: {
+        "@type": "WebSite",
+        name: "lab34/flows",
+        url: new URL(withBase("/"), Astro.site).href,
+    },
 };
 ---
 
 <DocsLayout
-  title="Documentation — lab34/flows"
-  description="Everything about writing, running and integrating lab34/flows: the same articles the tool ships in its Help section."
-  jsonLd={jsonLd}
+    title="Documentation — lab34/flows"
+    description="Everything about writing, running and integrating lab34/flows: the same articles the tool ships in its Help section."
+    jsonLd={jsonLd}
 >
-  <h1 class="fl-docs-h1">Documentation</h1>
-  <p class="fl-docs-lede">
-    These are the same articles the tool ships in its built-in Help section —
-    published straight from the source, so the website and the app never
-    disagree.
-  </p>
+    <h1 class="fl-docs-h1">Documentation</h1>
+    <p class="fl-docs-lede">
+        These are the same articles the tool ships in its built-in Help section.
+    </p>
 
-  {
-    groupedTopics.map((category) => (
-      <section class="fl-docs-section">
-        <h2 class="fl-docs-h2">{category.label}</h2>
-        <div class="fl-doc-cards">
-          {category.topics.map((topic) => (
-            <a href={withBase(`/docs/${topic.id}/`)} class="fl-doc-card">
-              <p class="fl-doc-card-title">{topic.title}</p>
-              <p class="fl-doc-card-desc">{topic.summary}</p>
-              <p class="fl-doc-card-slug">/docs/{topic.id}/</p>
-            </a>
-          ))}
-        </div>
-      </section>
-    ))
-  }
+    {
+        groupedTopics.map((category) => (
+            <section class="fl-docs-section">
+                <h2 class="fl-docs-h2">{category.label}</h2>
+                <div class="fl-doc-cards">
+                    {category.topics.map((topic) => (
+                        <a
+                            href={withBase(`/docs/${topic.id}/`)}
+                            class="fl-doc-card"
+                        >
+                            <p class="fl-doc-card-title">{topic.title}</p>
+                            <p class="fl-doc-card-desc">{topic.summary}</p>
+                            <p class="fl-doc-card-slug">/docs/{topic.id}/</p>
+                        </a>
+                    ))}
+                </div>
+            </section>
+        ))
+    }
 </DocsLayout>

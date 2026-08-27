@@ -19,6 +19,10 @@ const AI_TIMEOUT = 240000;
 // the credential helper before that.
 const GIT_TIMEOUT = 120000;
 
+// Testing the SharePoint credentials signs in with Microsoft and then walks
+// the site and its libraries: three round trips to another continent.
+const SHAREPOINT_TIMEOUT = 90000;
+
 // API methods
 export const flowsApi = {
   list: () => api.get('/api/flows'),
@@ -134,6 +138,11 @@ export const settingsApi = {
   pullJira: () => api.post('/api/settings/jira/pull'),
   getJiraPull: () => api.get('/api/settings/jira/pull'),
   cancelJiraPull: () => api.delete('/api/settings/jira/pull'),
+  getSharepoint: () => api.get('/api/settings/sharepoint'),
+  saveSharepoint: (settings) => api.put('/api/settings/sharepoint', settings),
+  // Signs in and resolves the site and library for real: give it the room a
+  // round trip to Microsoft needs
+  testSharepoint: () => api.post('/api/settings/sharepoint/test', {}, { timeout: SHAREPOINT_TIMEOUT }),
 };
 
 export const jiraApi = {

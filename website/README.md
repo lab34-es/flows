@@ -13,7 +13,7 @@ published at **https://flows.lab34.es/**.
 - The home page carries the example flow document: pressing **Run** replays a
   pre-recorded execution, including the MQTT retry, straight in the page.
 - The **Docs** section is generated at build time from the app's own Help
-  section (`frontend/src/components/settings/help/helpContent.js`). Edit the
+  section (`frontend/src/components/help/helpContent.ts`). Edit the
   in-app help and the website follows — there is no second copy.
 - Deployed automatically by `.github/workflows/deploy-website.yml` on every
   push to `master` that touches `website/` or the help content. One-time setup

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Palette, Sparkles, Ticket } from 'lucide-react';
+import { CloudUpload, Palette, Sparkles, Ticket } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,12 @@ const SECTIONS = [
     label: 'Xray',
     description: 'Jira integration',
     icon: Ticket,
+  },
+  {
+    to: '/settings/sharepoint',
+    label: 'SharePoint',
+    description: 'Where reports are uploaded',
+    icon: CloudUpload,
   },
   {
     to: '/settings/ui',

@@ -51,9 +51,9 @@ export function titleForRoute(route: string) {
     return decodeURIComponent(basename(pathname)) || 'Application';
   }
 
-  if (pathname.startsWith('/settings')) {
-    return pathname.startsWith('/settings/help') ? 'Help' : 'Settings';
-  }
+  if (pathname.startsWith('/settings')) { return 'Settings'; }
+
+  if (pathname.startsWith('/help')) { return 'Help'; }
 
   return 'flows';
 }
@@ -61,14 +61,16 @@ export function titleForRoute(route: string) {
 /**
  * Which tab a route belongs to. Opening a route whose key matches an open
  * tab focuses (and, if needed, navigates) that tab instead of adding another:
- * settings is one tab whatever section it sits on, a test run is one tab
- * whether it shows the run or one of its stored flows, and everything else
- * is keyed by its exact route.
+ * settings and help are one tab each whatever section or article they sit on,
+ * a test run is one tab whether it shows the run or one of its stored flows,
+ * and everything else is keyed by its exact route.
  */
 export function tabKeyForRoute(route: string) {
   const { pathname, search } = parseRoute(route);
 
   if (pathname.startsWith('/settings')) { return 'settings'; }
+
+  if (pathname.startsWith('/help')) { return 'help'; }
 
   const run = pathname.match(/^\/test-runs\/([^/]+)/);
   if (run) { return `run:${run[1]}`; }

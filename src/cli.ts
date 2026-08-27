@@ -24,6 +24,7 @@ import * as applications from './helpers/applications';
  *   --env          Environment to run the flow in (required for --file/--view)
  *   --server       Start the web server with built frontend and API
  *   --debug        Print debug information including environment variables
+ *   --version      Print the installed version and exit
  *   --help         Show this help message
  *
  * Flow generation with AI lives in the web UI (--server), where the provider,
@@ -87,6 +88,7 @@ Options:
   --env           Environment to run the flow in (required for --file and --view)
   --context       Context directory (optional)
   --debug         Print debug information including environment variables
+  --version, -v   Print the installed version and exit
   --help          Show this help message
 
 Generating flows with AI is done from the web UI (--server): the provider,
@@ -160,7 +162,9 @@ function parseArguments() {
     context: argv.context || null,
     debug: argv.debug || false,
     help: argv.help || false,
-    v: argv.v || false
+    // Both spellings print the version: --version is what people type, -v is
+    // what the CLI has always accepted.
+    version: argv.version || argv.v || false
   };
 }
 
@@ -307,7 +311,7 @@ async function main() {
   const args = parseArguments();
 
   // Show version if requested
-  if (args.v) {
+  if (args.version) {
     console.log(packageJson.version);
     process.exit(0);
   }

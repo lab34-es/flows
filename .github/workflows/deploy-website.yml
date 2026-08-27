@@ -1,8 +1,8 @@
 # Builds the documentation website (website/) and publishes it to GitHub Pages.
 #
 # The site's docs are generated from the app's Help section
-# (frontend/src/components/settings/help/helpContent.ts), so changes to that
-# file also trigger a deploy.
+# (frontend/src/components/help), so changes to the help articles also
+# trigger a deploy.
 #
 # One-time setup: in the repository settings, under Pages, set
 # "Build and deployment > Source" to "GitHub Actions".
@@ -19,7 +19,7 @@ on:
     branches: [master]
     paths:
       - 'website/**'
-      - 'frontend/src/components/settings/help/helpContent.ts'
+      - 'frontend/src/components/help/**'
       - '.github/workflows/deploy-website.yml'
   workflow_dispatch:
 

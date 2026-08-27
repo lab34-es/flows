@@ -108,10 +108,17 @@ export function AppSidebar() {
               <div className="grid flex-1 text-left leading-tight">
                 {/* The open-source lockup: parent Medium 500, brass slash,
                     project Regular 400, all lowercase. */}
-                <span className="truncate font-mono text-sm tracking-[-0.04em]">
-                  <span className="font-medium">lab34</span>
-                  <span className="text-brass">/</span>
-                  <span className="font-normal">flows</span>
+                <span className="flex items-baseline gap-1.5 truncate font-mono text-sm tracking-[-0.04em]">
+                  <span className="truncate">
+                    <span className="font-medium">lab34</span>
+                    <span className="text-brass">/</span>
+                    <span className="font-normal">flows</span>
+                  </span>
+                  {/* Which release this is, baked in at build time from the
+                      package's version (see `define` in vite.config.ts). */}
+                  <span className="text-muted-foreground text-[0.625rem] font-normal tracking-normal">
+                    v{__APP_VERSION__}
+                  </span>
                 </span>
                 <span className="text-muted-foreground truncate text-xs">E2E flow testing</span>
               </div>

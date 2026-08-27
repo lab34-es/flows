@@ -23,12 +23,21 @@ jest.mock('../../src/helpers/applications', () => ({
   loadAll: jest.fn(async () => {})
 }));
 jest.mock('../../src/helpers/bases', () => ({ query: jest.fn() }));
+
+// A finished run hands its report to the integrations: none of them may
+// reach the network from a test
+jest.mock('../../src/helpers/sharepoint', () => ({
+  loadSettings: jest.fn(async () => ({})),
+  shouldUpload: jest.fn(() => false),
+  uploadReport: jest.fn(async () => null)
+}));
 jest.mock('../../src/helpers/runner/v1', () => ({ run: jest.fn(), isRunning: jest.fn(() => false) }));
 
 import * as testRuns from '../../src/helpers/testRuns';
 import * as markdownFlows from '../../src/helpers/markdownFlows';
 import * as bases from '../../src/helpers/bases';
 import * as runner from '../../src/helpers/runner/v1';
+import * as sharepoint from '../../src/helpers/sharepoint';
 
 const CONTEXT = mockContext;
 const RUNS_DIR = path.join(CONTEXT, 'test-runs');
@@ -121,7 +130,7 @@ describe('testRuns recording', () => {
 
     testRuns.flowStarted(run, 'payments/pay.md');
     testRuns.flowFinished(run, 'payments/pay.md', { content: MARKDOWN, flow: executedFlow() });
-    testRuns.finalize(run);
+    await testRuns.finalize(run);
 
     const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
     expect(summary.status).toBe('passed');
@@ -158,7 +167,7 @@ describe('testRuns recording', () => {
     const run = await testRuns.create({ trigger: 'flow', environment: 'local', flows: [{ file: 'a.md' }] });
 
     testRuns.flowFinished(run, 'a.md', { content: MARKDOWN, flow: executedFlow('failed') });
-    testRuns.finalize(run);
+    await testRuns.finalize(run);
 
     const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
     expect(summary.status).toBe('failed');
@@ -185,7 +194,7 @@ describe('testRuns recording', () => {
     const run = await testRuns.create({ trigger: 'folder', environment: 'local', flows: [{ file: 'broken.md' }] });
 
     testRuns.flowFailed(run, 'broken.md', { content: '```step\n[broken\n```\n', error: new Error('Invalid markdown flow') });
-    testRuns.finalize(run);
+    await testRuns.finalize(run);
 
     const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
     expect(summary.status).toBe('failed');
@@ -390,5 +399,87 @@ describe('testRuns reading', () => {
 
     await expect(testRuns.getFlow(run.id, '../outside.md')).rejects.toThrow('Flow not found');
     await expect(testRuns.getFlow(run.id, 'run.json')).rejects.toThrow('Flow not found');
+  });
+});
+
+describe('delivering the report of a finished run', () => {
+  beforeEach(() => {
+    (sharepoint.shouldUpload as jest.Mock).mockReturnValue(false);
+    (sharepoint.uploadReport as jest.Mock).mockResolvedValue(null);
+  });
+
+  /** A one-flow run, finished and ready to have its report taken somewhere. */
+  const finishedRun = async () => {
+    const run = await testRuns.create({ trigger: 'flow', environment: 'local', flows: [{ file: 'a.md' }] });
+    testRuns.flowFinished(run, 'a.md', { content: MARKDOWN, flow: executedFlow() });
+    return run;
+  };
+
+  const storedSummary = (run) =>
+    JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
+
+  test('says nothing about an upload nobody asked for', async () => {
+    const run = await finishedRun();
+
+    await testRuns.finalize(run);
+
+    expect(sharepoint.uploadReport).not.toHaveBeenCalled();
+    expect(storedSummary(run).upload).toBeUndefined();
+  });
+
+  test('records where the report landed', async () => {
+    (sharepoint.shouldUpload as jest.Mock).mockReturnValue(true);
+    const run = await finishedRun();
+
+    // What run.json says while the upload is in flight: the run page reads it
+    // to show that something is happening
+    let inFlight;
+    (sharepoint.uploadReport as jest.Mock).mockImplementation(async () => {
+      inFlight = storedSummary(run).upload;
+      return {
+        target: 'sharepoint',
+        status: 'uploaded',
+        path: 'Test reports/run.html',
+        url: 'https://acme.sharepoint.com/run.html'
+      };
+    });
+
+    await testRuns.finalize(run);
+
+    expect((sharepoint.uploadReport as jest.Mock).mock.calls[0][0]).toMatchObject({
+      dir: run.dir,
+      file: 'report.html'
+    });
+    expect(inFlight).toMatchObject({ target: 'sharepoint', status: 'uploading' });
+    expect(storedSummary(run).upload).toMatchObject({
+      status: 'uploaded',
+      url: 'https://acme.sharepoint.com/run.html'
+    });
+  });
+
+  test('an upload that failed is recorded, and the run still passed', async () => {
+    (sharepoint.shouldUpload as jest.Mock).mockReturnValue(true);
+    (sharepoint.uploadReport as jest.Mock).mockResolvedValue({
+      target: 'sharepoint', status: 'failed', error: 'Access denied'
+    });
+
+    const run = await finishedRun();
+    await testRuns.finalize(run);
+
+    const summary = storedSummary(run);
+    expect(summary.status).toBe('passed');
+    expect(summary.upload).toMatchObject({ status: 'failed', error: 'Access denied' });
+  });
+
+  test('an integration that threw cannot take the run down with it', async () => {
+    (sharepoint.shouldUpload as jest.Mock).mockReturnValue(true);
+    (sharepoint.uploadReport as jest.Mock).mockRejectedValue(new Error('boom'));
+
+    const run = await finishedRun();
+    await expect(testRuns.finalize(run)).resolves.toBeUndefined();
+
+    const summary = storedSummary(run);
+    expect(summary.status).toBe('passed');
+    expect(summary.upload).toMatchObject({ status: 'failed', error: 'boom' });
   });
 });

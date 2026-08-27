@@ -11,8 +11,11 @@ import ApplicationPage from '@/pages/ApplicationPage';
 import SettingsPage from '@/pages/SettingsPage';
 import AiSettings from '@/components/settings/AiSettings';
 import XraySettings from '@/components/settings/XraySettings';
+import SharepointSettings from '@/components/settings/SharepointSettings';
 import UiSettings from '@/components/settings/UiSettings';
-import HelpSection from '@/components/settings/help/HelpSection';
+import HelpPage from '@/pages/HelpPage';
+import HelpIndex from '@/components/help/HelpIndex';
+import HelpArticle from '@/components/help/HelpArticle';
 
 /**
  * The route table of the app. Every workspace tab runs its own router over
@@ -34,8 +37,12 @@ export function AppRoutes() {
         <Route index element={<Navigate to="/settings/ai" replace />} />
         <Route path="ai" element={<AiSettings />} />
         <Route path="xray" element={<XraySettings />} />
+        <Route path="sharepoint" element={<SharepointSettings />} />
         <Route path="ui" element={<UiSettings />} />
-        <Route path="help" element={<HelpSection />} />
+      </Route>
+      <Route path="/help" element={<HelpPage />}>
+        <Route index element={<HelpIndex />} />
+        <Route path=":topicId" element={<HelpArticle />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

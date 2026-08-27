@@ -3,5 +3,8 @@
   "ext": "ts,json",
   "ignore": ["src/defaults/**"],
   "exec": "tsx src/api.ts",
-  "args": []
+  "args": [],
+  "env": {
+    "FLOWS_DEV": "1"
+  }
 }

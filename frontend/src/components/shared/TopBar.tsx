@@ -25,7 +25,7 @@ export function TopBar() {
   const { environments, environment, setEnvironment } = useAppState();
 
   const onSettings = location.pathname.startsWith('/settings');
-  const onHelp = location.pathname.startsWith('/settings/help');
+  const onHelp = location.pathname.startsWith('/help');
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
@@ -50,14 +50,14 @@ export function TopBar() {
         <Button
           variant={onHelp ? 'secondary' : 'ghost'}
           size="sm"
-          onClick={() => openTab('/settings/help')}
+          onClick={() => openTab('/help')}
           title="How flows, steps and applications work"
         >
           <CircleHelp /> Help
         </Button>
 
         <Button
-          variant={onSettings && !onHelp ? 'secondary' : 'ghost'}
+          variant={onSettings ? 'secondary' : 'ghost'}
           size="sm"
           onClick={() => openTab('/settings')}
           title="AI, Xray and UI settings"

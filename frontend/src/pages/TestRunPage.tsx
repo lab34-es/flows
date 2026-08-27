@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertCircle, ChevronRight, FileChartColumn, History } from 'lucide-react';
+import {
+  AlertCircle,
+  ChevronRight,
+  CloudAlert,
+  CloudUpload,
+  FileChartColumn,
+  History,
+  Loader2,
+} from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +33,41 @@ const STATUS_BADGES = {
   passed: { label: 'Passed', variant: 'success' },
   failed: { label: 'Failed', variant: 'destructive' },
 };
+
+/**
+ * Where the report of this run went, when an integration was configured to
+ * take it somewhere. A successful upload is a link to the uploaded file; a
+ * failed one says why, because the run itself says nothing about it.
+ */
+function UploadBadge({ upload }) {
+  if (!upload) { return null; }
+
+  if (upload.status === 'uploading') {
+    return (
+      <Badge variant="info" className="gap-1">
+        <Loader2 className="size-3 animate-spin" /> Uploading the report…
+      </Badge>
+    );
+  }
+
+  if (upload.status === 'failed') {
+    return (
+      <Badge variant="destructive" className="gap-1" title={upload.error || ''}>
+        <CloudAlert className="size-3" /> Report upload failed
+      </Badge>
+    );
+  }
+
+  const badge = (
+    <Badge variant="success" className="gap-1" title={upload.path || ''}>
+      <CloudUpload className="size-3" /> Report on SharePoint
+    </Badge>
+  );
+
+  return upload.url
+    ? <a href={upload.url} target="_blank" rel="noreferrer">{badge}</a>
+    : badge;
+}
 
 /**
  * One test run: which flows it executed and how each of them went. A run in
@@ -112,6 +155,7 @@ export function TestRunPage() {
           <span className="text-muted-foreground text-sm">
             {runScore(run)} passed{formatDuration(run.times) ? ` · ${formatDuration(run.times)}` : ''}
           </span>
+          <UploadBadge upload={run.upload} />
           {/* The report is written when the execution finishes */}
           {run.status !== 'running' && (
             <Button asChild variant="outline" size="sm" className="ml-auto">

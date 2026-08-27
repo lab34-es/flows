@@ -13,10 +13,27 @@ jest.mock('../../src/helpers/config', () => {
   };
 });
 
-// No settings route is allowed to reach Jira/Xray on its own
+// The SharePoint client secret goes to the context's .env: keep it in memory
+jest.mock('../../src/helpers/env', () => {
+  let stored: Record<string, string> = {};
+  return {
+    FILE: '.env',
+    readAll: jest.fn(async () => stored),
+    read: jest.fn(async (key) => stored[key]),
+    write: jest.fn(async (key, value) => {
+      if (value) { stored[key] = String(value); }
+      else { delete stored[key]; }
+    }),
+    __set: (value) => { stored = value; },
+    __get: () => stored
+  };
+});
+
+// No settings route is allowed to reach Jira/Xray or SharePoint on its own
 jest.mock('axios', () => ({
   get: jest.fn(),
-  post: jest.fn()
+  post: jest.fn(),
+  put: jest.fn()
 }));
 
 import express from 'express';
@@ -24,6 +41,7 @@ import request from 'supertest';
 
 import axios from 'axios';
 import * as configHelper from '../../src/helpers/config';
+import * as env from '../../src/helpers/env';
 import settings from '../../src/api/routes/settings';
 
 const app = express();
@@ -32,8 +50,10 @@ app.use('/api/settings', settings);
 
 beforeEach(() => {
   (configHelper as any).__set({});
+  (env as any).__set({});
   (axios.get as jest.Mock).mockReset();
   (axios.post as jest.Mock).mockReset();
+  (axios.put as jest.Mock).mockReset();
 });
 
 describe('GET /api/settings/jira', () => {
@@ -137,5 +157,59 @@ describe('GET /api/settings/ai', () => {
 
     expect(JSON.stringify(response.body)).not.toContain('super-secret');
     expect(response.body.providers.gemini.hasApiKey).toBe(true);
+  });
+});
+
+describe('/api/settings/sharepoint', () => {
+  test('never sends the client secret to the client', async () => {
+    (configHelper as any).__set({
+      enabled: true,
+      tenantId: 'tenant-id',
+      clientId: 'client-id',
+      siteUrl: 'https://acme.sharepoint.com/sites/QA'
+    });
+    (env as any).__set({ SHAREPOINT_CLIENT_SECRET: 'super-secret' });
+
+    const response = await request(app).get('/api/settings/sharepoint').expect(200);
+
+    expect(JSON.stringify(response.body)).not.toContain('super-secret');
+    expect(response.body.hasClientSecret).toBe(true);
+    expect(response.body.configured).toBe(true);
+  });
+
+  test('stores the settings, keeping the secret out of the config file', async () => {
+    const response = await request(app)
+      .put('/api/settings/sharepoint')
+      .send({
+        enabled: true,
+        tenantId: 'tenant-id',
+        clientId: 'client-id',
+        clientSecret: 'super-secret',
+        siteUrl: 'https://acme.sharepoint.com/sites/QA/',
+        folderPath: '/Test reports/{environment}/'
+      })
+      .expect(200);
+
+    expect(JSON.stringify(response.body)).not.toContain('super-secret');
+    expect(response.body.siteUrl).toBe('https://acme.sharepoint.com/sites/QA');
+    expect(response.body.folderPath).toBe('Test reports/{environment}');
+    expect(JSON.stringify((configHelper as any).__get())).not.toContain('super-secret');
+    expect((env as any).__get().SHAREPOINT_CLIENT_SECRET).toBe('super-secret');
+  });
+
+  test('answers 400 on settings that make no sense', async () => {
+    const response = await request(app)
+      .put('/api/settings/sharepoint')
+      .send({ siteUrl: 'acme.sharepoint.com' })
+      .expect(400);
+
+    expect(response.body.error).toMatch(/must start with http/);
+  });
+
+  test('answers 400 without calling SharePoint when nothing is configured', async () => {
+    const response = await request(app).post('/api/settings/sharepoint/test').expect(400);
+
+    expect(response.body.error).toMatch(/tenant id/);
+    expect(axios.post).not.toHaveBeenCalled();
   });
 });
