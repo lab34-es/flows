@@ -41,20 +41,14 @@ publishing from a stale `frontend/dist`.
 
 ### The release, step by step
 
-1. **Start from a clean, up-to-date `master`.**
+1. **Start from a clean, up-to-date `master`.** The bump goes on `master`.
 
    ```bash
    git checkout master && git pull
    git status --porcelain   # must be empty
    ```
 
-2. **Branch.** Releases go through a PR like everything else.
-
-   ```bash
-   git checkout -b chore/release-1.4.0
-   ```
-
-3. **Bump the version.** Use `npm version`, never hand-edit `package.json` —
+2. **Bump the version.** Use `npm version`, never hand-edit `package.json` —
    it keeps `package-lock.json` in sync (the version appears twice in there),
    which is the usual source of a messy release.
 
@@ -62,45 +56,27 @@ publishing from a stale `frontend/dist`.
    npm version 1.4.0 --no-git-tag-version
    ```
 
-   `--no-git-tag-version` matters: the tag is created later, on the commit
-   that actually got released, not on a branch commit that may never merge.
-   Pick the number by semver — breaking change → major, new capability →
-   minor, fix only → patch.
+   `--no-git-tag-version` matters: the release workflow creates the tag itself,
+   on the commit it actually published. Tagging here would put the tag on a
+   commit before CI has had a look at it. Pick the number by semver — breaking
+   change → major, new capability → minor, fix only → patch.
 
-4. **Run the same gates CI will run**, so a red release pipeline is a surprise
-   rather than the norm:
+3. **Do not verify the release locally.** Every gate — lint, types, the 80%
+   coverage threshold, the audits, the frontend build, the package build and
+   `node dist/cli.js --help` — is re-run by
+   `.github/workflows/npm-publish.yml` against the exact commit being
+   released, before anything is published. Running them by hand first proves
+   nothing extra and just slows the release down. Publishing is a GitHub
+   Actions job; let it do its job.
 
-   ```bash
-   npm ci
-   npm ci --prefix frontend
-   npm run lint
-   npm run typecheck
-   npm run test:coverage          # 80% gate, from jest.config.js
-   npm run lint --prefix frontend
-   npm run typecheck --prefix frontend
-   npm audit --audit-level=critical
-   npm audit --audit-level=critical --prefix frontend
-   npm run build:frontend         # must run BEFORE the next line
-   npm run build                  # copy-assets folds frontend/dist -> dist/frontend
-   test -f dist/frontend/index.html
-   node dist/cli.js --version     # prints the new number
-   ```
-
-   The frontend build comes first on purpose: `scripts/copy-assets.js` can only
-   copy `frontend/dist` once Vite has written it, and it *skips with a warning*
-   instead of failing when it is missing — so a wrong order ships a package
-   with no UI in it.
-
-5. **Commit, push, open the PR, get CI green, merge.**
+4. **Commit and push the bump to `master`.**
 
    ```bash
    git commit -am 'chore: bump version to 1.4.0'
-   git push -u origin chore/release-1.4.0
-   gh pr create --fill
+   git push
    ```
 
-6. **Publish.** Only after the bump is on `master`. Trigger the release
-   workflow by hand:
+5. **Publish.** Trigger the release workflow by hand:
 
    ```bash
    gh workflow run npm-publish.yml --ref master
@@ -111,12 +87,20 @@ publishing from a stale `frontend/dist`.
    released, publishes to npm, and then **creates and pushes the `v1.4.0` tag
    itself**. There is nothing left to tag by hand.
 
-7. **Check it landed.**
+6. **Check it landed.**
 
    ```bash
    npm view @lab34/flows version
    npx -y @lab34/flows@1.4.0 --version
    ```
+
+### Never run the release by hand
+
+The build and the checks belong to GitHub Actions. Do not run the gates
+locally as a pre-flight, and do not build `dist/` on your machine to "make
+sure" — the release pipeline builds from a clean checkout of the released
+commit, and anything produced locally is neither what ships nor evidence about
+what ships.
 
 ### The other way in: pushing a tag
 
@@ -166,8 +150,10 @@ npm test                 # jest
 npm run coverage:badge   # refresh .github/badges/coverage.svg
 ```
 
-Before pushing anything, the minimum is `npm run lint && npm run typecheck &&
-npm test`, plus the `--prefix frontend` equivalents when the UI changed. CI
-enforces coverage of `src/` above 80% on statements, branches, functions and
+While working on a change, `npm run lint`, `npm run typecheck` and `npm test`
+are the fast local feedback loop (add the `--prefix frontend` equivalents when
+the UI changed). They are a convenience, not the gate: `ci.yml` decides what
+lands and `npm-publish.yml` decides what ships. CI enforces coverage of `src/`
+above 80% on statements, branches, functions and
 lines; coverage is collected from all of `src/`, not just what tests import, so
 new files need tests to land.
