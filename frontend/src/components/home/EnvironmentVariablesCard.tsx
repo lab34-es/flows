@@ -103,10 +103,10 @@ export function EnvironmentVariablesCard() {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => openTab('/environment-variables/export')}>
+          <Button size="sm" variant="outline" onClick={open('/environment-variables/export')}>
             <Download /> Export
           </Button>
-          <Button size="sm" variant="outline" onClick={() => openTab('/environment-variables/import')}>
+          <Button size="sm" variant="outline" onClick={open('/environment-variables/import')}>
             <Upload /> Import
           </Button>
           {summary && summary.creatable > 0 && (
