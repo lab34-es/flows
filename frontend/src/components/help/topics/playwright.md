@@ -15,6 +15,11 @@ keywords:
   - 'session'
   - 'reuse browser'
   - 'keep open'
+  - 'upload'
+  - 'file upload'
+  - 'attach file'
+  - 'setInputFiles'
+  - 'file chooser'
 ---
 
 Web applications are tested through [Playwright](https://playwright.dev).
@@ -79,6 +84,68 @@ Two things a session cannot do. It is **one page**, so a step that opens a new
 tab is on its own; and the browser it was opened with is the browser it keeps,
 so a later step asking for a different `browserType` or `device` is given the
 one already running.
+
+### Uploading files
+
+A browser step uploads a file with the `upload` method (`setInputFiles` is the
+same step under its Playwright name):
+
+```yaml
+steps:
+  - method: upload
+    parameters:
+      selector: 'input[type=file]'
+      files: ./report.txt
+```
+
+**The files live in the flows directory.** Every path is resolved inside
+`<context>/flows`, so `./report.txt` is `<context>/flows/report.txt` and
+`invoices/march.pdf` is `<context>/flows/invoices/march.pdf`. The fixtures a
+flow uploads are versioned next to the flow that uploads them — and nothing
+outside that directory can be sent to a page, so a path climbing out of it
+(`../../.ssh/id_rsa`) is refused rather than uploaded.
+
+| Key | What it does |
+|-|-|
+| `files` | The file to upload, or a list of them. `file` works too, for one. |
+| `selector` | The `<input type="file">` to fill. |
+| `trigger` | Instead of a selector: the element to click, when it opens the operating system's file chooser rather than exposing an input. |
+| `timeout` | Passed through to Playwright. |
+
+A widget with no visible `<input type="file">` — a drop zone, a styled
+"Attach" button — is uploaded to through its `trigger`:
+
+```yaml
+steps:
+  - method: upload
+    parameters:
+      trigger: '#attach'
+      files:
+        - ./report.txt
+        - ./invoices/march.pdf
+```
+
+Which file to upload is usually the flow step's decision, not the YAML's. The
+step names it, and the YAML takes it from the parameters like any other value:
+
+```step
+application: application-ui
+method: upload-to-server
+parameters:
+  files:
+    report: ./report.txt
+```
+
+```yaml
+steps:
+  - method: upload
+    parameters:
+      selector: 'input[type=file]'
+      files: '{{ parameters.files.report }}'
+```
+
+A step that uploaded keeps what it sent, as absolute paths, so a later step can
+read it back with `{{ steps.<id>.result.files.[0] }}`.
 
 This part is **experimental**: the set of available methods lives with the
 Playwright helper, and the seeded `playful_website` example application shows a

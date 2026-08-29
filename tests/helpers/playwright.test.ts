@@ -9,7 +9,8 @@ const browser: any = {};
 const PAGE_METHODS = [
   'goto', 'click', 'type', 'fill', 'press', 'hover', 'dragAndDrop', 'selectOption',
   'check', 'uncheck', 'dblclick', 'focus', 'waitForSelector', 'waitForTimeout',
-  'screenshot', 'evaluate', 'title', 'route', 'on', '$$'
+  'screenshot', 'evaluate', 'title', 'route', 'on', '$$', 'setInputFiles',
+  'waitForEvent'
 ];
 
 const resetBrowser = () => {
@@ -45,9 +46,30 @@ import os from 'os';
 import path from 'path';
 import YAML from 'yaml';
 
+// An upload resolves its files inside the flows directory of the context, so
+// that directory has to be a throwaway one -- the tests must never reach the
+// real ~/lab34-flows, nor be able to read anything outside what they wrote.
+const mockContext = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-ctx-'));
+
+jest.mock('../../src/helpers/paths', () => ({
+  contextDir: async (pathParts) =>
+    require('path').join(mockContext, ...(pathParts || []))
+}));
+
 import * as playwright from '../../src/helpers/playwright';
 
 const CTX_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-'));
+const FLOWS_DIR = path.join(mockContext, 'flows');
+
+fs.mkdirSync(FLOWS_DIR, { recursive: true });
+
+/** Write a file to upload inside the flows directory, and return its path. */
+const writeUpload = (relativePath: string, content = 'hello') => {
+  const absolute = path.join(FLOWS_DIR, relativePath);
+  fs.mkdirSync(path.dirname(absolute), { recursive: true });
+  fs.writeFileSync(absolute, content, 'utf8');
+  return absolute;
+};
 
 const ctx = () => ({
   path: CTX_DIR,
@@ -71,7 +93,10 @@ beforeEach(() => {
   resetBrowser();
 });
 
-afterAll(() => fs.rmSync(CTX_DIR, { recursive: true, force: true }));
+afterAll(() => {
+  fs.rmSync(CTX_DIR, { recursive: true, force: true });
+  fs.rmSync(mockContext, { recursive: true, force: true });
+});
 
 describe('playwright.run - setup', () => {
   test('launches the default browser and device', async () => {
@@ -486,5 +511,169 @@ describe('playwright.closeSessions', () => {
 
   test('closing a session nobody opened is not an error', async () => {
     await expect(playwright.closeSession('nope')).resolves.toBe(false);
+  });
+});
+
+describe('playwright.run - uploads', () => {
+  const upload = (parameters: any, method = 'upload') =>
+    run({ steps: [{ method, parameters }] });
+
+  test('a file named by the step is uploaded from the flows directory', async () => {
+    const report = writeUpload('report.txt');
+
+    await upload({ selector: 'input[type=file]', files: './report.txt' });
+
+    expect(page.setInputFiles).toHaveBeenCalledWith(
+      'input[type=file]', [report], { timeout: undefined }
+    );
+  });
+
+  test('a path with no leading ./ resolves inside the flows directory too', async () => {
+    const invoice = writeUpload('invoices/march.pdf');
+
+    await upload({ selector: '#file', files: 'invoices/march.pdf' });
+
+    expect(page.setInputFiles).toHaveBeenCalledWith('#file', [invoice], expect.any(Object));
+  });
+
+  test('several files are uploaded at once, in the order given', async () => {
+    const a = writeUpload('a.txt');
+    const b = writeUpload('b.txt');
+
+    await upload({ selector: '#file', files: ['./b.txt', './a.txt'] });
+
+    expect(page.setInputFiles).toHaveBeenCalledWith('#file', [b, a], expect.any(Object));
+  });
+
+  test('"file" names a single upload just as well as "files"', async () => {
+    const report = writeUpload('single.txt');
+
+    await upload({ selector: '#file', file: './single.txt' });
+
+    expect(page.setInputFiles).toHaveBeenCalledWith('#file', [report], expect.any(Object));
+  });
+
+  test('an absolute path inside the flows directory is accepted', async () => {
+    const report = writeUpload('absolute.txt');
+
+    await upload({ selector: '#file', files: report });
+
+    expect(page.setInputFiles).toHaveBeenCalledWith('#file', [report], expect.any(Object));
+  });
+
+  test('the timeout is passed through', async () => {
+    writeUpload('timed.txt');
+
+    await upload({ selector: '#file', files: './timed.txt', timeout: 5000 });
+
+    expect(page.setInputFiles).toHaveBeenCalledWith('#file', expect.any(Array), { timeout: 5000 });
+  });
+
+  test('setInputFiles is the same step under its playwright name', async () => {
+    const report = writeUpload('aliased.txt');
+
+    await upload({ selector: '#file', files: './aliased.txt' }, 'setInputFiles');
+
+    expect(page.setInputFiles).toHaveBeenCalledWith('#file', [report], expect.any(Object));
+  });
+
+  test('a trigger uploads through the file chooser instead of an input', async () => {
+    const report = writeUpload('chooser.txt');
+    const chooser = { setFiles: jest.fn().mockResolvedValue(undefined) };
+    page.waitForEvent = jest.fn().mockResolvedValue(chooser);
+
+    await upload({ trigger: '#attach', files: './chooser.txt', timeout: 1000 });
+
+    expect(page.waitForEvent).toHaveBeenCalledWith('filechooser', { timeout: 1000 });
+    expect(page.click).toHaveBeenCalledWith('#attach', { timeout: 1000 });
+    expect(chooser.setFiles).toHaveBeenCalledWith([report]);
+    expect(page.setInputFiles).not.toHaveBeenCalled();
+  });
+
+  test('the flow step decides which file the yaml uploads', async () => {
+    const report = writeUpload('from-the-step.txt');
+
+    // What the markdown step wrote reaches the yaml as a parameter, exactly
+    // like every other value a step passes in
+    await run(
+      { steps: [{ method: 'upload', parameters: { selector: '#file', files: '{{ parameters.report }}' } }] },
+      { report: './from-the-step.txt' }
+    );
+
+    expect(page.setInputFiles).toHaveBeenCalledWith('#file', [report], expect.any(Object));
+  });
+
+  test('a later step can read back what was uploaded', async () => {
+    const report = writeUpload('result.txt');
+
+    await run({
+      steps: [
+        { slug: 'attach', method: 'upload', parameters: { selector: '#file', files: './result.txt' } },
+        { method: 'fill', parameters: { selector: '#name', value: '{{ steps.attach.result.files.[0] }}' } }
+      ]
+    });
+
+    expect(page.fill).toHaveBeenCalledWith('#name', report, expect.any(Object));
+  });
+
+  test('a file outside the flows directory is refused', async () => {
+    await expect(upload({ selector: '#file', files: '../escape.txt' }))
+      .rejects.toThrow(/outside the flows directory/);
+    expect(page.setInputFiles).not.toHaveBeenCalled();
+  });
+
+  test('an absolute path outside the flows directory is refused', async () => {
+    await expect(upload({ selector: '#file', files: '/etc/passwd' }))
+      .rejects.toThrow(/outside the flows directory/);
+  });
+
+  test('a file that is not there is reported by name', async () => {
+    await expect(upload({ selector: '#file', files: './nope.txt' }))
+      .rejects.toThrow(/file not found/);
+  });
+
+  test('a directory is not a file to upload', async () => {
+    fs.mkdirSync(path.join(FLOWS_DIR, 'a-folder'), { recursive: true });
+
+    await expect(upload({ selector: '#file', files: './a-folder' }))
+      .rejects.toThrow(/file not found/);
+  });
+
+  test('a step with nothing to upload says so', async () => {
+    await expect(upload({ selector: '#file' })).rejects.toThrow(/no file to upload/);
+    await expect(upload({ selector: '#file', files: [] })).rejects.toThrow(/no file to upload/);
+    await expect(upload({ selector: '#file', files: '' })).rejects.toThrow(/no file to upload/);
+  });
+
+  test('a step with no parameters at all says so too', async () => {
+    await expect(run({ steps: ['upload'] })).rejects.toThrow(/no file to upload/);
+  });
+
+  test('something that is not a path is refused', async () => {
+    await expect(upload({ selector: '#file', files: [42] })).rejects.toThrow(/invalid file to upload/);
+    await expect(upload({ selector: '#file', files: ['  '] })).rejects.toThrow(/invalid file to upload/);
+  });
+});
+
+describe('playwright.resolveUploadFiles', () => {
+  test('resolves a single path to its absolute one', async () => {
+    const report = writeUpload('direct.txt');
+
+    await expect(playwright.resolveUploadFiles('./direct.txt')).resolves.toEqual([report]);
+  });
+
+  test('trims the path a flow author left padded', async () => {
+    const report = writeUpload('padded.txt');
+
+    await expect(playwright.resolveUploadFiles('  ./padded.txt  ')).resolves.toEqual([report]);
+  });
+
+  test('refuses a path that climbs out of the flows directory', async () => {
+    await expect(playwright.resolveUploadFiles('nested/../../outside.txt'))
+      .rejects.toThrow(/outside the flows directory/);
+  });
+
+  test('refuses the flows directory itself', async () => {
+    await expect(playwright.resolveUploadFiles('.')).rejects.toThrow(/file not found/);
   });
 });

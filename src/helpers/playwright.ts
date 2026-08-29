@@ -10,6 +10,7 @@ const debug = createDebug('lab34:flows:helpers:playwright');
 import { chromium, firefox, webkit, devices } from 'playwright';
 
 import * as replacer from './replacer';
+import * as paths from './paths';
 
 const ALLOWED_METHODS = [
   'goto',
@@ -36,7 +37,11 @@ const ALLOWED_METHODS = [
   'dragAndDrop',
   'evaluate',
   'keyboard',
-  'mouse'
+  'mouse',
+  'upload',
+  // The Playwright name for the same thing, for whoever looks the method up
+  // in their docs rather than in ours
+  'setInputFiles'
 ];
 
 const BROWSER_TYPES = {
@@ -263,6 +268,61 @@ export const hasSession = (name) => sessions.has(name);
 
 /** The names of the open sessions. */
 export const openSessions = () => [...sessions.keys()];
+
+/**
+ * The files an `upload` step sends to the page.
+ *
+ * A flow uploads files that live *with the flows*: every path a step gives is
+ * resolved inside the flows directory of the context (`<context>/flows`), so
+ * `./report.txt` means `<context>/flows/report.txt` and `invoices/march.pdf`
+ * means `<context>/flows/invoices/march.pdf`. That is both the convention --
+ * the fixtures a flow uploads are versioned next to the flow that uploads
+ * them -- and the boundary: a flow is not a way to read arbitrary files off
+ * the machine running it, so anything resolving outside that directory is
+ * refused.
+ *
+ * @param {string|string[]} files - One path, or several, relative to the
+ *                                  flows directory (an absolute path is
+ *                                  accepted only if it is inside it)
+ * @returns {Promise<string[]>} The absolute paths, in the order given
+ */
+export const resolveUploadFiles = async (files) => {
+  const given = Array.isArray(files) ? files : [files];
+
+  if (!given.length || given.every(file => file === undefined || file === null || file === '')) {
+    throw new Error(
+      'upload: no file to upload. Set "files" to a path inside the flows directory, e.g. ./report.txt'
+    );
+  }
+
+  const flowsDir = await paths.contextDir(['flows']);
+
+  return given.map(file => {
+    if (typeof file !== 'string' || !file.trim()) {
+      throw new Error(`upload: invalid file to upload: ${JSON.stringify(file)}`);
+    }
+
+    const absolute = path.resolve(flowsDir, file.trim());
+
+    // path.resolve already collapsed any "..", so this catches both a
+    // relative path climbing out and an absolute one pointing elsewhere
+    if (absolute !== flowsDir && !absolute.startsWith(flowsDir + path.sep)) {
+      throw new Error(
+        `upload: "${file}" is outside the flows directory (${flowsDir}). ` +
+        'Files to upload must live in the flows directory.'
+      );
+    }
+
+    if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
+      throw new Error(
+        `upload: file not found: ${absolute}. ` +
+        'Files to upload must live in the flows directory.'
+      );
+    }
+
+    return absolute;
+  });
+};
 
 const error = (ctx, yamlFile, error) => {
   const message = `Error in ${yamlFile}: ${error}`;
@@ -526,6 +586,37 @@ export const run = (ctx, yamlFile, stepParams, options: Record<string, any> = {}
               timeout: parameters.timeout
             });
             break;
+          case 'upload':
+          case 'setInputFiles': {
+            // The files come from the flows directory, whatever the flow step
+            // wrote: "./report.txt" in the markdown reaches this yaml through
+            // the usual parameter replacement, and is resolved here
+            const upload = parameters || {};
+            const files = await resolveUploadFiles(
+              upload.files !== undefined ? upload.files : upload.file
+            );
+
+            if (upload.trigger) {
+              // No <input type="file"> to fill: a button opens the operating
+              // system's file chooser, and playwright hands us the chooser
+              debug('Uploading %o through the file chooser opened by %s', files, upload.trigger);
+              const [chooser] = await Promise.all([
+                page.waitForEvent('filechooser', { timeout: upload.timeout }),
+                page.click(upload.trigger, { timeout: upload.timeout })
+              ]);
+              await chooser.setFiles(files);
+            }
+            else {
+              debug('Uploading %o into selector: %s', files, upload.selector);
+              await page.setInputFiles(upload.selector, files, {
+                timeout: upload.timeout
+              });
+            }
+
+            // What was actually sent, so a later step can assert on it
+            steps[currentStep].result = { files };
+            break;
+          }
           case 'evaluate':
             await page.evaluate(parameters.pageFunction, parameters.arg);
             break;
