@@ -1,0 +1,63 @@
+# Signs into the demo site and takes everything the browser holds.
+#
+# The three ways of getting a value out of a browser, in one script:
+#
+#   scrape   reads it off the page      -- it is on the screen
+#   cookies  reads it out of the jar    -- the server set it, nothing shows it
+#   storage  reads it out of the origin -- the app wrote it, nothing shows it
+#
+# All three spell `output` and `regex` the same way, and everything they
+# collect is merged into the body of the step -- which is what the flow
+# asserts on, and what its `memory` mapping reads.
+device: Desktop Chrome
+
+# Flip this to false to watch it happen
+launchOptions:
+  headless: true
+
+steps:
+  # The url is the application's, not the script's: the demo site is started
+  # on whichever port the machine had free
+  - method: goto
+    parameters:
+      url: "{{ parameters.query.url }}"
+
+  - method: waitForSelector
+    parameters:
+      selector: '[data-testid="page-title"]'
+
+  ## On the screen
+  - method: scrape
+    parameters:
+      title:
+        selector: '[data-testid="page-title"]'
+        output: string
+      basketLabel:
+        selector: '[data-testid="basket"]'
+        output: string
+
+  ## Not on the screen: the session cookie the server set
+  - method: cookies
+    parameters:
+      sessionId:
+        name: demo_session
+      # A key with no name at all collects every cookie, as an object
+      everyCookie: {}
+
+  ## Not on the screen either: what the app kept for itself
+  - method: storage
+    parameters:
+      access_token:
+        key: access_token
+      # `profile` holds JSON, so reach into it rather than parsing it later
+      userId:
+        key: profile
+        json: id
+      userName:
+        key: profile
+        json: name
+      # Session storage is asked for by type; `output` casts it on the way out
+      cartCount:
+        key: cart.count
+        type: session
+        output: number
