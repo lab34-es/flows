@@ -68,16 +68,6 @@ export function EnvironmentVariablesCard() {
   const environments = status?.environments || [];
   const summary = status?.summary;
 
-  // Opening a tab hides the panel these buttons are in, and the workspace
-  // moves the focus to the panel that takes its place. The browser then
-  // scrolls whatever it has to for the focused element -- parked below the
-  // fold until it is shown -- to be on screen, taking the app's own header
-  // with it. Letting go of the button first leaves it nothing to chase.
-  const open = (route) => (event) => {
-    event.currentTarget.blur();
-    openTab(route);
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -103,10 +93,10 @@ export function EnvironmentVariablesCard() {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={open('/environment-variables/export')}>
+          <Button size="sm" variant="outline" onClick={() => openTab('/environment-variables/export')}>
             <Download /> Export
           </Button>
-          <Button size="sm" variant="outline" onClick={open('/environment-variables/import')}>
+          <Button size="sm" variant="outline" onClick={() => openTab('/environment-variables/import')}>
             <Upload /> Import
           </Button>
           {summary && summary.creatable > 0 && (
