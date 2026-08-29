@@ -1,6 +1,6 @@
 {
   "name": "@lab34/flows",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
