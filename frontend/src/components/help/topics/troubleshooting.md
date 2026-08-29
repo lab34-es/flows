@@ -23,6 +23,12 @@ adding files by hand.
 match a folder name in `applications/`. Open the sidebar and check the exact
 name — and that the method is exported and documented.
 
+**A browser step fails with "Executable doesn't exist".** Playwright is
+installed, its browsers are not: they are a separate download. Run `npx
+playwright install` (or `npx playwright install chromium` for a single one) on
+the machine running the flows — with `--with-deps` on a bare Linux box, which
+also installs the system libraries the browsers need.
+
 **A step fails only sometimes.** Add `retry: { times, delay }` for genuinely
 eventual behaviour. If the data is the problem, remember that replacers
 generate new values on every run: assert with `$expr:` instead of exact values.

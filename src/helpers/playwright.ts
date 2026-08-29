@@ -108,6 +108,25 @@ const sessionName = (ctx, flow, stepParams, options) => {
 };
 
 /**
+ * `npm install` brings in playwright itself, but not the browsers it drives:
+ * those are downloaded once, by hand, with `npx playwright install`. Until
+ * that is done every launch fails, so the error says what to run instead of
+ * leaving playwright's own message to be read as a broken flow.
+ */
+const isMissingBrowserError = (ex) => {
+  const message = String((ex && ex.message) || ex || '');
+
+  return message.includes('Executable doesn\'t exist')
+    || message.includes('playwright install');
+};
+
+const missingBrowserError = (browserType, ex) => new Error([
+  `The ${browserType} browser is not installed. Playwright drives real browsers,`,
+  `and they are downloaded separately: run "npx playwright install ${browserType}"`,
+  '(or "npx playwright install" for all of them) and run the flow again.'
+].join(' ') + `\n\n${(ex && ex.message) || ex}`);
+
+/**
  * Launch a browser, give it a context and a page, and return the three.
  *
  * @param {Object} flow - The parsed yaml file, for its launch and context options
@@ -127,7 +146,15 @@ const openBrowser = async (flow, browserType, device) => {
   };
 
   debug('Launching browser with options: %O', defaultLaunchOptions);
-  const browser = await BROWSER_TYPES[browserType].launch(defaultLaunchOptions);
+
+  let browser;
+  try {
+    browser = await BROWSER_TYPES[browserType].launch(defaultLaunchOptions);
+  }
+  catch (ex) {
+    if (isMissingBrowserError(ex)) {throw missingBrowserError(browserType, ex);}
+    throw ex;
+  }
 
   const constextOptions = {
     ...devices[device],

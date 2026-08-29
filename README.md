@@ -96,6 +96,15 @@ Requires Node.js `>= 24.0.0` (the current active LTS line).
 npm install -g @lab34/flows
 ```
 
+Browser automation needs one extra step: Playwright ships with the package but
+its browsers do not, so download them once before running a flow that drives a
+browser.
+
+```bash
+npx playwright install          # all three browsers
+npx playwright install chromium # or just the one you use
+```
+
 See [Quick start](https://flows.lab34.es/docs/quick-start/) for the first-run
 walkthrough.
 
