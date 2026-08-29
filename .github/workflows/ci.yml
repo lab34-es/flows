@@ -23,10 +23,13 @@ on:
   push:
     branches: [master]
 
-# Cancel superseded runs on the same branch: only the latest matters.
+# Cancel superseded runs on the same branch: on a pull request only the tip
+# matters, so a new push replaces the run for the commit it superseded. Master
+# is the exception -- every commit that lands there has to end up with a
+# completed run, so a quick second push must not cancel the first one.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 permissions:
   contents: read
