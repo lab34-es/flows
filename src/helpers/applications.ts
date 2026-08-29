@@ -286,31 +286,11 @@ const readinessError = (readiness): string | null => {
     : '';
 
   return `Missing environment file${missing.length > 1 ? 's' : ''} for "${environment}": ${list}.` +
-    `${templates} Only the applications a flow uses need one — create them from the ` +
-    'Environments card on the home page.';
+    `${templates} Only the applications a flow uses need one — create it from the ` +
+    "Environment variables card on the home page, or import a teammate's export there.";
 };
 
 export { readinessError };
-
-/**
- * An environment is named by its file, so the name must be a plain file-name
- * stem: no separators, no leading dot.
- * @param {string} name
- * @returns {string} The trimmed, usable name
- */
-const environmentNameOf = (name) => {
-  const trimmed = (name || '').trim();
-
-  if (!trimmed) {
-    throw new Error('Environment name is required');
-  }
-
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(trimmed) || trimmed.endsWith('.env') || trimmed.endsWith('.example')) {
-    throw new Error('Invalid environment name');
-  }
-
-  return trimmed;
-};
 
 /**
  * The env-files status of every application against every known environment:
@@ -403,63 +383,6 @@ const createMissingEnvFiles = async ({ environment, application }: EnvFilesScope
 };
 
 export { createMissingEnvFiles };
-
-/**
- * Add an environment to every application at once: create its .env file
- * wherever it is missing, so nobody writes twenty files by hand. Each file
- * starts from the application's .env.example for that environment when there
- * is one; otherwise from the keys of `baseEnvironment` with empty values;
- * otherwise as an empty file to fill in.
- * @param {string} name - The new environment's name
- * @param {string} [baseEnvironment] - Environment to copy the keys from
- * @returns {Promise<Array<{application: string, environment: string, path: string}>>} The files created
- */
-const addEnvironmentToAll = async (name, baseEnvironment?) => {
-  const trimmed = environmentNameOf(name);
-
-  const parsed = await parseApplications();
-  const created: { application: string, environment: string, path: string }[] = [];
-
-  parsed.forEach(app => {
-    if (app.envFiles.some(env => env.name === trimmed)) { return; }
-
-    const template = app.envTemplates.find(tpl => tpl.name === trimmed);
-    const base = baseEnvironment && app.envFiles.find(env => env.name === baseEnvironment);
-
-    let content;
-    if (template) {
-      content = fs.readFileSync(template.path, 'utf8');
-    }
-    else if (base) {
-      // The keys of the base environment, values left to fill in
-      const keys = Object.keys(dotenv.parse(fs.readFileSync(base.path)));
-      content = [
-        `# Environment "${trimmed}", keys copied from ${baseEnvironment}.env — fill in the values.`,
-        ...keys.map(key => `${key}=`),
-        ''
-      ].join('\n');
-    }
-    else {
-      content = `# Environment "${trimmed}" for ${app.name}. Add the variables this application needs here.\n`;
-    }
-
-    const envDir = path.resolve(app.path, 'env');
-    const envFile = path.resolve(envDir, `${trimmed}.env`);
-
-    if (envFile !== envDir && !envFile.startsWith(envDir + path.sep)) {
-      throw new Error('Invalid environment file path');
-    }
-
-    fs.mkdirSync(path.dirname(envFile), { recursive: true });
-    fs.writeFileSync(envFile, content, 'utf8');
-
-    created.push({ application: app.slug, environment: trimmed, path: envFile });
-  });
-
-  return created;
-};
-
-export { addEnvironmentToAll };
 
 /**
  * Given a value, return a masked value.

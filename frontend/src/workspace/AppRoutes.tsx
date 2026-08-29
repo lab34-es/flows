@@ -9,6 +9,9 @@ import TestRunPage from '@/pages/TestRunPage';
 import TestRunFlowPage from '@/pages/TestRunFlowPage';
 import ApplicationPage from '@/pages/ApplicationPage';
 import SettingsPage from '@/pages/SettingsPage';
+import EnvironmentVariablesPage from '@/pages/EnvironmentVariablesPage';
+import ExportVariables from '@/components/environment/ExportVariables';
+import ImportVariables from '@/components/environment/ImportVariables';
 import AiSettings from '@/components/settings/AiSettings';
 import XraySettings from '@/components/settings/XraySettings';
 import SharepointSettings from '@/components/settings/SharepointSettings';
@@ -33,6 +36,11 @@ export function AppRoutes() {
       <Route path="/test-runs/:id" element={<TestRunPage />} />
       <Route path="/test-runs/:id/flow" element={<TestRunFlowPage />} />
       <Route path="/applications/:slug" element={<ApplicationPage />} />
+      <Route path="/environment-variables" element={<EnvironmentVariablesPage />}>
+        <Route index element={<Navigate to="/environment-variables/export" replace />} />
+        <Route path="export" element={<ExportVariables />} />
+        <Route path="import" element={<ImportVariables />} />
+      </Route>
       <Route path="/settings" element={<SettingsPage />}>
         <Route index element={<Navigate to="/settings/ai" replace />} />
         <Route path="ai" element={<AiSettings />} />

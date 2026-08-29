@@ -496,46 +496,6 @@ describe('applications.createMissingEnvFiles', () => {
   });
 });
 
-describe('applications.addEnvironmentToAll', () => {
-  test('creates the env file in every application that lacks it', async () => {
-    write('a/env/local.env', 'A=1\nTOKEN=abc\n');
-    write('b/env/staging.env', 'B=1\n');
-
-    const created = await apps.addEnvironmentToAll('staging', 'local');
-
-    expect(created.map(c => c.application)).toEqual(['a']);
-
-    const content = fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8');
-    expect(content).toContain('A=');
-    expect(content).toContain('TOKEN=');
-    expect(content).not.toContain('abc');
-  });
-
-  test('prefers the application template over the base environment', async () => {
-    write('a/env/local.env', 'A=1\n');
-    write('a/env/staging.env.example', 'FROM_TEMPLATE=\n');
-
-    await apps.addEnvironmentToAll('staging', 'local');
-
-    expect(fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8')).toBe('FROM_TEMPLATE=\n');
-  });
-
-  test('creates a commented stub when there is nothing to copy from', async () => {
-    write('a/index.ts', 'export const nothing = 1;');
-
-    await apps.addEnvironmentToAll('staging');
-
-    expect(fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8')).toContain('# Environment "staging"');
-  });
-
-  test('rejects names that are not a plain file-name stem', async () => {
-    await expect(apps.addEnvironmentToAll('')).rejects.toThrow('Environment name is required');
-    await expect(apps.addEnvironmentToAll('../evil')).rejects.toThrow('Invalid environment name');
-    await expect(apps.addEnvironmentToAll('.hidden')).rejects.toThrow('Invalid environment name');
-    await expect(apps.addEnvironmentToAll('prod.env')).rejects.toThrow('Invalid environment name');
-  });
-});
-
 describe('applications.updateEnvFile', () => {
   test('updates an existing key, leaving the others', async () => {
     const file = write('calculator/env/local.env', 'A=1\nB=2\n');

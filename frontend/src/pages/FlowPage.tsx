@@ -705,12 +705,16 @@ export function FlowPage() {
                           {item.hasTemplate ? ' — a .env.example template is committed next to it' : ''}
                         </p>
                       ))}
-                      <p>Create them from the Environments card on the home page.</p>
+                      <p>
+                        Create them from the Environment variables card on the home page, or
+                        import a teammate's export under Environment variables › Import.
+                      </p>
                     </>
                   ) : (
                     <p>
                       No application declares that environment. Pick another one in the sidebar,
-                      or add it from the Environments card on the home page.
+                      or write its env file from the Source view of an application that needs it —
+                      importing a teammate's export creates the files the document names too.
                     </p>
                   )}
                 </AlertDescription>

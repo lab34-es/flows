@@ -88,6 +88,9 @@ test:
   environment, kept in your context folder. An environment exists as soon as
   one application declares it, and a run only asks for the files of the
   applications its flow actually uses.
+- **Onboarding in one paste.** Export whichever applications, environments and
+  variables a teammate needs as a single YAML document; importing it creates
+  the env files they are missing and fills in the rest.
 - **Batteries included.** Example applications and flows are seeded on first run.
 
 ## Install

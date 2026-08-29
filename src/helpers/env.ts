@@ -92,6 +92,8 @@ const serialize = (value: string): string => {
   return `"${text.replace(/"/g, '\\"').replace(/\r/g, '\\r').replace(/\n/g, '\\n')}"`;
 };
 
+export { serialize };
+
 /**
  * Keep the context's .env out of git. The file holds secrets, and a context
  * directory is very often a repository -- the entry is added once, and never

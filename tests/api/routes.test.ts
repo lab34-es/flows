@@ -9,6 +9,7 @@ jest.mock('../../src/helpers/inputs');
 jest.mock('../../src/helpers/bases');
 jest.mock('../../src/helpers/jira');
 jest.mock('../../src/helpers/applications');
+jest.mock('../../src/helpers/envTransfer');
 jest.mock('../../src/helpers/context');
 jest.mock('../../src/helpers/testRuns');
 
@@ -20,6 +21,7 @@ import * as inputs from '../../src/helpers/inputs';
 import * as bases from '../../src/helpers/bases';
 import * as jira from '../../src/helpers/jira';
 import * as apps from '../../src/helpers/applications';
+import * as envTransfer from '../../src/helpers/envTransfer';
 import * as contextHelper from '../../src/helpers/context';
 import * as testRuns from '../../src/helpers/testRuns';
 
@@ -519,30 +521,89 @@ describe('POST /api/environment/create-missing', () => {
   });
 });
 
-describe('POST /api/environment/add', () => {
-  test('adds the environment to every application', async () => {
-    const created = [{ application: 'a', environment: 'staging', path: '/x/staging.env' }];
-    (apps.addEnvironmentToAll as jest.Mock).mockResolvedValue(created);
+describe('GET /api/environment/variables', () => {
+  test('returns the inventory the export tree renders', async () => {
+    const inventory = { applications: [{ name: 'a', slug: 'a', environments: [] }] };
+    (envTransfer.inventory as jest.Mock).mockResolvedValue(inventory);
 
-    const res = await request(app)
-      .post('/api/environment/add')
-      .send({ name: 'staging', baseEnvironment: 'local' });
+    const res = await request(app).get('/api/environment/variables');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ success: true, created });
-    expect(apps.addEnvironmentToAll).toHaveBeenCalledWith('staging', 'local');
+    expect(res.body).toEqual(inventory);
   });
 
-  test('an invalid name maps to 400 with the message', async () => {
-    (apps.addEnvironmentToAll as jest.Mock).mockRejectedValue(new Error('Invalid environment name'));
-    const res = await request(app).post('/api/environment/add').send({ name: '../evil' });
+  test('a failure maps to 500 with a generic message', async () => {
+    (envTransfer.inventory as jest.Mock).mockRejectedValue(new Error('boom'));
+    const res = await request(app).get('/api/environment/variables');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Failed to list the environment variables' });
+  });
+});
+
+describe('POST /api/environment/export', () => {
+  const selection = [{ application: 'payments', environment: 'uat', keys: ['API_URL'] }];
+
+  test('answers with the document for the selection', async () => {
+    const result = { yaml: 'version: 1\n', summary: { applications: 1, environments: 1, variables: 1 } };
+    (envTransfer.exportSelection as jest.Mock).mockResolvedValue(result);
+
+    const res = await request(app).post('/api/environment/export').send({ selection });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(result);
+    expect(envTransfer.exportSelection).toHaveBeenCalledWith(selection);
+  });
+
+  test('an empty selection maps to 400 with the message', async () => {
+    (envTransfer.exportSelection as jest.Mock)
+      .mockRejectedValue(new Error('Invalid selection: pick at least one variable to export'));
+
+    const res = await request(app).post('/api/environment/export').send({});
+
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: 'Invalid environment name' });
+    expect(res.body).toEqual({ error: 'Invalid selection: pick at least one variable to export' });
   });
 
   test('any other failure maps to 500', async () => {
-    (apps.addEnvironmentToAll as jest.Mock).mockRejectedValue(new Error('disk gone'));
-    const res = await request(app).post('/api/environment/add').send({ name: 'staging' });
+    (envTransfer.exportSelection as jest.Mock).mockRejectedValue(new Error('disk gone'));
+    const res = await request(app).post('/api/environment/export').send({ selection });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'disk gone' });
+  });
+});
+
+describe('POST /api/environment/import', () => {
+  const yaml = 'applications:\n  payments:\n    uat:\n      API_URL: https://uat\n';
+
+  test('writes the document and answers with the report', async () => {
+    const result = { dryRun: false, files: [], skipped: [], summary: { files: 0 } };
+    (envTransfer.importDocument as jest.Mock).mockResolvedValue(result);
+
+    const res = await request(app).post('/api/environment/import').send({ yaml });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, ...result });
+    expect(envTransfer.importDocument).toHaveBeenCalledWith(yaml, { dryRun: false });
+  });
+
+  test('dryRun is passed through, so the UI can preview', async () => {
+    (envTransfer.importDocument as jest.Mock).mockResolvedValue({ dryRun: true });
+
+    await request(app).post('/api/environment/import').send({ yaml, dryRun: true });
+
+    expect(envTransfer.importDocument).toHaveBeenCalledWith(yaml, { dryRun: true });
+  });
+
+  test('a document that is not one maps to 400 with the message', async () => {
+    (envTransfer.importDocument as jest.Mock).mockRejectedValue(new Error('Invalid YAML: bad'));
+    const res = await request(app).post('/api/environment/import').send({ yaml: 'a: [' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Invalid YAML: bad' });
+  });
+
+  test('any other failure maps to 500', async () => {
+    (envTransfer.importDocument as jest.Mock).mockRejectedValue(new Error('disk gone'));
+    const res = await request(app).post('/api/environment/import').send({ yaml });
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'disk gone' });
   });

@@ -16,6 +16,11 @@ export function AppStateProvider({ children }) {
   const [tree, setTree] = useState<any[]>([]);
   const [treeLoading, setTreeLoading] = useState(true);
   const [applications, setApplications] = useState<any[]>([]);
+  // Bumped every time the applications are re-read. A page showing one of
+  // them keeps its own copy, fetched when it opened: this is what tells it
+  // that something -- an import on the home page, another tab's Source view,
+  // a file created from a template -- has written to the folder since.
+  const [applicationsRevision, setApplicationsRevision] = useState(0);
   const [applicationsLoading, setApplicationsLoading] = useState(true);
   const [environments, setEnvironments] = useState<any[]>([]);
   const [environment, setEnvironmentState] = useState(
@@ -50,6 +55,7 @@ export function AppStateProvider({ children }) {
     try {
       const response = await applicationsApi.list();
       setApplications(response.data || []);
+      setApplicationsRevision((revision) => revision + 1);
     } catch (error) {
       console.error('Error loading applications:', error);
     } finally {
@@ -135,6 +141,7 @@ export function AppStateProvider({ children }) {
       refreshTree,
       applications,
       applicationsLoading,
+      applicationsRevision,
       refreshApplications,
       environments,
       environment,
@@ -146,7 +153,7 @@ export function AppStateProvider({ children }) {
       testRuns,
       refreshTestRuns,
     }),
-    [tree, treeLoading, refreshTree, applications, applicationsLoading, refreshApplications, environments, environment, setEnvironment, refreshEnvironments, contextInfo, refreshContext, gitIndex, testRuns, refreshTestRuns]
+    [tree, treeLoading, refreshTree, applications, applicationsLoading, applicationsRevision, refreshApplications, environments, environment, setEnvironment, refreshEnvironments, contextInfo, refreshContext, gitIndex, testRuns, refreshTestRuns]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
