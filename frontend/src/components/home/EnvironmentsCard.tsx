@@ -41,8 +41,10 @@ function EnvCell({ application, environment }) {
   const cell = application.environments[environment];
   if (!cell) { return null; }
 
-  // Green when the file is there, red when it is not; amber is reserved for
-  // the in-between (the file exists but lacks variables of its template)
+  // Green when the file is there; amber when it is there but lacks variables
+  // of its template, which does break the flows that use it. A file that was
+  // never written is not an error -- only the flows that use this
+  // application on this environment need it -- so it stays muted.
   let icon;
   let label;
   if (cell.exists && cell.missingKeys.length === 0) {
@@ -52,11 +54,11 @@ function EnvCell({ application, environment }) {
     icon = <TriangleAlert className="text-warning size-4" />;
     label = `${cell.file} is missing ${cell.missingKeys.length} variable${cell.missingKeys.length > 1 ? 's' : ''} of its template: ${cell.missingKeys.join(', ')}`;
   } else if (cell.hasTemplate) {
-    icon = <FilePlus2 className="text-destructive size-4" />;
-    label = `${cell.file} is missing — open to create it from ${cell.template}`;
+    icon = <FilePlus2 className="text-muted-foreground size-4" />;
+    label = `${cell.file} does not exist — open to create it from ${cell.template}`;
   } else {
-    icon = <X className="text-destructive size-4" />;
-    label = `${cell.file} is missing and has no template — open to create it`;
+    icon = <X className="text-muted-foreground size-4" />;
+    label = `${cell.file} does not exist. Only the flows that use this application on this environment need it`;
   }
 
   return (
@@ -77,11 +79,17 @@ function EnvCell({ application, environment }) {
 
 /**
  * Home page card summarizing the env files of every application against
- * every known environment. A flow only runs on an environment when each
- * application it uses has its env/<environment>.env — with many applications
- * that is a lot of files to create by hand, so this card shows what is
- * missing and creates it: from the committed .env.example templates, or for
- * a whole new environment at once.
+ * every known environment.
+ *
+ * The environments are the union of what the applications declare: one
+ * application with an env/uat.env is enough for "uat" to exist, and no
+ * application is asked for a file it has no use for. What a run needs is
+ * checked per flow, when it is triggered: the applications that flow uses
+ * have to have their env/<environment>.env, and only those.
+ *
+ * So the blanks in this table are not a backlog. They are worth filling in
+ * where a flow will need them, which this card does in one click: from the
+ * committed .env.example templates, or for a whole new environment at once.
  */
 export function EnvironmentsCard() {
   const { refreshEnvironments, refreshApplications } = useAppState();
@@ -161,22 +169,24 @@ export function EnvironmentsCard() {
               <ChevronDown className={`text-muted-foreground size-4 shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
               <Layers className="text-muted-foreground size-4" /> Environments
               <Badge variant="secondary">{environments.length}</Badge>
-              {summary && summary.missing > 0 && (
-                <Badge variant="warning">{summary.missing} file{summary.missing > 1 ? 's' : ''} missing</Badge>
-              )}
-              {summary && summary.missing === 0 && summary.incomplete > 0 && (
+              {summary && summary.incomplete > 0 && (
                 <Badge variant="warning">{summary.incomplete} incomplete</Badge>
+              )}
+              {summary && summary.missing > 0 && (
+                <Badge variant="secondary">{summary.missing} file{summary.missing > 1 ? 's' : ''} not created</Badge>
               )}
               {summary && summary.total > 0 && summary.missing === 0 && summary.incomplete === 0 && (
                 <Badge variant="success">all set</Badge>
               )}
             </CardTitle>
             <CardDescription className="pl-6">
-              A flow runs on an environment only when every application it uses has its{' '}
-              <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">env/&lt;environment&gt;.env</code> file.
-              Those files hold secrets and stay out of git — commit{' '}
+              An environment exists as soon as one application declares it. A flow runs on it when
+              the applications <em>that flow</em> uses have their{' '}
+              <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">env/&lt;environment&gt;.env</code>{' '}
+              file — the rest of the table can stay empty, and running a flow says exactly what it is
+              short of. Those files hold secrets and stay out of git — commit{' '}
               <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">env/&lt;environment&gt;.env.example</code>{' '}
-              templates instead, and create the missing files from them here.
+              templates instead, and create the files from them here.
             </CardDescription>
           </CardHeader>
         </CollapsibleTrigger>

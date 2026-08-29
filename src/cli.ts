@@ -361,6 +361,16 @@ async function main() {
     const flowContent = fs.readFileSync(flowFilePath, 'utf8');
     const flowConfig = parseFlowContent(flowContent);
 
+    // Nothing is recorded, and no browser is opened, for a run that cannot
+    // start: the environment has to exist, and each application this flow
+    // uses -- only those -- has to have its env file for it
+    const readiness = await applications.environmentReadiness(flowConfig.steps, args.env);
+    const notReady = applications.readinessError(readiness);
+    if (notReady) {
+      exitWithError(notReady);
+      return;
+    }
+
     // Set up options
     const options: Record<string, any> = {
       environment: args.env,

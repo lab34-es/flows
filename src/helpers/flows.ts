@@ -526,6 +526,17 @@ export const start = async (body, opts) => {
   // but API-triggered runs need it too)
   await apps.loadAll();
 
+  // Everything the flow needs to run on this environment, before a test run
+  // is recorded for something that cannot start: the environment has to
+  // exist, and every application the flow uses needs its env file. Only
+  // those: the environment does not have to be declared everywhere.
+  const readiness = await apps.environmentReadiness(flowAsJson.steps, environment);
+  const notReady = apps.readinessError(readiness);
+
+  if (notReady) {
+    return Promise.reject(new Error(notReady));
+  }
+
   const runner = require(`./runner/v${flowAsJson.version || '1'}`);
 
   if (typeof runner.isRunning === 'function' && runner.isRunning()) {

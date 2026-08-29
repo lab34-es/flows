@@ -52,7 +52,20 @@ beforeEach(() => {
   calculatorAdd = jest.fn().mockResolvedValue([{ 'content-type': 'json' }, 200, { sum: 3 }, { last: 3 }]);
   apps.applications.calculator = { add: calculatorAdd };
 
-  jest.spyOn(apps, 'allPossibleEnvironments').mockResolvedValue(['local', 'prod']);
+  // What a flow needs before it can start is the applications helper's job,
+  // and has its own tests on a real context directory: here every
+  // application the flow uses has its env file, on a known environment
+  jest.spyOn(apps, 'environmentReadiness').mockImplementation(async (steps, environment) => {
+    const environments = ['local', 'prod'];
+    return {
+      environment,
+      environments,
+      known: environments.includes(environment),
+      applications: apps.applicationsOf(steps),
+      missing: [],
+      ready: environments.includes(environment)
+    };
+  });
 
   (paths.contextDir as jest.Mock).mockImplementation(async (parts: string[]) => `/ctx/${parts.join('/')}`);
   jest.spyOn(fs, 'existsSync').mockReturnValue(true);
@@ -136,14 +149,28 @@ describe('v1.run - environment validation', () => {
     expect(flow.execution.error.name).toBe('InvalidEnvironment');
   });
 
-  test('a missing env file fails the flow', async () => {
-    (fs.existsSync as jest.Mock).mockReturnValue(false);
+  test('a missing env file fails the flow before any step runs', async () => {
+    (apps.environmentReadiness as jest.Mock).mockResolvedValue({
+      environment: 'local',
+      environments: ['local', 'prod'],
+      known: true,
+      applications: ['calculator'],
+      missing: [{
+        application: 'calculator',
+        file: 'applications/calculator/env/local.env',
+        path: '/ctx/applications/calculator/env/local.env',
+        hasTemplate: false
+      }],
+      ready: false
+    });
     const flow = flowWith({ application: 'calculator', method: 'add' });
 
     await runCli(flow);
 
-    expect(flow.execution.error.name).toBe('EnvironmentSetupError');
+    expect(flow.execution.error.name).toBe('MissingEnvironmentFile');
     expect(flow.execution.error.message).toContain('Missing environment file');
+    expect(flow.execution.error.message).toContain('applications/calculator/env/local.env');
+    expect(calculatorAdd).not.toHaveBeenCalled();
   });
 
   test('an unreadable env file fails the flow', async () => {

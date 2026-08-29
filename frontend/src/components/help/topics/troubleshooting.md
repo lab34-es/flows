@@ -23,6 +23,13 @@ adding files by hand.
 match a folder name in `applications/`. Open the sidebar and check the exact
 name — and that the method is exported and documented.
 
+**"Missing environment file" when starting a flow.** The run is refused before
+it starts because an application the flow uses has no
+`env/<environment>.env`. Only the applications of *that* flow are asked for
+one — the message names each missing file. Create them from the *Environments*
+card on the home page (the cell links straight to the file, template included),
+or pick an environment the flow's applications do have.
+
 **A browser step fails with "Executable doesn't exist".** Playwright is
 installed, its browsers are not: they are a separate download. Run `npx
 playwright install` (or `npx playwright install chromium` for a single one) on

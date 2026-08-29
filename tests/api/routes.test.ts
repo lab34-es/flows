@@ -417,6 +417,86 @@ describe('GET /api/environment/status', () => {
   });
 });
 
+describe('POST /api/environment/readiness', () => {
+  const FLOW = [
+    '```step', 'application: calculator', 'method: add', '```', ''
+  ].join('\n');
+
+  test('answers with what the flow needs and what is missing', async () => {
+    const readiness = {
+      environment: 'uat',
+      environments: ['local', 'uat'],
+      known: true,
+      applications: ['calculator'],
+      missing: [{ application: 'calculator', file: 'applications/calculator/env/uat.env', path: '/x', hasTemplate: true }],
+      ready: false
+    };
+    (apps.environmentReadiness as jest.Mock).mockResolvedValue(readiness);
+    (apps.readinessError as jest.Mock).mockReturnValue('Missing environment file for "uat"');
+
+    const res = await request(app)
+      .post('/api/environment/readiness')
+      .send({ environment: 'uat', value: FLOW });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ...readiness, error: 'Missing environment file for "uat"' });
+
+    // The steps of the flow are what the check is asked about
+    const [steps, environment] = (apps.environmentReadiness as jest.Mock).mock.calls[0];
+    expect(steps.map(step => step.application)).toEqual(['calculator']);
+    expect(environment).toBe('uat');
+  });
+
+  test('a flow that cannot be parsed is asked about with no steps', async () => {
+    (apps.environmentReadiness as jest.Mock).mockResolvedValue({ ready: true, missing: [] });
+    (apps.readinessError as jest.Mock).mockReturnValue(null);
+
+    const res = await request(app)
+      .post('/api/environment/readiness')
+      .send({ environment: 'local', value: '```step\nnot: [valid' });
+
+    expect(res.status).toBe(200);
+    expect((apps.environmentReadiness as jest.Mock).mock.calls[0][0]).toEqual([]);
+  });
+
+  test('a value that is not a document at all is asked about with no steps', async () => {
+    (apps.environmentReadiness as jest.Mock).mockResolvedValue({ ready: true, missing: [] });
+    (apps.readinessError as jest.Mock).mockReturnValue(null);
+
+    const res = await request(app)
+      .post('/api/environment/readiness')
+      .send({ environment: 'local', value: 42 });
+
+    expect(res.status).toBe(200);
+    expect((apps.environmentReadiness as jest.Mock).mock.calls[0][0]).toEqual([]);
+  });
+
+  test('the applications can be named directly, without a flow to parse', async () => {
+    (apps.environmentReadiness as jest.Mock).mockResolvedValue({ ready: true, missing: [] });
+    (apps.readinessError as jest.Mock).mockReturnValue(null);
+
+    await request(app)
+      .post('/api/environment/readiness')
+      .send({ environment: 'local', applications: ['shop', 'payments'] });
+
+    expect((apps.environmentReadiness as jest.Mock).mock.calls[0][0])
+      .toEqual([{ application: 'shop' }, { application: 'payments' }]);
+  });
+
+  test('the environment is required', async () => {
+    const res = await request(app).post('/api/environment/readiness').send({ value: FLOW });
+    expect(res.status).toBe(400);
+    expect(apps.environmentReadiness).not.toHaveBeenCalled();
+  });
+
+  test('a failure maps to 500 with a generic message', async () => {
+    (apps.environmentReadiness as jest.Mock).mockRejectedValue(new Error('boom'));
+    const res = await request(app).post('/api/environment/readiness').send({ environment: 'local', value: FLOW });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Failed to check the environment' });
+  });
+});
+
 describe('POST /api/environment/create-missing', () => {
   test('creates the missing files, passing the narrowing through', async () => {
     const created = [{ application: 'a', environment: 'prod', path: '/x/prod.env' }];

@@ -2,6 +2,7 @@ import express from 'express';
 const router = express.Router();
 
 import * as apps from '../../helpers/applications';
+import * as markdownFlows from '../../helpers/markdownFlows';
 
 // Get all possible environments across all applications
 router.get('/all-possible', (req, res) => {
@@ -25,6 +26,45 @@ router.get('/status', (req, res) => {
     .catch(error => {
       console.error('Error fetching environments status:', error);
       res.status(500).json({ error: 'Failed to fetch environments status' });
+    });
+});
+
+// Whether a flow can run on an environment: the applications its steps use,
+// and which of them have no env/<environment>.env file. This is the same
+// check the run itself makes, so the UI can say it before anybody presses
+// Run. { environment, value } — the flow's markdown — or { environment,
+// applications } when the caller already knows which ones it uses.
+router.post('/readiness', (req, res) => {
+  const { environment, value, applications } = req.body || {};
+
+  if (!environment) {
+    return res.status(400).json({ error: 'Invalid request: "environment" is required' });
+  }
+
+  let steps: Array<Record<string, any>> = [];
+
+  if (Array.isArray(applications)) {
+    steps = applications.map(application => ({ application }));
+  }
+  else {
+    try {
+      // parse() reports its errors rather than throwing: a flow that is still
+      // being written is asked about too, and a broken step block is simply a
+      // step this check knows nothing about
+      steps = markdownFlows.parse(value || '').steps;
+    }
+    catch {
+      steps = [];
+    }
+  }
+
+  apps.environmentReadiness(steps, environment)
+    .then(readiness => {
+      res.json({ ...readiness, error: apps.readinessError(readiness) });
+    })
+    .catch(error => {
+      console.error('Error checking the environment readiness:', error);
+      res.status(500).json({ error: 'Failed to check the environment' });
     });
 });
 

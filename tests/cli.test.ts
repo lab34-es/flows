@@ -53,6 +53,12 @@ beforeEach(() => {
   jest.spyOn(fs, 'existsSync').mockReturnValue(true);
   jest.spyOn(fs, 'readFileSync').mockReturnValue('# t\n\n```step\napplication: a\nmethod: b\n```\n' as any);
   (markdownFlows.toFlow as jest.Mock).mockReturnValue({ title: 't', steps: [] });
+  // What the flow needs before it can run: every case but the one that
+  // checks it has it
+  (applications.environmentReadiness as jest.Mock).mockResolvedValue({
+    environment: 'local', environments: ['local'], known: true, applications: [], missing: [], ready: true
+  });
+  (applications.readinessError as jest.Mock).mockReturnValue(null);
   (bases.load as jest.Mock).mockResolvedValue(bases.normalizeDocument({
     views: [{ type: 'table', name: 'All flows' }, { type: 'table', name: 'Smoke tests' }]
   }));
@@ -178,6 +184,28 @@ describe('cli --file', () => {
       expect.anything(),
       expect.objectContaining({ onFinished: expect.any(Function) })
     );
+  });
+
+  test('a flow whose applications have no env file never runs', async () => {
+    (applications.environmentReadiness as jest.Mock).mockResolvedValue({
+      environment: 'uat',
+      environments: ['local', 'uat'],
+      known: true,
+      applications: ['payments'],
+      missing: [{ application: 'payments', file: 'applications/payments/env/uat.env', path: '/x', hasTemplate: false }],
+      ready: false
+    });
+    (applications.readinessError as jest.Mock).mockReturnValue(
+      'Missing environment file for "uat": payments (applications/payments/env/uat.env).'
+    );
+
+    ARGV = { file: 'flows/a.md', env: 'uat' };
+    await runCli();
+
+    expect(errored()).toContain('applications/payments/env/uat.env');
+    expect(runner.run).not.toHaveBeenCalled();
+    // Nothing is recorded for a run that never started
+    expect(testRuns.single).not.toHaveBeenCalled();
   });
 
   test('a broken test-run recording does not stop the run', async () => {

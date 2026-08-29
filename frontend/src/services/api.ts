@@ -117,6 +117,14 @@ export const environmentApi = {
   // The env-files matrix the home page card renders: which .env files each
   // application has, which are missing, and which have a template to start from
   getStatus: () => api.get('/api/environment/status'),
+  // What a flow needs before it can run on an environment: every application
+  // it uses — and only those — has to have its env file for it. Ask with the
+  // flow's markdown (value) or with the applications it uses.
+  readiness: ({ environment, applications, value }: {
+    environment: string;
+    applications?: string[];
+    value?: string;
+  }) => api.post('/api/environment/readiness', { environment, applications, value }),
   createMissing: (options = {}) => api.post('/api/environment/create-missing', options),
   add: (name, baseEnvironment) =>
     api.post('/api/environment/add', { name, baseEnvironment: baseEnvironment || undefined }),

@@ -85,7 +85,9 @@ test:
 - **Random data on every run.** A large set of replacers for ids, dates and
   fake data.
 - **Secrets stay out of the repo.** One env file per application per
-  environment, kept in your context folder.
+  environment, kept in your context folder. An environment exists as soon as
+  one application declares it, and a run only asks for the files of the
+  applications its flow actually uses.
 - **Batteries included.** Example applications and flows are seeded on first run.
 
 ## Install
