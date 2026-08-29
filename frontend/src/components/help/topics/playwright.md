@@ -15,11 +15,30 @@ keywords:
   - 'session'
   - 'reuse browser'
   - 'keep open'
+  - 'install'
+  - 'npx playwright install'
+  - 'executable does not exist'
 ---
 
 Web applications are tested through [Playwright](https://playwright.dev).
 Playwright automations have their **own YAML files**, and an application
 integrates with them by calling `playwright.run` with the path to one.
+
+### Install the browsers first
+
+Installing this package brings in Playwright, but **not the browsers it
+drives** — those are a separate download, and until they are there every
+browser step fails with *Executable doesn't exist*. Run this once on the
+machine that runs the flows:
+
+```bash
+npx playwright install
+```
+
+That fetches all three browsers. `npx playwright install chromium` fetches
+only the one you need. On a bare Linux box (CI, a container) the browsers also
+need system libraries: `npx playwright install --with-deps chromium` installs
+those too, and needs root.
 
 The application's `envs/*.env` decide the browser configuration: which browser,
 launch options (headless, slowMo…) and context options (viewport, locale,

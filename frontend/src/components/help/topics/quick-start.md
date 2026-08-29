@@ -15,6 +15,8 @@ keywords:
 ---
 
 1. **Installation** Install the npm package globally: `npm i -g @lab34/flows`
+   — and, for flows that drive a browser, `npx playwright install` once to
+   download the browsers Playwright needs.
 2. **The UI** Start the UI: `lab34-flows --server --context <the path where you want to store everything>`
 3. **Access the browser** Visit [http://localhost:3001](http://localhost:3001)
 4. **Pick and run** From the sidebar, select a flow (or a folder of them), and run any of the demos.

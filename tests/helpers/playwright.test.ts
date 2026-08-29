@@ -100,6 +100,29 @@ describe('playwright.run - setup', () => {
     expect(launch).toHaveBeenCalledWith(expect.objectContaining({ headless: true, timeout: 5000 }));
   });
 
+  test('a missing browser binary is reported as an install to run', async () => {
+    launch.mockRejectedValueOnce(new Error(
+      'browserType.launch: Executable doesn\'t exist at /root/.cache/ms-playwright/chromium/chrome'
+    ));
+
+    await expect(run({ steps: [{ method: 'goto', parameters: { url: 'https://x.test' } }] }))
+      .rejects.toThrow(/npx playwright install chromium/);
+  });
+
+  test('the browser that is missing is the one named in the error', async () => {
+    launch.mockRejectedValueOnce(new Error('Please run the following command: npx playwright install'));
+
+    await expect(run({ browserType: 'firefox', steps: [{ method: 'goto', parameters: { url: 'https://x.test' } }] }))
+      .rejects.toThrow(/The firefox browser is not installed/);
+  });
+
+  test('any other launch failure is left alone', async () => {
+    launch.mockRejectedValueOnce(new Error('no display'));
+
+    await expect(run({ steps: [{ method: 'goto', parameters: { url: 'https://x.test' } }] }))
+      .rejects.toThrow('no display');
+  });
+
   test('context options are merged too', async () => {
     await run({
       contextOptions: { locale: 'fr-BE' },
