@@ -12,6 +12,9 @@ const PAGE_METHODS = [
   'screenshot', 'evaluate', 'title', 'route', 'on', '$$'
 ];
 
+/** What the fake browser keeps in local and session storage. */
+const storage: any = { local: {}, session: {} };
+
 const resetBrowser = () => {
   PAGE_METHODS.forEach(m => { page[m] = jest.fn().mockResolvedValue(undefined); });
   page.title = jest.fn().mockResolvedValue('Expected title');
@@ -20,9 +23,17 @@ const resetBrowser = () => {
   page.keyboard = { press: jest.fn().mockResolvedValue(undefined) };
   page.mouse = { move: jest.fn().mockResolvedValue(undefined) };
 
+  storage.local = {};
+  storage.session = {};
+  // The helper hands `page.evaluate` a function meant for the browser and the
+  // store to read; there is no browser here, so the fake answers with the
+  // store itself
+  page.evaluate = jest.fn((_fn: any, kind: any) => Promise.resolve(storage[kind] || {}));
+
   context.newPage = jest.fn().mockResolvedValue(page);
   context.route = jest.fn().mockResolvedValue(undefined);
   context.close = jest.fn().mockResolvedValue(undefined);
+  context.cookies = jest.fn().mockResolvedValue([]);
 
   browser.newContext = jest.fn().mockResolvedValue(context);
   browser.close = jest.fn().mockResolvedValue(undefined);
@@ -340,6 +351,208 @@ describe('playwright.run - scraping', () => {
       steps: [{ method: 'goto', parameters: { url: 'https://x.test' } }]
     });
     expect(scraped).toEqual({});
+  });
+});
+
+describe('playwright.run - cookies', () => {
+  const withCookies = (cookies: any[]) => {
+    context.cookies = jest.fn().mockResolvedValue(cookies);
+  };
+
+  test('takes the value of a cookie by name', async () => {
+    withCookies([{ name: 'connect.sid', value: 's:abc123', domain: 'acme.me', path: '/' }]);
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'cookies', parameters: { sessionId: { name: 'connect.sid' } } }]
+    });
+
+    expect(harvested).toEqual({ sessionId: 's:abc123' });
+  });
+
+  test('a name written as a pattern matches a generated cookie', async () => {
+    withCookies([{ name: 'csrf_a1b2', value: 'tok', domain: 'acme.me', path: '/' }]);
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'cookies', parameters: { csrf: { name: '/^csrf_/' } } }]
+    });
+
+    expect(harvested.csrf).toBe('tok');
+  });
+
+  test('another field of the cookie can be asked for', async () => {
+    withCookies([{ name: 'sid', value: 'v', domain: '.acme.me', path: '/', httpOnly: true }]);
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'cookies', parameters: { where: { name: 'sid', field: 'domain' } } }]
+    });
+
+    expect(harvested.where).toBe('.acme.me');
+  });
+
+  test('the domain and the path narrow which cookie is taken', async () => {
+    withCookies([
+      { name: 'sid', value: 'other', domain: 'other.test', path: '/' },
+      { name: 'sid', value: 'mine', domain: 'acme.me', path: '/app' }
+    ]);
+
+    const [, , harvested]: any = await run({
+      steps: [{
+        method: 'cookies',
+        parameters: { sid: { name: 'sid', domain: 'acme.me', path: '/app' } }
+      }]
+    });
+
+    expect(harvested.sid).toBe('mine');
+  });
+
+  test('a key with no name collects every cookie', async () => {
+    withCookies([
+      { name: 'a', value: '1', domain: 'acme.me', path: '/' },
+      { name: 'b', value: '2', domain: 'acme.me', path: '/' }
+    ]);
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'cookies', parameters: { all: {} } }]
+    });
+
+    expect(harvested.all).toEqual({ a: '1', b: '2' });
+  });
+
+  test('a cookie that is not there is null, not an error', async () => {
+    withCookies([]);
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'cookies', parameters: { sessionId: { name: 'nope' } } }]
+    });
+
+    expect(harvested.sessionId).toBeNull();
+  });
+
+  test('output and regex format the cookie like a scrape', async () => {
+    withCookies([{ name: 'count', value: 'items: 42', domain: 'acme.me', path: '/' }]);
+
+    const [, , harvested]: any = await run({
+      steps: [{
+        method: 'cookies',
+        parameters: { count: { name: 'count', output: 'number', regex: '\\d+' } }
+      }]
+    });
+
+    expect(harvested.count).toBe(42);
+  });
+});
+
+describe('playwright.run - storage', () => {
+  test('takes a key out of local storage', async () => {
+    storage.local = { 'auth.token': 'ey.jwt.value' };
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'storage', parameters: { token: { key: 'auth.token' } } }]
+    });
+
+    expect(harvested).toEqual({ token: 'ey.jwt.value' });
+  });
+
+  test('session storage is asked for by type', async () => {
+    storage.local = { where: 'local' };
+    storage.session = { where: 'session' };
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'storage', parameters: { where: { key: 'where', type: 'session' } } }]
+    });
+
+    expect(harvested.where).toBe('session');
+  });
+
+  test('a json path reaches into a stored object', async () => {
+    storage.local = { 'auth.user': JSON.stringify({ id: 42, name: 'Ada' }) };
+
+    const [, , harvested]: any = await run({
+      steps: [{
+        method: 'storage',
+        parameters: { userId: { key: 'auth.user', json: 'id' } }
+      }]
+    });
+
+    expect(harvested.userId).toBe(42);
+  });
+
+  test('json true parses the whole value', async () => {
+    storage.local = { user: JSON.stringify({ id: 1 }) };
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'storage', parameters: { user: { key: 'user', json: true } } }]
+    });
+
+    expect(harvested.user).toEqual({ id: 1 });
+  });
+
+  test('a value that is not json is null rather than a failed run', async () => {
+    storage.local = { user: 'not json at all' };
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'storage', parameters: { user: { key: 'user', json: 'id' } } }]
+    });
+
+    expect(harvested.user).toBeNull();
+  });
+
+  test('a key that is not set is null', async () => {
+    storage.local = {};
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'storage', parameters: { token: { key: 'auth.token' } } }]
+    });
+
+    expect(harvested.token).toBeNull();
+  });
+
+  test('a key with no storage key collects the whole store', async () => {
+    storage.local = { a: '1', b: '2' };
+
+    const [, , harvested]: any = await run({
+      steps: [{ method: 'storage', parameters: { all: {} } }]
+    });
+
+    expect(harvested.all).toEqual({ a: '1', b: '2' });
+  });
+
+  test('the store is read once however many keys are asked for', async () => {
+    storage.local = { a: '1', b: '2' };
+
+    await run({
+      steps: [{ method: 'storage', parameters: { a: { key: 'a' }, b: { key: 'b' } } }]
+    });
+
+    expect(page.evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  test('scraped and harvested values land in the same body', async () => {
+    storage.local = { 'auth.token': 'tok' };
+    context.cookies = jest.fn().mockResolvedValue([
+      { name: 'sid', value: 'abc', domain: 'acme.me', path: '/' }
+    ]);
+
+    const [, , harvested]: any = await run({
+      steps: [
+        { method: 'scrape', parameters: { total: { selector: '#total' } } },
+        { method: 'cookies', parameters: { sid: { name: 'sid' } } },
+        { method: 'storage', parameters: { token: { key: 'auth.token' } } }
+      ]
+    });
+
+    expect(harvested).toEqual({ total: '42 items', sid: 'abc', token: 'tok' });
+  });
+
+  test('nothing harvested reaches the flow memory on its own', async () => {
+    storage.local = { 'auth.token': 'tok' };
+
+    const result: any = await run({
+      steps: [{ method: 'storage', parameters: { token: { key: 'auth.token' } } }]
+    });
+
+    // Three elements, not four: what a step remembers is the flow's decision
+    expect(result).toHaveLength(3);
   });
 });
 

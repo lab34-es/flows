@@ -3,8 +3,8 @@
  * running it.
  *
  * A step may need something only a human can supply -- the barcode of the
- * parcel actually in their hand, a code shown on a locker screen. Reading it
- * straight from `process.stdin`, which is what applications used to do, only
+ * parcel , a code shown on a system. Reading it straight from
+ * process.stdin`, which is what applications used to do, only
  * works on the CLI: started from the UI the prompt is printed on the terminal
  * the server happens to be attached to (nobody is looking at it) and the run
  * hangs for good.
@@ -16,10 +16,10 @@
  *  - from the UI it emits the request over the socket and the answer comes
  *    back through `POST /api/flows/input`, which lands in `answer()` here.
  *
- * Requests wait forever by design -- the person may well walk to the locker
- * before typing. `cancel()` is how a run gets out of one: the UI offers it as
- * a button, and the runner calls `cancelAll()` when a flow ends so nothing is
- * left waiting on a run that is over.
+ * Requests wait forever by design -- `cancel()` is how a run gets out
+ * of one: the UI offers it as a button, and the runner calls
+ * `cancelAll()` when a flow ends so nothing is left waiting on a run
+ * that is over.
  */
 // Imported for its side effect: colors patches String.prototype, which the
 // terminal prompt below relies on

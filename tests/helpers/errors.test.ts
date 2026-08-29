@@ -39,16 +39,16 @@ describe('errors.describe', () => {
 
   test('follows the cause chain', () => {
     const root = new Error('the socket died');
-    const wrapper = new Error('could not read the locker', { cause: root });
+    const wrapper = new Error('could not read', { cause: root });
 
     const described = errors.describe(wrapper);
 
-    expect(described.message).toBe('could not read the locker');
+    expect(described.message).toBe('could not read');
     expect(described.causes?.[0].message).toBe('the socket died');
   });
 
   test('keeps the driver fields worth showing and drops the rest', () => {
-    const error: any = new Error('relation "deliverypoints" does not exist');
+    const error: any = new Error('relation "table_name" does not exist');
     error.detail = 'The table was dropped';
     error.severity = 'ERROR';
     error.internalQuery = 'SELECT 1';

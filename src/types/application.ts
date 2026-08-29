@@ -87,6 +87,12 @@ export interface Step {
   test?: Record<string, any>;
   retry?: { times: number; delay?: number };
   mimic?: Array<Record<string, any>>;
+  /**
+   * What this step keeps in the flow memory, as `key: "{{ template }}"`.
+   * Resolved once the step has run, against its own response (`body`,
+   * `status`, `headers`), the steps so far and the memory as it stands.
+   */
+  memory?: Record<string, any>;
   /** The browser session the step browses in, kept open between steps. */
   session?: string | false;
   /** Close that session once this step is done with it. */

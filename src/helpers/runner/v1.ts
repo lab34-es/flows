@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 
 import * as mimicing from '../mimicing';
-import * as apps from '../applications'; 
+import * as apps from '../applications';
 import * as replacer from '../replacer';
 import * as tester from './tester';
 import * as paths from '../paths';
@@ -41,7 +41,7 @@ const buildSteps = (steps) => {
   // ids must be unique. If one is not unique, add a number to it
   const ids = steps.map(step => step.id);
   const uniqueIds = [...new Set(ids)];
-  
+
   if (ids.length !== uniqueIds.length) {
     steps = steps.map((step, index) => {
       if (ids.filter(id => id === step.id).length === 1) {return step;}
@@ -57,6 +57,78 @@ const buildSteps = (steps) => {
   });
 
   return steps;
+};
+
+/**
+ * A mapping value that is nothing but one `{{ expression }}`.
+ *
+ * Rendering such a value through Handlebars would turn it into text, and
+ * escape it on the way: a bearer token would arrive with its padding as
+ * `&#x3D;`, and a number as a string. So a lone expression is read straight
+ * off the scope instead, and keeps whatever type it had.
+ */
+const LONE_EXPRESSION = /^\s*\{\{\{?\s*([A-Za-z0-9_$]+(?:\.[A-Za-z0-9_$]+)*)\s*\}?\}\}\s*$/;
+
+/** Read `a.b.c` off a value without throwing halfway down. */
+const at = (value, path) => String(path).split('.').reduce(
+  (acc, key) => (acc === null || acc === undefined ? undefined : acc[key]),
+  value
+);
+
+/**
+ * What a step's `memory` mapping keeps, resolved against what the step just
+ * did.
+ *
+ * A method decides what it *returns*; the flow decides what is worth
+ * remembering and under which name:
+ *
+ *     memory:
+ *       app_bearer_token: "{{ body.access_token }}"
+ *
+ * The scope is the step's own response (`headers`, `status`, `body`), every
+ * step so far (`steps.<id>....`) and the memory as it stands. A key that
+ * resolves to nothing is not written: an undefined value would otherwise
+ * shadow whatever an earlier step remembered under that name.
+ *
+ * @returns {Object} The keys to merge into the flow memory
+ */
+const resolveMemory = (mapping, flow, response) => {
+  const stepData = flow.steps.reduce((acc, step) => {
+    acc[step.id] = step;
+    return acc;
+  }, {});
+
+  const scope = {
+    steps: stepData,
+    memory: flow.memory || {},
+    headers: response.headers,
+    status: response.status,
+    body: response.body
+  };
+
+  const resolved = {};
+
+  for (const key in mapping) {
+    const template = mapping[key];
+
+    // Anything that is not a template is what the flow wants remembered
+    if (typeof template !== 'string') {
+      resolved[key] = template;
+      continue;
+    }
+
+    const lone = template.match(LONE_EXPRESSION);
+    const value = lone ? at(scope, lone[1]) : replacer.string(template, scope);
+
+    if (value === undefined || value === null || value === '') {
+      console.log(`Step memory: "${key}" resolved to nothing, so it was not remembered`.yellow);
+      continue;
+    }
+
+    resolved[key] = value;
+  }
+
+  return resolved;
 };
 
 const buildData = (data, flow) => {
@@ -77,10 +149,10 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
   const { application, method, parameters } = step;
 
   const stepIndex = flow.steps.findIndex(s => s.id === step.id);
-  
+
   const params = buildData(parameters, flow);
 
-  // ATTENTION! we might retry the step!!! Meaning that the line above 
+  // ATTENTION! we might retry the step!!! Meaning that the line above
   // (buildData) must NOT be executed multiple times. Otherwise, we'll
   // endup replacing handlebars markers multiple times.
   //
@@ -224,7 +296,7 @@ const processor = async (flow, opts) => {
     // This allows us to control which step to execute next
     for (let i = 0; i < flow.steps.length; i++) {
       console.log('');
-      
+
       const step = flow.steps[i];
 
       try {
@@ -236,7 +308,7 @@ const processor = async (flow, opts) => {
         // Prepare holder for execution information
         // If the execution object already exists (due to a retry), preserve the attempt number
         const existingAttempt = flow.steps[i].execution?.attempt || 0;
-        
+
         flow.steps[i].execution = {
           times: {},
           attempt: existingAttempt // Preserve the attempt number
@@ -249,7 +321,7 @@ const processor = async (flow, opts) => {
 
         // Wait for all mimic'd applications to start
         await mimicing.startStep(mimicdApplications, step, flow);
-        
+
         const methodExists = applications[application] && applications[application][method];
 
         if (!methodExists) {
@@ -264,6 +336,17 @@ const processor = async (flow, opts) => {
         flow.reporter.stepUpdate(id);
 
         flow.memory = Object.assign(flow.memory || {}, memory || {});
+
+        // ... and then what the flow itself asked to keep, which has the last
+        // word: it can read the response the method just gave it, so a value
+        // a method only returns can still be remembered under the flow's own
+        // name for it
+        if (step.memory) {
+          flow.memory = Object.assign(
+            flow.memory,
+            resolveMemory(step.memory, flow, { headers, status, body })
+          );
+        }
 
         flow.steps[i].request = request;
         flow.steps[i].response = { headers, status, body };
@@ -295,27 +378,27 @@ const processor = async (flow, opts) => {
               if (typeof test.retry.delay !== 'number' || test.retry.delay < 0) {
                 throw new Error('Invalid retry configuration: delay must be a number greater than or equal to 0');
               }
-              
+
               // Get the current attempt number or initialize it
               const attemptNumber = flow.steps[i].execution.attempt || 0;
-              
+
               // Update the attempt number
               flow.steps[i].execution.attempt = attemptNumber + 1;
               flow.reporter.stepUpdate(id);
-              
+
               // Check if we should retry
               if (attemptNumber < test.retry.times) {
                 console.log(`Test failed for step ${step.id}. Retrying (${attemptNumber + 1}/${test.retry.times})...`);
-                
+
                 // Wait for the specified delay
                 await new Promise(resolve => setTimeout(resolve, test.retry.delay));
-                
+
                 // Retry the step by decrementing i so the same step is executed again in the next iteration
                 i--; // This is the key change - we decrement i instead of index
                 continue; // Skip to the next iteration of the loop
               }
             }
-            
+
             // If no retry configuration or max retries reached, fail the step
             flow.steps[i].execution.status = 'failed';
             flow.steps[i].execution.error = {
@@ -336,7 +419,7 @@ const processor = async (flow, opts) => {
         }
         flow.reporter.stepUpdate(id);
       } catch (stepError) {
-        
+
         // Uncomment this for extra debugging
         console.error(stepError);
 
@@ -354,7 +437,7 @@ const processor = async (flow, opts) => {
         }
 
         flow.steps[i].execution.status = 'error';
-        
+
         flow.steps[i].execution.error = {
           ...described,
           name: described.name || 'StepExecutionError',

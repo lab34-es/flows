@@ -139,6 +139,127 @@ describe('v1.run - happy path', () => {
   });
 });
 
+describe('v1.run - what a step keeps in memory', () => {
+  test('a mapping keeps a value the method only returned', async () => {
+    const flow = flowWith({
+      application: 'calculator',
+      method: 'add',
+      memory: { the_sum: '{{ body.sum }}' }
+    });
+
+    await runCli(flow);
+
+    expect(flow.memory.the_sum).toBe(3);
+  });
+
+  test('a lone expression keeps the type it had', async () => {
+    calculatorAdd.mockResolvedValue([{}, 200, { token: 'a.b=', count: 7 }, {}]);
+
+    const flow = flowWith({
+      application: 'calculator',
+      method: 'add',
+      memory: { token: '{{ body.token }}', count: '{{ body.count }}' }
+    });
+
+    await runCli(flow);
+
+    // Rendered through Handlebars the '=' would arrive as '&#x3D;' and the
+    // number as a string: a token has to survive the trip intact
+    expect(flow.memory.token).toBe('a.b=');
+    expect(flow.memory.count).toBe(7);
+  });
+
+  test('the status is in scope too', async () => {
+    const flow = flowWith({
+      application: 'calculator',
+      method: 'add',
+      memory: { code: '{{ status }}' }
+    });
+
+    await runCli(flow);
+
+    expect(flow.memory.code).toBe(200);
+  });
+
+  test('a template that is more than one expression is rendered', async () => {
+    const flow = flowWith({
+      application: 'calculator',
+      method: 'add',
+      memory: { header: 'Bearer {{ body.sum }}' }
+    });
+
+    await runCli(flow);
+
+    expect(flow.memory.header).toBe('Bearer 3');
+  });
+
+  test('an earlier step is in scope by its id', async () => {
+    const flow = flowWith(
+      { slug: 'first', application: 'calculator', method: 'add' },
+      {
+        slug: 'second',
+        application: 'calculator',
+        method: 'add',
+        memory: { earlier: '{{ steps.first.response.body.sum }}' }
+      }
+    );
+
+    await runCli(flow);
+
+    expect(flow.memory.earlier).toBe(3);
+  });
+
+  test('the mapping has the last word over what the method returned', async () => {
+    const flow = flowWith({
+      application: 'calculator',
+      method: 'add',
+      memory: { last: '{{ body.sum }}' }
+    });
+
+    await runCli(flow);
+
+    // The method returns `{ last: 3 }`; the flow renames the same value, and
+    // what the flow said is what stands
+    expect(flow.memory.last).toBe(3);
+  });
+
+  test('a value that resolves to nothing is not remembered', async () => {
+    const flow = flowWith(
+      { slug: 'first', application: 'calculator', method: 'add' },
+      {
+        slug: 'second',
+        application: 'calculator',
+        method: 'add',
+        memory: { last: '{{ body.nothing }}' }
+      }
+    );
+
+    await runCli(flow);
+
+    // The earlier value stands rather than being shadowed by an empty one
+    expect(flow.memory.last).toBe(3);
+  });
+
+  test('a literal is kept as it is written', async () => {
+    const flow = flowWith({
+      application: 'calculator',
+      method: 'add',
+      memory: { environment: 'local', attempts: 2 }
+    });
+
+    await runCli(flow);
+
+    expect(flow.memory.environment).toBe('local');
+    expect(flow.memory.attempts).toBe(2);
+  });
+
+  test('a step with no mapping changes nothing', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+    await runCli(flow);
+    expect(flow.memory).toEqual({ last: 3 });
+  });
+});
+
 describe('v1.run - environment validation', () => {
   test('an unknown environment fails the flow', async () => {
     const flow = flowWith({ application: 'calculator', method: 'add' });

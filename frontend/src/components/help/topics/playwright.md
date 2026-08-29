@@ -17,6 +17,15 @@ keywords:
   - 'keep open'
   - 'install'
   - 'npx playwright install'
+  - 'cookies'
+  - 'cookie'
+  - 'localstorage'
+  - 'local storage'
+  - 'sessionstorage'
+  - 'session storage'
+  - 'access token'
+  - 'bearer token'
+  - 'scrape'
   - 'executable does not exist'
 ---
 
@@ -98,6 +107,74 @@ Two things a session cannot do. It is **one page**, so a step that opens a new
 tab is on its own; and the browser it was opened with is the browser it keeps,
 so a later step asking for a different `browserType` or `device` is given the
 one already running.
+
+### Taking values out of the browser
+
+Three methods bring something back: `scrape` reads it off the page, and
+`cookies` and `storage` read it out of the browser itself. All three take the
+same shape — the key on the left is the name the value comes back under, and
+what is under it says where to find it.
+
+```yaml
+- method: cookies
+  parameters:
+    sessionId:
+      name: connect.sid       # the cookie's name
+    csrf:
+      name: /^csrf_/          # ... or a pattern, when the app generates it
+    expiresAt:
+      name: connect.sid
+      field: expires          # value (default), domain, path, expires, httpOnly…
+    every: {}                 # no name at all: every cookie, as an object
+
+- method: storage
+  parameters:
+    token:
+      key: access_token       # a localStorage key
+    userId:
+      key: auth.user
+      json: id                # the value is JSON — take this path out of it
+    cartCount:
+      key: cart.count
+      type: session           # sessionStorage instead of localStorage
+      output: number
+    everything: {}            # no key at all: the whole store
+```
+
+`output` and `regex` work exactly as they do for `scrape`. A cookie or a key
+that is not there comes back as `null` rather than failing the run — so a flow
+can assert that it *is* there. Cookies are read from the context, so one set on
+the identity provider is still readable after the redirect back; storage is
+read from the page, so it is the storage of the origin the browser is on.
+
+All of it is merged, in step order, into the **body** of the step. Which means
+a later step of the same YAML file reads it as
+`{{ steps.<id>.result.<key> }}`, and the flow asserts on it the usual way:
+
+```step
+application: shop
+method: login
+test:
+  body:
+    sessionId: "$expr: value && value.length > 10"
+    token: "$expr: value !== null"
+```
+
+None of it reaches the flow memory on its own — a flow says what is worth
+keeping, and under which name, with the step's `memory` mapping:
+
+```step
+application: shop
+method: login
+memory:
+  shop_bearer_token: "{{ body.token }}"
+```
+
+See *Passing data between steps* for what that mapping can read.
+
+A harvested value is reported to the terminal and persisted with the test run,
+like any other response body. Name the keys accordingly: the reporter masks a
+value whose key contains `token`, `password`, `secret` or `authorization`.
 
 This part is **experimental**: the set of available methods lives with the
 Playwright helper, and the seeded `playful_website` example application shows a

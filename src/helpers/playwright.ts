@@ -25,6 +25,8 @@ const ALLOWED_METHODS = [
   'waitForInput',
   'waitForTimeout',
   'scrape',
+  'cookies',
+  'storage',
   'hover',
   'press',
   'fill',
@@ -38,6 +40,17 @@ const ALLOWED_METHODS = [
   'keyboard',
   'mouse'
 ];
+
+/**
+ * The methods that bring something back from the browser. What they collect
+ * is merged, in step order, into the body the run returns -- so a later step
+ * of the same yaml reads it as `{{ steps.<id>.result.<key> }}`, and the flow
+ * asserts on it as the step's body.
+ *
+ * `waitForInput` also leaves a `result` behind and is deliberately not here:
+ * what somebody typed into the terminal is for the script that asked for it.
+ */
+const HARVESTING_METHODS = ['scrape', 'cookies', 'storage'];
 
 const BROWSER_TYPES = {
   chromium,
@@ -298,12 +311,56 @@ const error = (ctx, yamlFile, error) => {
 };
 
 /**
- * @param {*} result 
+ * Turn the text a page gave us into the value the yaml asked for.
+ *
+ * Shared by every method that harvests something -- `scrape` reads it off an
+ * element, `cookies` and `storage` read it out of the browser -- so all three
+ * spell `output` and `regex` the same way.
+ *
+ * @param {string} text - The raw text, as the browser holds it
  * @param {string} output - The format to have the output in (defaults to string)
  * - number
  * - string
  * - date
  * - boolean
+ * @param {string} regexp - The regex to apply to the result
+ * @returns {*} The formatted value, or null when the regex did not match
+ */
+const formatValue = (text, output, regexp) => {
+  // Apply default output
+  if (!output) {output = 'string';}
+
+  const expectsArrayAsOutput = output.includes('[]');
+  if (expectsArrayAsOutput) {
+    return 'not supported yet';
+  }
+
+  if (text === null || text === undefined) {return null;}
+
+  text = String(text);
+
+  if (regexp) {
+    const regex = new RegExp(regexp);
+    const match = text.match(regex);
+    if (match) {
+      text = match[0];
+    } else {
+      return null;
+    }
+  }
+
+  let result;
+
+  if (output === 'number') {result = Number(text.replace(/[^0-9.]/g, ''));}
+  if (output === 'string') {result = text.trim();}
+  if (output === 'date') {result = new Date(text).toISOString();}
+  if (output === 'boolean') {result = ['true', 'yes', '1', 'si'].includes(text.toLowerCase());}
+  return result || text;
+};
+
+/**
+ * @param {*} elements - What `page.$$` returned for the selector
+ * @param {string} output - The format to have the output in (defaults to string)
  * @param {string} regexp - The regex to apply to the result
  * @returns 
  */
@@ -319,23 +376,166 @@ const formatScrapeResult = async (elements, output, regexp) => {
   let firstElement = Array.isArray(elements) ? elements[0] : elements;
   firstElement = await firstElement.textContent();
 
-  if (regexp) {
-    const regex = new RegExp(regexp);
-    const match = firstElement.match(regex);
-    if (match) {
-      firstElement = match[0];
-    } else {
-      return null;
+  return Promise.resolve(formatValue(firstElement, output, regexp));
+};
+
+/**
+ * A cookie name can be written out in full, or as `/pattern/flags` when the
+ * application generates it.
+ *
+ * @returns {RegExp|null} The pattern, or null when the name is a literal
+ */
+const namePattern = (name) => {
+  if (typeof name !== 'string' || !name.startsWith('/')) {return null;}
+
+  const end = name.lastIndexOf('/');
+  if (end < 1) {return null;}
+
+  return new RegExp(name.slice(1, end), name.slice(end + 1));
+};
+
+const nameMatches = (actual, expected) => {
+  const pattern = namePattern(expected);
+  return pattern ? pattern.test(actual) : actual === expected;
+};
+
+/**
+ * Read a path such as `user.id` out of a value, without throwing on the way
+ * through something that is not an object.
+ */
+const at = (value, path) => String(path).split('.').reduce(
+  (acc, key) => (acc === null || acc === undefined ? undefined : acc[key]),
+  value
+);
+
+/**
+ * The cookies the context holds, as the yaml asked for them.
+ *
+ * The cookies come from the context and not from the page, so a cookie set
+ * on the identity provider is still there after the redirect back.
+ *
+ * @param {Object} context - The browser context
+ * @param {Object} parameters - Output key -> what to take, i.e.
+ *   `{ name, domain, path, field, output, regex }`. A key with no
+ *   `name` collects every cookie as a `{ name: value }` object.
+ */
+const collectCookies = async (context, parameters) => {
+  const cookies = (await context.cookies()) || [];
+  const results = {};
+
+  for (const key in parameters) {
+    const { name, domain, path: cookiePath, field, output, regex } = parameters[key] || {};
+
+    const matches = cookies.filter(cookie =>
+      (!name || nameMatches(cookie.name, name))
+      && (!domain || String(cookie.domain || '').includes(domain))
+      && (!cookiePath || cookie.path === cookiePath)
+    );
+
+    debug('Cookie "%s": %d match(es) for %s', key, matches.length, name || 'every cookie');
+
+    if (!name) {
+      results[key] = matches.reduce((acc, cookie) => {
+        acc[cookie.name] = cookie.value;
+        return acc;
+      }, {});
+      continue;
     }
+
+    const cookie = matches[0];
+
+    if (!cookie) {
+      results[key] = null;
+      continue;
+    }
+
+    // `value` is what a flow almost always wants; the rest of the cookie is
+    // there for the flows that assert on an expiry or a domain
+    const raw = !field || field === 'value' ? cookie.value : cookie[field];
+
+    results[key] = formatValue(raw, output, regex);
   }
 
-  let result;
+  return results;
+};
 
-  if (output === 'number') {result = Number(firstElement.replace(/[^0-9.]/g, ''));}
-  if (output === 'string') {result = firstElement.trim();}
-  if (output === 'date') {result = new Date(firstElement).toISOString();}
-  if (output === 'boolean') {result = ['true', 'yes', '1', 'si'].includes(firstElement.toLowerCase());}
-  return Promise.resolve(result || firstElement);
+/**
+ * `window.localStorage` (or `sessionStorage`) of the page, as a plain object.
+ *
+ * Storage belongs to the origin the page is on, so this is read from the page
+ * rather than from the context: what a flow gets is the storage of the site
+ * it is looking at.
+ */
+const readStorage = (page, type) => page.evaluate((kind) => {
+  // This runs in the browser, not in node: `globalThis` is the window there,
+  // and is what keeps the DOM out of this package's types
+  const scope = globalThis as any;
+  const store = kind === 'session' ? scope.sessionStorage : scope.localStorage;
+  const entries = {};
+  for (let index = 0; index < store.length; index++) {
+    const key = store.key(index);
+    entries[key] = store.getItem(key);
+  }
+  return entries;
+}, type === 'session' ? 'session' : 'local');
+
+/**
+ * What the page keeps in local or session storage, as the yaml asked for it.
+ *
+ * @param {Object} page - The page whose origin owns the storage
+ * @param {Object} parameters - Output key -> what to take, i.e.
+ *   `{ key, type, json, output, regex }`. A key with no `key`
+ *   collects the whole store. `json` takes a path out of a value the
+ *   application stored as JSON -- `json: true` parses it whole.
+ */
+const collectStorage = async (page, parameters) => {
+  const stores = {};
+  const results = {};
+
+  for (const outputKey in parameters) {
+    const { key, type = 'local', json, output, regex } = parameters[outputKey] || {};
+
+    // One read per store, however many keys the step asks for
+    if (!stores[type]) {stores[type] = (await readStorage(page, type)) || {};}
+
+    const store = stores[type];
+
+    if (!key) {
+      results[outputKey] = store;
+      continue;
+    }
+
+    let raw = store[key];
+
+    debug('Storage "%s": %s storage key "%s" is %s', outputKey, type, key, raw === undefined ? 'not set' : 'set');
+
+    if (raw === undefined || raw === null) {
+      results[outputKey] = null;
+      continue;
+    }
+
+    if (json) {
+      try {
+        const parsed = JSON.parse(raw);
+        raw = json === true ? parsed : at(parsed, json);
+      }
+      catch (ex) {
+        // A value that is not JSON is not an error worth stopping a flow for:
+        // the step says so and the assertion on it fails
+        debug('Storage key "%s" is not JSON: %s', key, ex.message);
+        raw = null;
+      }
+    }
+
+    // A string is formatted like a scrape -- trimmed, and cast when the yaml
+    // says so. What `json` pulled out of a stored object already has a type
+    // of its own, and keeps it unless the yaml asks for another one.
+    results[outputKey] = typeof raw === 'string' || output || regex
+      ? formatValue(raw, output, regex)
+      : raw;
+  }
+
+  return results;
 };
 
 /**
@@ -595,6 +795,18 @@ export const run = (ctx, yamlFile, stepParams, options: Record<string, any> = {}
             steps[currentStep].result = results;
             break;
           }
+          case 'cookies': {
+            const results = await collectCookies(context, parameters);
+            debug('Cookie results: %O', results);
+            steps[currentStep].result = results;
+            break;
+          }
+          case 'storage': {
+            const results = await collectStorage(page, parameters);
+            debug('Storage results: %O', results);
+            steps[currentStep].result = results;
+            break;
+          }
           default:
             break;
         }
@@ -618,12 +830,17 @@ export const run = (ctx, yamlFile, stepParams, options: Record<string, any> = {}
       } else {
         debug('Keeping browser open as requested');
       }
+      // Everything the run picked up off the browser, in one object: what
+      // `scrape` read off the page, and what `cookies` and `storage` read out
+      // of the browser itself. It is the body of the step, so a flow asserts
+      // on it with `test.body` and keeps what it wants with the step's
+      // `memory` mapping -- nothing here reaches the flow memory on its own.
       const allScrappedData = steps
-        .filter(step => step.method === 'scrape')
+        .filter(step => HARVESTING_METHODS.includes(step.method))
         .map(step => step.result)
         .reduce((acc, result) => Object.assign(acc, result), {});
 
-      debug('Flow completed successfully. Scraped data: %O', allScrappedData);
+      debug('Flow completed successfully. Harvested data: %O', allScrappedData);
       resolve([null, null, allScrappedData]);
 
     } catch (error) {

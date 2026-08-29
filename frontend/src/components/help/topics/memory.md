@@ -19,6 +19,10 @@ keywords:
   - 'write'
   - 'read'
   - 'fallback'
+  - 'step memory'
+  - 'rename'
+  - 'keep'
+  - 'token'
 ---
 
 A flow carries one plain object called the **memory**. It starts empty every
@@ -66,6 +70,40 @@ When a step returns, what it wrote is **merged** into the flow memory:
 
 So `memory.lastResult` always means *the most recent* result, and a step that
 returns no memory changes nothing.
+
+### Writing it from the flow: the step's `memory` mapping
+
+The other way in belongs to the flow rather than to the method. A step can
+name what it keeps out of what the method just returned:
+
+    ```step
+    application: app-cloud-ui
+    method: dashboard_login
+    memory:
+      app_bearer_token: "{{ body.access_token }}"
+    ```
+
+Use it when the value is *in* the response but the method does not remember it
+for you, or when the name the method uses is not the name the rest of the flow
+wants to call it by.
+
+The mapping is resolved **after** the step has run, and it can read:
+
+| | |
+|-|-|
+| `body`, `status`, `headers` | The response of this step. |
+| `steps.<id>....` | Any step so far — `{{ steps.login.response.body.access_token }}`. |
+| `memory.<key>` | The memory as it stands, including what this step just wrote. |
+
+Three things it does differently from `parameters`:
+
+| | |
+|-|-|
+| **Types survive** | A value that is nothing but one `{{ expression }}` is taken straight off the response, so a number stays a number and a token keeps its `=` instead of arriving as `&#x3D;`. Mix it into a sentence — `"Bearer {{ body.token }}"` — and it is text again, escaping and all. |
+| **Nothing is written for nothing** | A key that resolves to empty is skipped, and says so in the run log. Whatever an earlier step remembered under that name stands. |
+| **It has the last word** | The mapping is applied after the method's own fourth value, so a step can override what the method remembered. |
+
+A value that is not a template — `environment: "local"` — is kept as written.
 
 ### Reading it: `{{ memory.key }}`
 
