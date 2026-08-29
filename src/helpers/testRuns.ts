@@ -651,6 +651,7 @@ const prepareFolderRun = async ({ files, folder = '', view, environment }: {
 
   const flowsHelper = require('./flows');
   const targets: Array<{ file: string; content: string; title: string }> = [];
+  const steps: Array<Record<string, any>> = [];
 
   for (const relativePath of relativePaths) {
     const { absolute, relative } = await flowsHelper.resolveWithinFlows(relativePath);
@@ -665,11 +666,26 @@ const prepareFolderRun = async ({ files, folder = '', view, environment }: {
     const content = fs.readFileSync(absolute, 'utf8');
     const parsed = markdownFlows.parse(content);
 
+    steps.push(...parsed.steps);
+
     targets.push({
       file: relative.split(path.sep).join('/'),
       content,
       title: parsed.title || path.basename(absolute)
     });
+  }
+
+  // Every application these flows use has to have its env file for the
+  // environment before the first one starts -- a run that would break half
+  // way through is better refused than recorded. Applications no flow of the
+  // run touches are not asked for anything.
+  const applications = apps.applicationsOf(steps);
+  const missing = await apps.missingEnvFilesFor(applications, environment);
+
+  if (missing.length) {
+    throw new Error(apps.readinessError({
+      environment, environments: allEnvironments, known: true, applications, missing, ready: false
+    }));
   }
 
   return { targets, view: viewName };

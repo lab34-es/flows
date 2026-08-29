@@ -21,6 +21,10 @@ keywords:
   Click one to read its README and browse its methods: input parameters,
   output, memory usage and examples, plus its environment files.
 - **Sidebar footer › Environment** — the environment used for every run.
+- **Home › Environment variables** — what state your env files are in, and the
+  way into the *Environment variables* screen: **Export** hands a teammate the
+  values they are missing as a single document, **Import** writes theirs into
+  your own files (see *Environments and secrets*).
 - **Top bar › Context folder** — the folder everything is read from and written
   to, with its git branch next to it -- a menu to switch, create and fetch
   branches -- and a *sync* button (see *The context folder and git*). Changed files are coloured in the sidebar, the way an

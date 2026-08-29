@@ -114,12 +114,26 @@ export const contextApi = {
 
 export const environmentApi = {
   getAllPossible: () => api.get('/api/environment/all-possible'),
-  // The env-files matrix the home page card renders: which .env files each
-  // application has, which are missing, and which have a template to start from
+  // The env-files status: which .env files each application has, which are
+  // missing, and which have a template to start from
   getStatus: () => api.get('/api/environment/status'),
+  // What a flow needs before it can run on an environment: every application
+  // it uses — and only those — has to have its env file for it. Ask with the
+  // flow's markdown (value) or with the applications it uses.
+  readiness: ({ environment, applications, value }: {
+    environment: string;
+    applications?: string[];
+    value?: string;
+  }) => api.post('/api/environment/readiness', { environment, applications, value }),
   createMissing: (options = {}) => api.post('/api/environment/create-missing', options),
-  add: (name, baseEnvironment) =>
-    api.post('/api/environment/add', { name, baseEnvironment: baseEnvironment || undefined }),
+  // Exchanging the values of the env files between developers. The tree is
+  // names only; the values travel in the document the export answers with.
+  variables: () => api.get('/api/environment/variables'),
+  exportVariables: (selection: Array<{ application: string; environment: string; keys?: string[] }>) =>
+    api.post('/api/environment/export', { selection }),
+  // dryRun answers with the same report, having written nothing
+  importVariables: (yaml: string, options: { dryRun?: boolean } = {}) =>
+    api.post('/api/environment/import', { yaml, dryRun: Boolean(options.dryRun) }),
 };
 
 export const settingsApi = {

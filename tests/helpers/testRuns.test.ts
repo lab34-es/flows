@@ -20,6 +20,12 @@ jest.mock('../../src/helpers/paths', () => ({
 // loaded, the view that picks the flows, and the runner that executes them.
 jest.mock('../../src/helpers/applications', () => ({
   allPossibleEnvironments: jest.fn(async () => ['local', 'staging']),
+  // The env files a run needs before it starts: covered for real in
+  // applications.test.ts and testRunsIntegration.test.ts, so here every
+  // application already has its file
+  applicationsOf: jest.fn(() => []),
+  missingEnvFilesFor: jest.fn(async () => []),
+  readinessError: jest.fn(() => null),
   loadAll: jest.fn(async () => {})
 }));
 jest.mock('../../src/helpers/bases', () => ({ query: jest.fn() }));

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { AlertCircle, Save } from 'lucide-react';
 
@@ -23,6 +23,11 @@ const LANGUAGES = {
 };
 
 const extensionOf = (filePath) => (filePath.split('.').pop() || '').toLowerCase();
+
+/** The entries of `record` whose key is one of `keys`. */
+const only = (record, keys) => Object.fromEntries(
+  keys.filter((key) => key in record).map((key) => [key, record[key]])
+);
 
 // Starting content offered when a canonical file does not exist yet
 const templateFor = (filePath, slug) => {
@@ -89,10 +94,11 @@ const dropKeys = (map, target) => Object.fromEntries(
  * "Source" view of an application: a VS Code-like explorer listing its files
  * — where they can be created, renamed and deleted — next to the Monaco
  * editor used for flows. `initialFile` pre-selects a file on open (deep links
- * from the home page's Environments card), even one that does not exist yet.
+ * from the home page's Environment variables card), even one that does not
+ * exist yet.
  */
-export function ApplicationSource({ slug, initialFile = null, onSaved }: {
-  slug: any, initialFile?: string | null, onSaved?: () => void
+export function ApplicationSource({ slug, initialFile = null, revision = 0, onSaved }: {
+  slug: any, initialFile?: string | null, revision?: number, onSaved?: () => void
 }) {
   const { theme } = useTheme();
 
@@ -173,6 +179,44 @@ export function ApplicationSource({ slug, initialFile = null, onSaved }: {
 
     return () => { cancelled = true; };
   }, [slug, initialFile, openFile]);
+
+  // What is on screen was read from disk when the file was opened. Something
+  // else writing to the application folder -- environment variables imported
+  // on the home page, env files created from their templates -- makes that
+  // stale, so everything with no unsaved edit in it is dropped and read
+  // again. A file being edited is left exactly as it is: that draft is the
+  // one thing nobody else can bring back.
+  const readAtRevision = useRef(revision);
+
+  // Read when the answer comes back rather than when the request went out:
+  // what counts as edited is whatever the editor holds by then
+  const cache = useRef({ drafts, originals });
+  useEffect(() => { cache.current = { drafts, originals }; }, [drafts, originals]);
+
+  useEffect(() => {
+    if (readAtRevision.current === revision) { return undefined; }
+    readAtRevision.current = revision;
+
+    let cancelled = false;
+
+    refreshFiles()
+      .then((list) => {
+        if (cancelled) { return; }
+
+        const { drafts: held, originals: read } = cache.current;
+        const edited = Object.keys(held).filter((path) => held[path] !== read[path]);
+
+        setDrafts((current) => only(current, edited));
+        setOriginals((current) => only(current, edited));
+
+        if (selected && !edited.includes(selected)) {
+          openFile(list.find((file) => file.path === selected) || { path: selected }, {});
+        }
+      })
+      .catch((ex) => !cancelled && setError(ex.response?.data?.error || ex.message));
+
+    return () => { cancelled = true; };
+  }, [revision, refreshFiles, openFile, selected]);
 
   const dirtyFor = useCallback((filePath) =>
     drafts[filePath] !== undefined && drafts[filePath] !== originals[filePath],

@@ -146,46 +146,40 @@ const processor = async (flow, opts) => {
     const { environment } = opts;
 
     steps = flow.steps;
-    // validate environment is valid
-    const allEnvironments = await apps.allPossibleEnvironments();
-    if (!allEnvironments.includes(environment)) {
+
+    // Everything this flow needs, checked before a single step runs: a known
+    // environment, and an env file in each application the flow uses. The
+    // applications it does not use are not looked at.
+    const readiness = await apps.environmentReadiness(steps, environment);
+
+    if (!readiness.known) {
       flow.execution.status = 'error';
       flow.execution.error = {
         name: 'InvalidEnvironment',
-        message: `Invalid environment: ${environment}. Must be one of ${allEnvironments.join(', ')}`,
+        message: apps.readinessError(readiness),
         code: 2
       };
       flow.reporter.execution();
       throw flow.execution.error;
     }
-    
-    // Prepare environment
-    const uniqueApplications = [...new Set<string>(steps.map(step => step.application).filter(Boolean))];
+
+    if (readiness.missing.length) {
+      flow.execution.status = 'error';
+      flow.execution.error = {
+        name: 'MissingEnvironmentFile',
+        message: apps.readinessError(readiness),
+        code: 3,
+        details: { environment, missing: readiness.missing.map(item => item.file) }
+      };
+      flow.reporter.execution();
+      throw flow.execution.error;
+    }
 
     // Load environment variables for each application
-    for (const application of uniqueApplications) {
+    for (const application of readiness.applications) {
       try {
-        if (application === 'tester') {continue;}
-
         const applicationPath = await paths.contextDir(['applications', application]);
         const envFile = await paths.contextDir(['applications', application, 'env', `${environment}.env`]);
-
-        // Stop if the file does not exist
-        if (application !== 'tester' && !fs.existsSync(envFile)) {
-          // A committed template means the file only needs creating: point
-          // there instead of leaving the tester to guess the variables
-          const templateHint = fs.existsSync(`${envFile}.example`)
-            ? ` A template exists at ${envFile}.example — create the missing env files from the Environments card on the home page.`
-            : '';
-          flow.execution.status = 'error';
-          flow.execution.error = {
-            name: 'MissingEnvironmentFile',
-            message: `Missing environment file for ${application} at ${envFile}.${templateHint}`,
-            code: 3
-          };
-          flow.reporter.execution();
-          throw flow.execution.error;
-        }
 
         appsCtx[application] = {
           name: application,

@@ -196,3 +196,54 @@ describe('a folder run executes its flows one after the other', () => {
     expect(fs.existsSync(RUNS_DIR)).toBe(false);
   });
 });
+
+describe('a run is refused when the flow\'s applications have no env file', () => {
+  test('the applications of the flow are what is checked, and nothing is recorded', async () => {
+    const io = { emit: jest.fn() };
+
+    // "payments" has no env folder at all; the flow that uses it cannot run
+    const flow = PASSING.replace('application: calculator', 'application: payments');
+
+    await expect(flows.start({ value: flow, environment: 'local', path: 'shop/pay.md' }, { io }))
+      .rejects.toThrow(/Missing environment file for "local": payments/);
+
+    expect(fs.existsSync(RUNS_DIR)).toBe(false);
+  });
+
+  test('a folder run stops before the first flow starts', async () => {
+    fs.writeFileSync(path.join(FLOWS_DIR, 'add.md'), PASSING, 'utf8');
+    fs.writeFileSync(
+      path.join(FLOWS_DIR, 'pay.md'),
+      PASSING.replace('application: calculator', 'application: payments'),
+      'utf8'
+    );
+
+    await expect(testRuns.startFolderRun({
+      files: ['add.md', 'pay.md'],
+      environment: 'local',
+      io: { emit: jest.fn() }
+    })).rejects.toThrow(/Missing environment file for "local": payments/);
+
+    expect(fs.existsSync(RUNS_DIR)).toBe(false);
+    expect((apps.applications as any).calculator.add).not.toHaveBeenCalled();
+  });
+
+  test('an environment only some applications declare still runs the flows that have it', async () => {
+    // "uat" exists because calculator declares it -- "legacy" never will,
+    // and no flow of this run uses it
+    fs.mkdirSync(path.join(CONTEXT, 'applications', 'legacy', 'env'), { recursive: true });
+    fs.writeFileSync(path.join(CONTEXT, 'applications', 'legacy', 'env', 'local.env'), 'L=1\n', 'utf8');
+    fs.writeFileSync(path.join(CONTEXT, 'applications', 'calculator', 'env', 'uat.env'), 'BASE=2\n', 'utf8');
+
+    const io = { emit: jest.fn() };
+
+    const result: any = await flows.start({ value: PASSING, environment: 'uat', path: 'math/add.md' }, { io });
+    expect(result.execution.id).toBeDefined();
+
+    const [runId] = fs.readdirSync(RUNS_DIR);
+    const summary = await finishedSummary(runId);
+
+    expect(summary.status).toBe('passed');
+    expect(summary.environment).toBe('uat');
+  });
+});

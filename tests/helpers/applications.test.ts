@@ -310,6 +310,125 @@ describe('applications.allPossibleEnvironments', () => {
   });
 });
 
+describe('applications.applicationsOf', () => {
+  test('is the unique list of the applications the steps call', () => {
+    expect(apps.applicationsOf([
+      { application: 'shop' },
+      { application: 'payments' },
+      { application: 'shop' }
+    ])).toEqual(['shop', 'payments']);
+  });
+
+  test('the tester pseudo-application, blanks and no steps at all are left out', () => {
+    expect(apps.applicationsOf([{ application: 'tester' }, { application: '' }, null])).toEqual([]);
+    expect(apps.applicationsOf(undefined)).toEqual([]);
+  });
+});
+
+describe('applications.missingEnvFilesFor', () => {
+  test('only the applications asked about are looked at', async () => {
+    write('shop/env/uat.env', 'A=1\n');
+    write('payments/env/local.env', 'B=1\n');
+    write('billing/env/uat.env', 'C=1\n');
+
+    // Applications outside the list are never a reason to be missing
+    // something: "billing" has uat, "payments" does not, and only payments
+    // is reported
+    const missing = await apps.missingEnvFilesFor(['shop', 'payments'], 'uat');
+
+    expect(missing).toEqual([{
+      application: 'payments',
+      file: 'applications/payments/env/uat.env',
+      path: path.join(appsDir, 'payments/env/uat.env'),
+      hasTemplate: false
+    }]);
+  });
+
+  test('a committed template is reported with the missing file', async () => {
+    write('payments/env/uat.env.example', 'TOKEN=\n');
+
+    const [missing] = await apps.missingEnvFilesFor(['payments'], 'uat');
+
+    expect(missing.hasTemplate).toBe(true);
+  });
+
+  test('a name that is not a plain segment never reaches the filesystem', async () => {
+    const [missing] = await apps.missingEnvFilesFor(['../../etc'], 'uat');
+
+    expect(missing.path).toBeNull();
+    expect(await apps.envFileOf('shop', '../../../etc/passwd')).toBeNull();
+  });
+});
+
+describe('applications.environmentReadiness', () => {
+  test('a flow runs on an environment its own applications have a file for', async () => {
+    write('shop/env/uat.env', 'A=1\n');
+    // Declares uat for everyone, and has no file of its own for it
+    write('legacy/env/uat.env.example', 'A=\n');
+
+    const readiness = await apps.environmentReadiness([{ application: 'shop' }], 'uat');
+
+    expect(readiness).toMatchObject({
+      environment: 'uat',
+      known: true,
+      applications: ['shop'],
+      missing: [],
+      ready: true
+    });
+    expect(apps.readinessError(readiness)).toBeNull();
+  });
+
+  test('the application the flow uses is the one that has to have the file', async () => {
+    write('shop/env/uat.env', 'A=1\n');
+    write('payments/env/local.env', 'B=1\n');
+
+    const readiness = await apps.environmentReadiness(
+      [{ application: 'shop' }, { application: 'payments' }],
+      'uat'
+    );
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.missing.map(item => item.application)).toEqual(['payments']);
+    expect(apps.readinessError(readiness))
+      .toContain('Missing environment file for "uat": payments (applications/payments/env/uat.env)');
+  });
+
+  test('an unknown environment is answered as such, not as missing files', async () => {
+    write('shop/env/local.env', 'A=1\n');
+
+    const readiness = await apps.environmentReadiness([{ application: 'shop' }], 'nope');
+
+    expect(readiness).toMatchObject({ known: false, missing: [], ready: false });
+    expect(apps.readinessError(readiness)).toBe('Invalid environment: nope. Must be one of local');
+  });
+
+  test('a flow that only uses the tester needs no env file at all', async () => {
+    write('shop/env/uat.env', 'A=1\n');
+
+    const readiness = await apps.environmentReadiness([{ application: 'tester' }], 'uat');
+
+    expect(readiness.ready).toBe(true);
+  });
+
+  test('every missing application is named, and the templates are pointed at', async () => {
+    write('shop/env/uat.env.example', 'A=\n');
+    write('payments/env/uat.env', 'B=1\n');
+
+    const readiness = await apps.environmentReadiness(
+      [{ application: 'shop' }, { application: 'billing' }, { application: 'payments' }],
+      'uat'
+    );
+
+    const message = apps.readinessError(readiness)!;
+
+    expect(message).toContain('Missing environment files for "uat"');
+    expect(message).toContain('shop (applications/shop/env/uat.env)');
+    expect(message).toContain('billing (applications/billing/env/uat.env)');
+    expect(message).not.toContain('payments (');
+    expect(message).toContain('.env.example template');
+  });
+});
+
 describe('applications.environmentsStatus', () => {
   test('reports each application against each environment', async () => {
     write('a/env/local.env', 'A=1\n');
@@ -374,46 +493,6 @@ describe('applications.createMissingEnvFiles', () => {
     expect(created.map(c => `${c.application}/${c.environment}`)).toEqual(['a/prod']);
     expect(fs.existsSync(path.join(appsDir, 'a/env/staging.env'))).toBe(false);
     expect(fs.existsSync(path.join(appsDir, 'b/env/prod.env'))).toBe(false);
-  });
-});
-
-describe('applications.addEnvironmentToAll', () => {
-  test('creates the env file in every application that lacks it', async () => {
-    write('a/env/local.env', 'A=1\nTOKEN=abc\n');
-    write('b/env/staging.env', 'B=1\n');
-
-    const created = await apps.addEnvironmentToAll('staging', 'local');
-
-    expect(created.map(c => c.application)).toEqual(['a']);
-
-    const content = fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8');
-    expect(content).toContain('A=');
-    expect(content).toContain('TOKEN=');
-    expect(content).not.toContain('abc');
-  });
-
-  test('prefers the application template over the base environment', async () => {
-    write('a/env/local.env', 'A=1\n');
-    write('a/env/staging.env.example', 'FROM_TEMPLATE=\n');
-
-    await apps.addEnvironmentToAll('staging', 'local');
-
-    expect(fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8')).toBe('FROM_TEMPLATE=\n');
-  });
-
-  test('creates a commented stub when there is nothing to copy from', async () => {
-    write('a/index.ts', 'export const nothing = 1;');
-
-    await apps.addEnvironmentToAll('staging');
-
-    expect(fs.readFileSync(path.join(appsDir, 'a/env/staging.env'), 'utf8')).toContain('# Environment "staging"');
-  });
-
-  test('rejects names that are not a plain file-name stem', async () => {
-    await expect(apps.addEnvironmentToAll('')).rejects.toThrow('Environment name is required');
-    await expect(apps.addEnvironmentToAll('../evil')).rejects.toThrow('Invalid environment name');
-    await expect(apps.addEnvironmentToAll('.hidden')).rejects.toThrow('Invalid environment name');
-    await expect(apps.addEnvironmentToAll('prod.env')).rejects.toThrow('Invalid environment name');
   });
 });
 

@@ -12,7 +12,7 @@ import AiEditDialog from '@/components/flow/AiEditDialog';
 import BlockEditor from '@/components/flow/BlockEditor';
 import FlowProperties from '@/components/flow/FlowProperties';
 import XrayChip from '@/components/flow/XrayChip';
-import { flowsApi, jiraApi } from '@/services/api';
+import { environmentApi, flowsApi, jiraApi } from '@/services/api';
 import { useAppState } from '@/context/AppStateContext';
 import { useExecutions } from '@/context/ExecutionContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -56,6 +56,9 @@ export function FlowPage() {
   const [savingProperties, setSavingProperties] = useState(false);
   const [saveError, setSaveError] = useState<any>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  // What this flow needs to run on the selected environment: null until the
+  // check has answered
+  const [readiness, setReadiness] = useState<any>(null);
   // configured: null while unknown (loading / unreachable), then a boolean
   const [xray, setXray] = useState<{
     configured: boolean | null;
@@ -419,6 +422,41 @@ export function FlowPage() {
 
   const parseErrors = flowData?.errors || [];
 
+  // The applications the document calls, as a stable key: the readiness check
+  // only has to be asked again when they -- or the environment -- change, not
+  // on every keystroke
+  const usedApplications = useMemo(
+    () => [...new Set<string>((flowData?.steps || [])
+      .map((step) => step.application)
+      .filter(Boolean))].sort().join(','),
+    [flowData?.steps]
+  );
+
+  const flowLoaded = Boolean(flowData);
+
+  /**
+   * Whether the flow can run where the sidebar points, asked before anybody
+   * presses Run. An environment exists as soon as one application declares
+   * it, so the files that matter are the ones belonging to the applications
+   * this flow uses -- the rest of them are none of this flow's business.
+   */
+  useEffect(() => {
+    if (!environment || !flowLoaded) {
+      setReadiness(null);
+      return;
+    }
+
+    let cancelled = false;
+    const applications = usedApplications ? usedApplications.split(',') : [];
+
+    environmentApi.readiness({ environment, applications })
+      .then((response) => { if (!cancelled) { setReadiness(response.data); } })
+      // A check that cannot be made says nothing: the run itself makes it too
+      .catch(() => { if (!cancelled) { setReadiness(null); } });
+
+    return () => { cancelled = true; };
+  }, [environment, usedApplications, flowLoaded]);
+
   // Invalid step YAML, by step number, as the parser saw it
   const stepErrors = useMemo(() => {
     const errors = new Map<number, string>();
@@ -550,7 +588,13 @@ export function FlowPage() {
           <Button
             onClick={handleRun}
             disabled={anyRunning || !environment}
-            title={!environment ? 'Select an environment in the sidebar first' : `Run on “${environment}”`}
+            title={
+              !environment
+                ? 'Select an environment in the sidebar first'
+                : readiness && !readiness.ready
+                  ? `This flow is missing env files for “${environment}”`
+                  : `Run on “${environment}”`
+            }
           >
             <Play /> Run{environment ? ` · ${environment}` : ''}
           </Button>
@@ -639,6 +683,40 @@ export function FlowPage() {
                       {cause.name}: {cause.message}
                     </p>
                   ))}
+                </AlertDescription>
+              </Alert>
+            )}
+            {readiness && !readiness.ready && (
+              <Alert className="mb-4">
+                <AlertCircle />
+                <AlertTitle>
+                  This flow is not ready to run on &ldquo;{readiness.environment}&rdquo;
+                </AlertTitle>
+                <AlertDescription>
+                  {readiness.known ? (
+                    <>
+                      <p>
+                        Every application a flow uses needs its env file for the environment.
+                        These do not have one yet:
+                      </p>
+                      {readiness.missing.map((item) => (
+                        <p key={item.application} className="font-mono text-xs">
+                          {item.file}
+                          {item.hasTemplate ? ' — a .env.example template is committed next to it' : ''}
+                        </p>
+                      ))}
+                      <p>
+                        Create them from the Environment variables card on the home page, or
+                        import a teammate's export under Environment variables › Import.
+                      </p>
+                    </>
+                  ) : (
+                    <p>
+                      No application declares that environment. Pick another one in the sidebar,
+                      or write its env file from the Source view of an application that needs it —
+                      importing a teammate's export creates the files the document names too.
+                    </p>
+                  )}
                 </AlertDescription>
               </Alert>
             )}

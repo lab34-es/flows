@@ -198,7 +198,7 @@ export function ApplicationPage() {
   // editor with that file selected — how the home page opens env files
   const requestedView = searchParams.get('view');
   const requestedFile = searchParams.get('file');
-  const { refreshApplications, refreshEnvironments } = useAppState();
+  const { applicationsRevision, refreshApplications, refreshEnvironments } = useAppState();
 
   const [app, setApp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -229,6 +229,19 @@ export function ApplicationPage() {
   useEffect(() => {
     fetchApp();
   }, [fetchApp]);
+
+  // What this page holds was read when it opened. Anything that writes to the
+  // application folder afterwards -- importing environment variables on the
+  // home page, creating env files from their templates, another tab saving a
+  // file -- re-reads the applications, and this page follows: silently, so
+  // the env values on screen are the ones on disk without the page blinking.
+  const readAtRevision = useRef(applicationsRevision);
+
+  useEffect(() => {
+    if (readAtRevision.current === applicationsRevision) { return; }
+    readAtRevision.current = applicationsRevision;
+    fetchApp({ silent: true });
+  }, [applicationsRevision, fetchApp]);
 
   // Deep links to a method (?method=x) always land on the Document view
   useEffect(() => {
@@ -302,7 +315,12 @@ export function ApplicationPage() {
 
       {view === 'source' ? (
         <div className="min-h-0 flex-1">
-          <ApplicationSource slug={slug} initialFile={requestedFile} onSaved={handleSourceSaved} />
+          <ApplicationSource
+            slug={slug}
+            initialFile={requestedFile}
+            revision={applicationsRevision}
+            onSaved={handleSourceSaved}
+          />
         </div>
       ) : (
       <div className="min-h-0 flex-1 overflow-auto">
