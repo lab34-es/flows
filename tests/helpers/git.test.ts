@@ -10,8 +10,62 @@ import * as git from '../../src/helpers/git';
 
 /**
  * The unit under test is the git binary's own behaviour as much as it is our
- * parsing of it, so these run against real repositories in a temp directory.
+ * parsing of it, so these run against real repositories in a temp directory --
+ * which makes the machine's git configuration part of the test environment,
+ * and it should not be.
+ *
+ * The one that bites is `url.<base>.insteadOf`: a
+ * `url.https://github.com/.insteadOf git@github.com:` rewrite -- common on
+ * developer machines, and injected through the environment by some CI and
+ * sandbox images -- makes `git remote get-url` answer with the rewritten
+ * address, so a remote added here as `git@github.com:owner/repo.git` comes
+ * back as an https one and the remote test below fails for a reason that has
+ * nothing to do with this code.
+ *
+ * Every git process is therefore spawned with a pristine configuration
+ * environment: no system file, no global file, and none of the config pairs
+ * `GIT_CONFIG_COUNT` and `GIT_CONFIG_PARAMETERS` carry. It has to be done to
+ * the child's environment rather than to `process.env`, because jest gives
+ * each test file its own copy of `process.env` and a spawned process inherits
+ * the real one -- so setting a variable in a test never reaches git.
+ *
+ * The repository-local config is left alone: that is where `init` below puts
+ * the identity these tests commit with.
  */
+const mockConfigDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flows-gitconfig-')));
+
+// A file git can read and find nothing in. An empty file rather than /dev/null
+// so this holds on Windows too.
+const mockEmptyConfig = path.join(mockConfigDir, 'gitconfig');
+fs.writeFileSync(mockEmptyConfig, '');
+
+const mockGitEnv = {
+  GIT_CONFIG_SYSTEM: mockEmptyConfig,
+  GIT_CONFIG_GLOBAL: mockEmptyConfig,
+  // Zero pairs to read, whatever GIT_CONFIG_KEY_<n> still says
+  GIT_CONFIG_COUNT: '0',
+  GIT_CONFIG_PARAMETERS: ''
+};
+
+jest.mock('child_process', () => {
+  const actual = jest.requireActual('child_process');
+
+  return {
+    ...actual,
+    // The helper spawns git as execFile(file, args, options, callback), and
+    // what changes here is only the environment git starts from -- including
+    // whatever a test itself put in `process.env`, such as
+    // GIT_CEILING_DIRECTORIES
+    execFile: (file: string, args: string[], options: any, callback: any) =>
+      actual.execFile(
+        file,
+        args,
+        { ...options, env: { ...process.env, ...mockGitEnv } },
+        callback
+      )
+  };
+});
+
 let repo: string;
 
 const init = async (dir: string) => {
@@ -38,6 +92,10 @@ beforeEach(async () => {
 
 afterEach(() => {
   fs.rmSync(repo, { recursive: true, force: true });
+});
+
+afterAll(() => {
+  fs.rmSync(mockConfigDir, { recursive: true, force: true });
 });
 
 describe('statusFromCode', () => {
