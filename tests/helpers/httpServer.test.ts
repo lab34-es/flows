@@ -14,9 +14,16 @@ const mimicConfig = (application: string, rep = reporter()) => ({
   flow: { reporter: rep }
 });
 
-// Each test claims its own port so the module-level registry stays predictable.
-let nextPort = 45_000;
-const takePort = () => nextPort++;
+// Every test asks for port 0 and lets the OS hand out a free one. Fixed ports
+// made this suite flaky on CI: 45000+ falls inside Linux's ephemeral range
+// (32768-60999), so a busy runner could claim the same port between listen()
+// and connect() and the request came back ECONNREFUSED at random.
+//
+// The registry in httpServer keys on (application, port), so what keeps the
+// tests from reusing each other's server is now the application name alone --
+// give every test its own.
+const PORT = 0;
+const urlOf = (server: any) => `http://127.0.0.1:${server.address().port}`;
 
 const started: Array<{ server: any }> = [];
 
@@ -27,14 +34,13 @@ afterEach(async () => {
 describe('httpServer.start', () => {
   test('serves the callback\'s response and reports the exchange', async () => {
     const rep = reporter();
-    const port = takePort();
 
-    const server: any = await httpServer.start(mimicConfig('calculator', rep), port, (req, res) => {
+    const server: any = await httpServer.start(mimicConfig('calculator', rep), PORT, (req, res) => {
       res.json({ sum: 3 });
     });
     started.push({ server });
 
-    const res = await request(`http://127.0.0.1:${port}`).post('/add').send({ a: 1, b: 2 });
+    const res = await request(urlOf(server)).post('/add').send({ a: 1, b: 2 });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ sum: 3 });
@@ -47,8 +53,7 @@ describe('httpServer.start', () => {
   });
 
   test('resolves with an http server that is listening', async () => {
-    const port = takePort();
-    const server: any = await httpServer.start(mimicConfig('httpbin'), port, (req, res) => res.json({}));
+    const server: any = await httpServer.start(mimicConfig('httpbin'), PORT, (req, res) => res.json({}));
     started.push({ server });
 
     expect(server).toBeDefined();
@@ -57,35 +62,32 @@ describe('httpServer.start', () => {
   });
 
   test('starting the same application and port again reuses the running server', async () => {
-    const port = takePort();
-    const first: any = await httpServer.start(mimicConfig('reused'), port, (req, res) => res.json({ n: 1 }));
+    const first: any = await httpServer.start(mimicConfig('reused'), PORT, (req, res) => res.json({ n: 1 }));
     started.push({ server: first });
 
-    const second: any = await httpServer.start(mimicConfig('reused'), port, (req, res) => res.json({ n: 2 }));
+    const second: any = await httpServer.start(mimicConfig('reused'), PORT, (req, res) => res.json({ n: 2 }));
 
     expect(second).toBe(first);
-    const res = await request(`http://127.0.0.1:${port}`).get('/');
+    const res = await request(urlOf(first)).get('/');
     expect(res.body).toEqual({ n: 1 });
   });
 
   test('templated responses are rendered against the request body', async () => {
-    const port = takePort();
-    const server: any = await httpServer.start(mimicConfig('templated'), port, (req, res) => {
+    const server: any = await httpServer.start(mimicConfig('templated'), PORT, (req, res) => {
       res.json({ echoed: '{{name}}' });
     });
     started.push({ server });
 
-    const res = await request(`http://127.0.0.1:${port}`).post('/').send({ name: 'ana' });
+    const res = await request(urlOf(server)).post('/').send({ name: 'ana' });
     expect(res.body).toEqual({ echoed: 'ana' });
   });
 
   test('urlencoded bodies are parsed too', async () => {
-    const port = takePort();
     const rep = reporter();
-    const server: any = await httpServer.start(mimicConfig('form', rep), port, (req, res) => res.json({ ok: true }));
+    const server: any = await httpServer.start(mimicConfig('form', rep), PORT, (req, res) => res.json({ ok: true }));
     started.push({ server });
 
-    await request(`http://127.0.0.1:${port}`).post('/form').type('form').send({ a: '1' });
+    await request(urlOf(server)).post('/form').type('form').send({ a: '1' });
     expect(rep.mimicRequest).toHaveBeenCalledWith('form', '/form', expect.objectContaining({ body: { a: '1' } }));
   });
 });

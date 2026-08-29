@@ -182,8 +182,8 @@ const exportSelection = async (selection: Selection[]) => {
 
   const header = [
     '# Environment variables exported from lab34/flows.',
-    '# Paste it into the Import tab of the Environment variables card to write',
-    '# these values into the env files of your own context.',
+    '# Paste it into the Import section of the Environment variables screen to',
+    '# write these values into the env files of your own context.',
     '#',
     '# These are the real values, secrets included: share it the way you would',
     '# share a password, and keep it out of git.',
