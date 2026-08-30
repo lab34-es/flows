@@ -31,15 +31,22 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyse
+    name: Analyse (${{ matrix.language }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both of the languages the default setup was analysing. Dropping
+        # "actions" would quietly stop scanning the workflow files, which is
+        # the last thing to lose in a change that rewrites them.
+        language: [javascript-typescript, actions]
     steps:
       - uses: actions/checkout@v7
 
-      # One language covers the repository: src/ and frontend/src are both
-      # TypeScript, and CodeQL analyses them under the same extractor.
+      # src/ and frontend/src are both TypeScript and share one extractor, so
+      # javascript-typescript covers the whole package.
       - uses: github/codeql-action/init@v4
         with:
-          languages: javascript-typescript
+          languages: ${{ matrix.language }}
 
       - uses: github/codeql-action/analyze@v4
