@@ -44,9 +44,24 @@ published. Do not bump it; release-please does not touch it either.
 1. **Merge your work into master under a conventional commit title.** The
    repository squash-merges, so the pull request title becomes the commit
    message on master, and the `pr-title` job in `ci.yml` rejects a title that
-   cannot be parsed. The type decides the bump: `fix:` → patch, `feat:` →
-   minor, `feat!:` or a `BREAKING CHANGE:` footer → major. `chore:`, `docs:`,
-   `ci:` and `test:` release nothing on their own.
+   cannot be parsed. The type of that title decides the bump:
+
+   | Title | Bump | 1.5.5 becomes |
+   | --- | --- | --- |
+   | `feat: …` | minor | 1.6.0 |
+   | `fix: …`, `perf: …`, `revert: …` | patch | 1.5.6 |
+   | `feat!: …` — any type with `!` | major | 2.0.0 |
+   | `docs:` `style:` `chore:` `refactor:` `test:` `build:` `ci:` | none | — |
+
+   The last row does not block a release, it just cannot start one. Those
+   types are hidden from the changelog, and release-please skips a release
+   whose changelog would come out empty. Merge them alongside a `feat:` and
+   they ship with it, simply unlisted.
+
+   A major needs the `!` in the title. `BREAKING CHANGE:` in a commit body
+   works too, but the repository squash-merges with the pull request title as
+   the entire message, so there is no body to put it in unless you edit the
+   message in the merge dialog.
 
    Note the space: `feat: upload via playwright` parses, `feat:upload via
    playwright` does not — it is read as an ordinary message and released as
