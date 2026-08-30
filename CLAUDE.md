@@ -70,6 +70,14 @@ published. Do not bump it; release-please does not touch it either.
    npx -y @lab34/flows@1.6.0 --version
    ```
 
+The `release` job needs one repository setting that is easy to miss:
+**Settings → Actions → General → Workflow permissions** must have *Allow
+GitHub Actions to create and approve pull requests* ticked — on the `lab34-es`
+organisation as well as on this repository, since the organisation setting
+caps the repository one. Without it release-please cannot open the release
+pull request at all, and fails with "GitHub Actions is not permitted to create
+or approve pull requests".
+
 ### Never bump by hand
 
 Do not run `npm version`, do not edit the version in `package.json`, do not
@@ -113,17 +121,23 @@ to sit on `Update the coverage badge` instead of on a release commit, and it is
 also what produced the `Merge branch 'master' of github.com:lab34-es/flows`
 commits — the bot had pushed while you were working.
 
-The branch is created once, by hand:
+The branch is created once, by hand. `git switch --orphan` empties the working
+tree, so the SVGs have to be copied out before the switch, not after:
 
 ```bash
+mkdir -p /tmp/flows-badges && cp .github/badges/*.svg /tmp/flows-badges/
 git switch --orphan badges
-cp .github/badges/*.svg . && git add *.svg
-git commit -m 'badges: initial branch' && git push -u origin badges
+cp /tmp/flows-badges/*.svg .
+git add coverage.svg codeql.svg
+git commit -m 'badges: initial branch'
+git push -u origin badges
 git switch master
 ```
 
-`.github/badges/*.svg` is gitignored: `npm run coverage:badge` still writes
-there locally, it is just never committed.
+If the SVGs are not in the tree, generate them first: `npm run coverage:badge`
+writes the coverage one and `CODEQL_OPEN_ALERTS=0 node scripts/codeql-badge.js`
+the other. `.github/badges/*.svg` is gitignored — the scripts still write there
+locally, the files are just never committed.
 
 ### The documentation site is separate
 
