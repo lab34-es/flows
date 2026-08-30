@@ -5,8 +5,8 @@
 **Trigger, understand and test E2E flows and behaviours.**
 
 [![CI](https://github.com/lab34-es/flows/actions/workflows/ci.yml/badge.svg)](https://github.com/lab34-es/flows/actions/workflows/ci.yml)
-[![Coverage](https://raw.githubusercontent.com/lab34-es/flows/master/.github/badges/coverage.svg)](https://github.com/lab34-es/flows/actions/workflows/ci.yml)
-[![CodeQL](https://raw.githubusercontent.com/lab34-es/flows/master/.github/badges/codeql.svg)](https://github.com/lab34-es/flows/security/code-scanning)
+[![Coverage](https://raw.githubusercontent.com/lab34-es/flows/badges/coverage.svg)](https://github.com/lab34-es/flows/actions/workflows/ci.yml)
+[![CodeQL](https://raw.githubusercontent.com/lab34-es/flows/badges/codeql.svg)](https://github.com/lab34-es/flows/security/code-scanning)
 [![npm](https://img.shields.io/npm/v/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
 [![license](https://img.shields.io/npm/l/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
 
@@ -119,6 +119,7 @@ walkthrough.
 lab34-flows --server                                  # web UI on http://localhost:3001
 lab34-flows --file flows/my-flow.md --env production  # run a flow headlessly
 lab34-flows --view smoke-tests --env production       # run every flow a saved view matches
+lab34-flows --import-env env.yaml --view smoke --env uat  # load the env variables, then run
 lab34-flows --capabilities                            # list available applications and methods
 lab34-flows --version                                 # print the installed version
 lab34-flows --help
@@ -126,6 +127,12 @@ lab34-flows --help
 
 A `--view` is an scopped list of flows that matches criterias you specify via the UI.
 You can get the exact cli command to run scopped filters via the UI.
+
+`--import-env` takes the YAML the *Environment variables* screen exports and
+writes it into this context's env files before anything runs — which is how a
+pipeline carries its credentials as one file next to the command instead of a
+folder of env files nobody can commit. Add `--dry-run` to see what it would
+write without writing it.
 
 Full reference: [Running flows](https://flows.lab34.es/docs/running/) and
 [Command line](https://flows.lab34.es/docs/cli/).
@@ -178,8 +185,9 @@ unless all of it passes:
 The threshold lives in [`jest.config.js`](jest.config.js) (`coverageThreshold`),
 so the number is defined once and CI simply runs `npm run test:coverage`.
 Coverage is collected from *all* of `src/`, not only the files a test happens to
-import. The same gates run again against the exact commit being released, in
-[`.github/workflows/npm-publish.yml`](.github/workflows/npm-publish.yml).
+import. The release runs on the same gates: the `release` and `publish` jobs of
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) depend on all of them,
+so nothing ships from a red master.
 
 ### Dependency pinning
 

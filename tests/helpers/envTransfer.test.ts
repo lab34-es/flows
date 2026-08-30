@@ -7,7 +7,8 @@ import YAML from 'yaml';
 
 const CONTEXT = fs.mkdtempSync(path.join(os.tmpdir(), 'env-transfer-'));
 jest.mock('../../src/helpers/paths', () => ({
-  contextDir: async (parts) => require('path').join(CONTEXT, ...(parts || []))
+  contextDir: async (parts) => require('path').join(CONTEXT, ...(parts || [])),
+  contextRoot: async () => CONTEXT
 }));
 
 import * as envTransfer from '../../src/helpers/envTransfer';
@@ -23,6 +24,9 @@ const write = (relative: string, content = '') => {
 };
 
 const read = (relative: string) => fs.readFileSync(path.join(appsDir, relative), 'utf8');
+
+/** A document as this module writes them, from the applications alone. */
+const document = (applications) => YAML.stringify({ version: 1, applications });
 
 beforeEach(() => {
   fs.rmSync(appsDir, { recursive: true, force: true });
@@ -135,8 +139,6 @@ describe('exportSelection', () => {
 });
 
 describe('importDocument', () => {
-  const document = (applications) => YAML.stringify({ version: 1, applications });
-
   test('creates the env file of an environment the application does not have yet', async () => {
     write('payments/README.md', '# payments');
 
@@ -350,5 +352,142 @@ describe('importDocument', () => {
     await envTransfer.importDocument(moved);
 
     expect(read('checkout/env/uat.env')).toBe('API_URL=https://uat\nAPI_TOKEN=\'a b"c\'\n');
+  });
+});
+
+describe('importFile', () => {
+  test('reads a document relative to the working directory', async () => {
+    write('payments/env/uat.env', 'API_URL=https://old\n');
+
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'env-transfer-cwd-'));
+    fs.writeFileSync(path.join(cwd, 'env.yaml'), document({ payments: { uat: { API_URL: 'https://new' } } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(cwd);
+
+    const result = await envTransfer.importFile('env.yaml');
+
+    expect(result.file).toBe(path.join(cwd, 'env.yaml'));
+    expect(result.summary).toMatchObject({ files: 1, changed: 1 });
+    expect(read('payments/env/uat.env')).toBe('API_URL=https://new\n');
+
+    fs.rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test('falls back to the context directory, so the document can live with the flows', async () => {
+    write('payments/env/uat.env', '');
+    fs.writeFileSync(
+      path.join(CONTEXT, 'shared.yaml'),
+      document({ payments: { uat: { API_TOKEN: 'abc' } } })
+    );
+
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'env-transfer-cwd-'));
+    jest.spyOn(process, 'cwd').mockReturnValue(cwd);
+
+    const result = await envTransfer.importFile('shared.yaml');
+
+    expect(result.file).toBe(path.join(CONTEXT, 'shared.yaml'));
+    expect(read('payments/env/uat.env')).toBe('API_TOKEN=abc\n');
+
+    fs.rmSync(path.join(CONTEXT, 'shared.yaml'), { force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test('an absolute path is taken as it is', async () => {
+    write('payments/env/uat.env', '');
+
+    const file = path.join(CONTEXT, 'absolute.yaml');
+    fs.writeFileSync(file, document({ payments: { uat: { A: '1' } } }));
+
+    const result = await envTransfer.importFile(file);
+
+    expect(result.file).toBe(file);
+    expect(read('payments/env/uat.env')).toBe('A=1\n');
+
+    fs.rmSync(file, { force: true });
+  });
+
+  test('a dry run reports without writing', async () => {
+    write('payments/env/uat.env', 'A=1\n');
+
+    const file = path.join(CONTEXT, 'preview.yaml');
+    fs.writeFileSync(file, document({ payments: { uat: { A: '2' } } }));
+
+    const result = await envTransfer.importFile(file, { dryRun: true });
+
+    expect(result.dryRun).toBe(true);
+    expect(result.summary).toMatchObject({ changed: 1 });
+    expect(read('payments/env/uat.env')).toBe('A=1\n');
+
+    fs.rmSync(file, { force: true });
+  });
+
+  test('a document that is not there names where it was looked for', async () => {
+    await expect(envTransfer.importFile('nope.yaml')).rejects.toThrow(/Document not found/);
+    await expect(envTransfer.importFile('nope.yaml')).rejects.toThrow(CONTEXT);
+    await expect(envTransfer.importFile('/definitely/not/here.yaml')).rejects.toThrow(/Document not found/);
+    // A folder is not a document either
+    await expect(envTransfer.importFile(appsDir)).rejects.toThrow(/Document not found/);
+  });
+
+  test('no path at all is refused', async () => {
+    await expect(envTransfer.importFile('')).rejects.toThrow(/No document given/);
+    await expect(envTransfer.importFile('   ')).rejects.toThrow(/No document given/);
+    await expect(envTransfer.importFile(undefined as any)).rejects.toThrow(/No document given/);
+    // `--import-env` with nothing after it
+    await expect(envTransfer.importFile(true as any)).rejects.toThrow(/No document given/);
+  });
+});
+
+describe('reportLines', () => {
+  test('one line per file, with what happened to it', () => {
+    const lines = envTransfer.reportLines({
+      file: '/tmp/env.yaml',
+      dryRun: false,
+      files: [
+        { file: 'applications/payments/env/uat.env', created: true, added: ['A', 'B'], changed: [], unchanged: [] },
+        { file: 'applications/checkout/env/uat.env', created: false, added: ['C'], changed: ['D'], unchanged: ['E'] },
+        { file: 'applications/billing/env/uat.env', created: false, added: [], changed: [], unchanged: ['F'] }
+      ],
+      skipped: [],
+      summary: { files: 3, created: 1, updated: 2, added: 3, changed: 1, unchanged: 2, skipped: 0 }
+    });
+
+    expect(lines[0]).toBe('Environment variables — imported /tmp/env.yaml:');
+    expect(lines[1]).toBe('  created applications/payments/env/uat.env — 2 added');
+    expect(lines[2]).toBe('  updated applications/checkout/env/uat.env — 1 added, 1 overwritten, 1 already the same');
+    // Nothing added and nothing overwritten: the file was already right
+    expect(lines[3]).toBe('  unchanged applications/billing/env/uat.env — 1 already the same');
+    expect(lines[4]).toContain('1 created, 2 updated');
+    expect(lines[4]).toContain('3 added, 1 overwritten, 2 already the same');
+  });
+
+  test('what was left out is named, at whichever level it was', () => {
+    const lines = envTransfer.reportLines({
+      file: '/tmp/env.yaml',
+      dryRun: false,
+      files: [],
+      skipped: [
+        { application: 'billing', reason: 'no such application in this context' },
+        { application: 'payments', environment: 'uat', key: 'not a name', reason: 'not a usable variable name' }
+      ],
+      summary: { files: 0, created: 0, updated: 0, added: 0, changed: 0, unchanged: 0, skipped: 2 }
+    }).join('\n');
+
+    expect(lines).toContain('skipped billing — no such application in this context');
+    expect(lines).toContain('skipped payments · uat · not a name — not a usable variable name');
+    expect(lines).toContain('2 skipped');
+  });
+
+  test('a dry run says so, and a document that does nothing says that', () => {
+    const lines = envTransfer.reportLines({
+      file: '/tmp/env.yaml',
+      dryRun: true,
+      files: [],
+      skipped: [],
+      summary: { files: 0, created: 0, updated: 0, added: 0, changed: 0, unchanged: 0, skipped: 0 }
+    }).join('\n');
+
+    expect(lines).toContain('what /tmp/env.yaml would do');
+    expect(lines).toContain('nothing to do: the document changes nothing in this context');
+    expect(lines).toContain('Dry run: nothing was written, and no flow was run.');
   });
 });

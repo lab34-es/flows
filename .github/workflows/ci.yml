@@ -1,4 +1,5 @@
-# Quality gates for every pull request and every push to master.
+# Quality gates for every pull request and every push to master, and the
+# release that rides on top of them.
 #
 # A pull request cannot be merged, and master cannot go green, unless:
 #   - eslint and the TypeScript compiler are both clean, for the package and
@@ -10,6 +11,24 @@
 #   - npm audit reports no critical vulnerability, in any of the three
 #     package trees
 #   - the package and the frontend both build
+#   - the pull request title is a conventional commit
+#
+# That last one is not cosmetics. The repository squash-merges, so the title
+# of a pull request becomes the commit message on master, and release-please
+# reads those messages to work out the next version. A title it cannot parse
+# is a change it cannot release.
+#
+# Releasing lives here too, in the last two jobs, because a release is only a
+# push to master that happens to land a version bump:
+#   - release   keeps the "chore(master): release x.y.z" pull request up to
+#               date, and when that pull request is merged, tags the commit
+#               v<version> and creates the GitHub release
+#   - publish   fires only for that commit, and publishes it to npm
+#
+# Both hang off every gate above, so nothing ships from a red master. And
+# because one process writes package.json, the lockfile and the tag, they
+# cannot drift apart -- which is what used to leave tags on master pointing
+# at commits naming a different version, and nothing published at all.
 #
 # Every job takes its Node version from .nvmrc, so the pipelines, the website
 # build and a local `nvm use` all run the same release. Keep .nvmrc on a Node
@@ -26,7 +45,9 @@ on:
 # Cancel superseded runs on the same branch: on a pull request only the tip
 # matters, so a new push replaces the run for the commit it superseded. Master
 # is the exception -- every commit that lands there has to end up with a
-# completed run, so a quick second push must not cancel the first one.
+# completed run, so a quick second push must not cancel the first one. Since
+# the release jobs live in this workflow, a cancelled run on master is also a
+# cancelled release.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
@@ -184,33 +205,160 @@ jobs:
       - name: Check the CLI starts from the compiled output
         run: node dist/cli.js --help
 
-  badge:
-    name: Refresh the coverage badge
-    needs: [quality, frontend, audit, build]
+  pr-title:
+    name: Conventional commit in the title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # The repository squash-merges, so this title becomes the commit message
+      # on master and is what release-please reads. This is the last point at
+      # which a malformed message can still be fixed.
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  badges:
+    name: Refresh the badges
+    needs: [quality]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      security-events: read
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
 
-      - run: npm ci
-      - run: npm run test:coverage
+      # quality already ran the suite and uploaded what it measured. Running
+      # the whole thing again just to redraw an SVG is a test suite of waste.
+      - name: Fetch the coverage quality measured
+        uses: actions/download-artifact@v7
+        with:
+          name: coverage
+          path: coverage
+
       - run: node scripts/coverage-badge.js
 
-      - name: Commit the badge when it changed
+      - name: Count the open CodeQL alerts on master
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- .github/badges/coverage.svg; then
-            echo "Coverage badge unchanged."
-            exit 0
+          count=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?tool_name=CodeQL&state=open&ref=refs/heads/master&per_page=100" \
+            --paginate --jq '.[].number' | wc -l)
+          echo "Open CodeQL alerts on master: ${count}"
+          echo "CODEQL_OPEN_ALERTS=${count}" >> "$GITHUB_ENV"
+
+      - run: node scripts/codeql-badge.js
+
+      # The SVGs live on an orphan "badges" branch and never on master. A bot
+      # commit on master steals the tip of the branch, and that is how five of
+      # the seven tags this repository never managed to publish ended up sitting
+      # on an "Update the ... badge" commit, whose package.json named an
+      # earlier version than the tag did.
+      - name: Publish the badges to the badges branch
+        run: |
+          if ! git ls-remote --exit-code origin refs/heads/badges >/dev/null 2>&1; then
+            echo 'The badges branch does not exist; see "The badges" in CLAUDE.md.' >&2
+            exit 1
           fi
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add .github/badges/coverage.svg
-          git commit -m 'Update the coverage badge [skip ci]'
-          git push
+          git fetch --depth=1 origin badges
+          git worktree add ../badges -B badges origin/badges
+          cp .github/badges/*.svg ../badges/
+          git -C ../badges add -A
+          if git -C ../badges diff --cached --quiet; then
+            echo "Badges unchanged."
+            exit 0
+          fi
+          git -C ../badges commit -m "badges: refresh for ${GITHUB_SHA::7}"
+          git -C ../badges push origin badges
+
+  release:
+    name: Keep the release pull request up to date
+    needs: [quality, frontend, audit, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # the version bump, the tag and the GitHub release
+      pull-requests: write   # the "chore(master): release x.y.z" pull request
+    outputs:
+      created: ${{ steps.release-please.outputs.release_created }}
+      tag: ${{ steps.release-please.outputs.tag_name }}
+    steps:
+      # On an ordinary push this opens or updates the release pull request --
+      # the version bump, the lockfile and the changelog, worked out from the
+      # conventional commits since the last release -- and stops there.
+      #
+      # On the push that merges that pull request it instead tags the commit
+      # v<version> and creates the GitHub release, and sets release_created.
+      # Nobody types a version number at any point, which is the whole reason
+      # this job exists: package.json, the lockfile and the tag are written by
+      # one process, so they cannot disagree.
+      - uses: googleapis/release-please-action@v5
+        id: release-please
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    name: Publish to npm
+    needs: [release]
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-latest
+
+    # Trusted publishing: npm trades this short-lived OIDC token for a publish
+    # credential, which is also what attaches provenance to the release. There
+    # is no long-lived NPM_TOKEN to expire, rotate or leak. The trusted
+    # publisher configured on npmjs.com names this repository and this workflow
+    # file; if either moves, update it there or the exchange is refused.
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # Check out the tag, not the branch: what ships is exactly what
+      # release-please tagged, even if master has moved on since.
+      #
+      # The gates ran against this commit already -- release needs all four of
+      # them, and publish needs release -- so there is nothing left to re-verify
+      # here.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      # Deliberately no registry-url: it makes setup-node write an _authToken
+      # line into .npmrc, filled with a placeholder when no token is supplied.
+      # npm falls back to that placeholder whenever the OIDC exchange fails, so
+      # the job would publish a bogus credential and report a confusing 404.
+      # The default registry is npmjs.org anyway.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # OIDC publishing needs npm 11.5.1 or newer; without it npm never
+      # attempts the exchange and fails looking for a token with ENEEDAUTH.
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+
+      # prepublishOnly builds the frontend as well, so its dependencies have to
+      # be installed here too or the publish dies on a missing vite.
+      - run: npm ci --prefix frontend
+
+      # prepublishOnly cleans, builds the UI and compiles src/ into dist/, which
+      # is what "files" ships. package.json already carries the new version at
+      # this point, so the version Vite bakes into the UI bundle is the right
+      # one -- which is the failure mode "UI shows the old version" was.
+      # If this ever fails, re-run with --loglevel=verbose: npm reports a failed
+      # token exchange only at verbose level and otherwise falls through to a
+      # bare ENEEDAUTH.
+      - run: npm publish --access=public

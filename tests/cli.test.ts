@@ -17,6 +17,10 @@ jest.mock('../src/helpers/bases', () => ({
   ...jest.requireActual('../src/helpers/bases'),
   load: jest.fn()
 }));
+jest.mock('../src/helpers/envTransfer', () => ({
+  importFile: jest.fn(),
+  reportLines: jest.fn(() => ['  created applications/payments/env/uat.env — 2 added'])
+}));
 jest.mock('../src/helpers/reporter', () => ({ get: jest.fn(() => ({ server: { emit: jest.fn() } })) }));
 jest.mock('../src/helpers/cli', () => ({ logo: jest.fn(), wisdom: jest.fn(), isInteractive: false }));
 jest.mock('../src/api', () => ({ start: jest.fn().mockResolvedValue(undefined) }));
@@ -33,6 +37,7 @@ import * as markdownFlows from '../src/helpers/markdownFlows';
 import * as runner from '../src/helpers/runner/v1';
 import * as testRuns from '../src/helpers/testRuns';
 import * as bases from '../src/helpers/bases';
+import * as envTransfer from '../src/helpers/envTransfer';
 import * as api from '../src/api';
 
 /** Import cli.ts fresh and let its async main() settle. */
@@ -62,6 +67,13 @@ beforeEach(() => {
   (bases.load as jest.Mock).mockResolvedValue(bases.normalizeDocument({
     views: [{ type: 'table', name: 'All flows' }, { type: 'table', name: 'Smoke tests' }]
   }));
+  (envTransfer.importFile as jest.Mock).mockResolvedValue({
+    file: '/ctx/env.yaml',
+    dryRun: false,
+    files: [{ file: 'applications/payments/env/uat.env', created: true, added: ['A', 'B'], changed: [], unchanged: [] }],
+    skipped: [],
+    summary: { files: 1, created: 1, updated: 0, added: 2, changed: 0, unchanged: 0, skipped: 0 }
+  });
   (testRuns.runViewFromCli as jest.Mock).mockResolvedValue({
     id: 'run-9',
     status: 'passed',
@@ -349,6 +361,96 @@ describe('cli --view', () => {
     await runCli();
 
     expect(errored()).toContain('No flows to run');
+  });
+});
+
+describe('cli --import-env', () => {
+  test('on its own, imports the document and stops', async () => {
+    ARGV = { 'import-env': 'env.yaml' };
+    await runCli();
+
+    expect(envTransfer.importFile).toHaveBeenCalledWith('env.yaml', { dryRun: false });
+    expect(logged()).toContain('created applications/payments/env/uat.env');
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(runner.run).not.toHaveBeenCalled();
+    expect(testRuns.runViewFromCli).not.toHaveBeenCalled();
+  });
+
+  test('the camelCase spelling of the flag is the same flag', async () => {
+    ARGV = { importEnv: 'env.yaml' };
+    await runCli();
+
+    expect(envTransfer.importFile).toHaveBeenCalledWith('env.yaml', { dryRun: false });
+  });
+
+  // The variables have to be on disk before the run is checked against them:
+  // a flow whose application has no env file is refused before it starts
+  test('the variables land before a view runs', async () => {
+    ARGV = { 'import-env': 'env.yaml', view: 'smoke-tests', env: 'uat' };
+    await runCli();
+
+    expect(envTransfer.importFile).toHaveBeenCalledWith('env.yaml', { dryRun: false });
+    expect(testRuns.runViewFromCli).toHaveBeenCalledWith(
+      expect.objectContaining({ view: 'Smoke tests', environment: 'uat' })
+    );
+    expect((envTransfer.importFile as jest.Mock).mock.invocationCallOrder[0])
+      .toBeLessThan((testRuns.runViewFromCli as jest.Mock).mock.invocationCallOrder[0]);
+  });
+
+  test('the variables land before a single flow runs', async () => {
+    ARGV = { 'import-env': 'env.yaml', file: 'flows/a.md', env: 'uat' };
+    await runCli();
+
+    expect(envTransfer.importFile).toHaveBeenCalled();
+    expect(applications.environmentReadiness).toHaveBeenCalled();
+    expect(runner.run).toHaveBeenCalled();
+    expect((envTransfer.importFile as jest.Mock).mock.invocationCallOrder[0])
+      .toBeLessThan((applications.environmentReadiness as jest.Mock).mock.invocationCallOrder[0]);
+  });
+
+  test('a document that cannot be read stops everything', async () => {
+    ARGV = { 'import-env': 'nope.yaml', view: 'smoke-tests', env: 'uat' };
+    (envTransfer.importFile as jest.Mock).mockRejectedValue(new Error('Document not found: /x/nope.yaml'));
+
+    await runCli();
+
+    expect(errored()).toContain('Could not import the environment variables');
+    expect(errored()).toContain('Document not found');
+    expect(testRuns.runViewFromCli).not.toHaveBeenCalled();
+  });
+
+  test('--dry-run previews the import and runs nothing', async () => {
+    ARGV = { 'import-env': 'env.yaml', 'dry-run': true, view: 'smoke-tests', env: 'uat' };
+    await runCli();
+
+    expect(envTransfer.importFile).toHaveBeenCalledWith('env.yaml', { dryRun: true });
+    expect(testRuns.runViewFromCli).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  test('--dry-run without a document to preview is refused', async () => {
+    ARGV = { dryRun: true, view: 'smoke-tests', env: 'uat' };
+    await runCli();
+
+    expect(errored()).toContain('--dry-run only applies to --import-env');
+    expect(envTransfer.importFile).not.toHaveBeenCalled();
+    expect(testRuns.runViewFromCli).not.toHaveBeenCalled();
+  });
+
+  test('an import before the UI starts is an import, then the UI', async () => {
+    ARGV = { 'import-env': 'env.yaml', server: true };
+    await runCli();
+
+    expect(envTransfer.importFile).toHaveBeenCalled();
+    expect(api.start).toHaveBeenCalled();
+  });
+
+  test('the help mentions it', async () => {
+    ARGV = { help: true };
+    await runCli();
+
+    expect(logged()).toContain('--import-env');
+    expect(logged()).toContain('--dry-run');
   });
 });
 

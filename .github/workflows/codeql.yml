@@ -1,0 +1,52 @@
+# CodeQL analysis, as a workflow of our own rather than through GitHub's
+# default setup.
+#
+# The default setup has no workflow file and no say in when it runs: it scans
+# every pull request and then scans the same code again on the merge commit,
+# which is one of the four runs every push to master used to start. Owning the
+# file is the only way to choose. Pull requests are where the finding is
+# actionable; the weekly run is what keeps master's own scan (and the badge
+# that counts its alerts) from going stale.
+#
+# One-time setup: this and the default setup cannot both be active. Turn the
+# default setup off first, under Settings > Code security, or this file is
+# ignored.
+
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyse (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both of the languages the default setup was analysing. Dropping
+        # "actions" would quietly stop scanning the workflow files, which is
+        # the last thing to lose in a change that rewrites them.
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v7
+
+      # src/ and frontend/src are both TypeScript and share one extractor, so
+      # javascript-typescript covers the whole package.
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+
+      - uses: github/codeql-action/analyze@v4
