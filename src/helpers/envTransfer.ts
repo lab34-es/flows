@@ -416,3 +416,116 @@ const importDocument = async (text: string, { dryRun = false } = {}) => {
 };
 
 export { importDocument };
+
+/**
+ * Where a document named on the command line actually is.
+ *
+ * An export usually arrives as a file somewhere outside the context — the
+ * Downloads folder, a checkout of the pipeline's repository — so the path is
+ * resolved against the working directory first. Falling back to the context
+ * directory afterwards is what makes `--import-env env.yaml` work from
+ * anywhere once the file lives next to the flows it is for.
+ *
+ * @param {string} file - Path as it was typed
+ * @returns {Promise<string>} Absolute path of the file that was found
+ */
+const documentPath = async (file: string): Promise<string> => {
+  // `--import-env` with no value reaches here as a boolean, and is the same
+  // mistake as no flag at all: a path is what this needs
+  if (typeof file !== 'string' || !file.trim()) {
+    throw new Error('No document given: pass the path of the YAML to import');
+  }
+
+  const candidates = path.isAbsolute(file)
+    ? [file]
+    : [...new Set([path.resolve(process.cwd(), file), path.resolve(await paths.contextRoot(), file)])];
+
+  const found = candidates.find(candidate => (
+    fs.existsSync(candidate) && fs.statSync(candidate).isFile()
+  ));
+
+  if (!found) {
+    throw new Error(`Document not found: ${candidates.join(', nor ')}`);
+  }
+
+  return found;
+};
+
+/**
+ * Import a document straight off the disk, which is how the CLI does it: the
+ * UI has the text in a textarea, a command line has a path.
+ *
+ * The report is the one importDocument() answers with, plus the file it was
+ * read from — with the path resolved, because "which of the two places it was
+ * found in" is exactly what someone whose import wrote nothing wants to know.
+ *
+ * @param {string} file - Path of the YAML document
+ * @param {Object} [options]
+ * @param {boolean} [options.dryRun] - Report the changes without making them
+ * @returns {Promise<{file: string, dryRun: boolean, files: Array<Object>, skipped: Array<Object>, summary: Object}>}
+ */
+const importFile = async (file: string, { dryRun = false } = {}) => {
+  const resolved = await documentPath(file);
+  const text = fs.readFileSync(resolved, 'utf8');
+
+  return { file: resolved, ...(await importDocument(text, { dryRun })) };
+};
+
+export { importFile };
+
+/**
+ * The report of an import as the lines a terminal shows it in.
+ *
+ * One line per file, one per entry that was left out, and a last one with the
+ * totals — the same three things the UI's plan renders, in the shape a log
+ * scrolled past in a pipeline can still be read in.
+ *
+ * @param {Object} result - What importFile() answered with
+ * @returns {string[]}
+ */
+const reportLines = (result): string[] => {
+  const { file, dryRun, files, skipped, summary } = result || ({} as Record<string, any>);
+
+  const lines = [dryRun
+    ? `Environment variables — what ${file} would do:`
+    : `Environment variables — imported ${file}:`];
+
+  (files || []).forEach(entry => {
+    // A file the document only confirmed is worth a line of its own: it says
+    // the variables are there, which is not the same as nothing happening
+    const verb = entry.created
+      ? 'created'
+      : (entry.added.length || entry.changed.length) ? 'updated' : 'unchanged';
+
+    const counts = [
+      entry.added.length && `${entry.added.length} added`,
+      entry.changed.length && `${entry.changed.length} overwritten`,
+      entry.unchanged.length && `${entry.unchanged.length} already the same`
+    ].filter(Boolean).join(', ');
+
+    lines.push(`  ${verb} ${entry.file}${counts ? ` — ${counts}` : ''}`);
+  });
+
+  (skipped || []).forEach(entry => {
+    const what = [entry.application, entry.environment, entry.key].filter(Boolean).join(' · ');
+    lines.push(`  skipped ${what} — ${entry.reason}`);
+  });
+
+  if (!(files || []).length && !(skipped || []).length) {
+    lines.push('  nothing to do: the document changes nothing in this context');
+  }
+
+  lines.push(
+    `  ${summary.created} created, ${summary.updated} updated; ` +
+    `${summary.added} added, ${summary.changed} overwritten, ${summary.unchanged} already the same` +
+    (summary.skipped ? `, ${summary.skipped} skipped` : '')
+  );
+
+  if (dryRun) {
+    lines.push('  Dry run: nothing was written, and no flow was run.');
+  }
+
+  return lines;
+};
+
+export { reportLines };

@@ -11,6 +11,7 @@ import * as applications from './helpers/applications';
  * Usage:
  *   node cli.js --file <path-to-flow-file> --env <environment> [--debug] [--help]
  *   node cli.js --view <view> --env <environment> [--folder <folder>]
+ *   node cli.js --import-env <path-to-yaml> [--view <view> --env <environment>]
  *   node cli.js --capabilities
  *   node cli.js --server
  *
@@ -20,6 +21,11 @@ import * as applications from './helpers/applications';
  *                  matches runs, in one test run
  *   --folder       Folder of the flows tree the view is scoped to
  *   --context      Context directory
+ *   --import-env   Path of a YAML export of environment variables: its values
+ *                  are written into the context's env files before anything
+ *                  runs
+ *   --dry-run      Report what --import-env would write, write nothing and run
+ *                  nothing
  *   --capabilities List all available capabilities from the contents of ~/flows
  *   --env          Environment to run the flow in (required for --file/--view)
  *   --server       Start the web server with built frontend and API
@@ -33,6 +39,7 @@ import * as applications from './helpers/applications';
  * Examples:
  *   node cli.js --file flows/my-flow.md --env production
  *   node cli.js --view smoke-tests --env production
+ *   node cli.js --context my/context --import-env env.yaml --view smoke --env uat
  *   node cli.js --server
  */
 
@@ -53,6 +60,7 @@ import * as reporter from './helpers/reporter';
 import * as flows from './helpers/flows';
 import * as testRuns from './helpers/testRuns';
 import * as bases from './helpers/bases';
+import * as envTransfer from './helpers/envTransfer';
 
 /**
  * Print error message and exit with error code
@@ -74,6 +82,7 @@ Lab34 Flows CLI Tool v${packageJson.version}
 Usage:
   lab34-flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
   lab34-flows --view <view> --env <environment> [--folder <folder>]
+  lab34-flows --import-env <path-to-yaml> [--view <view> --env <environment>]
   lab34-flows --server [--context=<context>]
 
 Options:
@@ -83,6 +92,15 @@ Options:
                   run. The view is evaluated now, so flows added since the
                   command was written down are picked up too
   --folder        Folder of the flows tree the view is scoped to (default: all flows)
+  --import-env    Path of a YAML export of environment variables -- the
+                  document the Environment variables screen produces. Its
+                  values are written into this context's env files before
+                  anything else runs, creating the files that are missing and
+                  leaving everything the document does not name untouched.
+                  On its own it imports and exits; with --file or --view the
+                  flows run afterwards
+  --dry-run       With --import-env, report what the document would write
+                  without writing it -- and without running any flow
   --capabilities  List all available capabilities from the contents of ~/flows
   --server        Start the web server with built frontend and API
   --env           Environment to run the flow in (required for --file and --view)
@@ -98,6 +116,9 @@ Examples:
   lab34-flows --context my/context/folder --file flows/my-flow.md --env production
   lab34-flows --context my/context/folder --view all-flows --env production
   lab34-flows --context my/context/folder --view smoke --folder payments --env staging
+  lab34-flows --context my/context/folder --import-env ~/Downloads/env.yaml
+  lab34-flows --context my/context/folder --import-env env.yaml --view smoke --env uat
+  lab34-flows --context my/context/folder --import-env env.yaml --dry-run
   lab34-flows --context my/context/folder --capabilities
   lab34-flows --server --context=myproject
   `);
@@ -155,6 +176,10 @@ function parseArguments() {
     // `--view` on its own means "the first view of views.yaml"
     view: argv.view === undefined ? null : (typeof argv.view === 'string' ? argv.view : ''),
     folder: typeof argv.folder === 'string' ? argv.folder : '',
+    // yargs-parser gives a dashed flag both spellings; both are read so the
+    // CLI behaves the same however the command was written down
+    importEnv: argv.importEnv || argv['import-env'] || null,
+    dryRun: argv.dryRun || argv['dry-run'] || false,
     ai: argv.ai || null, // Removed: kept only to show a helpful error
     capabilities: argv.capabilities || false,
     server: argv.server || false,
@@ -289,6 +314,39 @@ async function runView({ view, folder, env }) {
 }
 
 /**
+ * Write a YAML export of environment variables into this context's env files.
+ *
+ * The document is the one the Environment variables screen produces, and this
+ * does to it exactly what that screen's Import section does: the env files it
+ * names are created when they are missing, and the ones already there keep
+ * everything the document does not mention. It runs before any flow so that a
+ * pipeline can carry its credentials as one file next to the command, rather
+ * than as a folder of env files nobody can commit.
+ *
+ * A document that cannot be read is fatal: a run started without the values it
+ * was told to import would fail later, and say much less about why.
+ *
+ * @param {Object} options - { file, dryRun }
+ * @returns {Promise<boolean>} false when the import failed, and nothing else should run
+ */
+async function importEnvironment({ file, dryRun }) {
+  let result;
+
+  try {
+    result = await envTransfer.importFile(file, { dryRun });
+  }
+  catch (error) {
+    exitWithError(`Could not import the environment variables: ${error.message}`);
+    return false;
+  }
+
+  envTransfer.reportLines(result).forEach(line => console.log(line));
+  console.log('');
+
+  return true;
+}
+
+/**
  * Start the web server with built frontend and API
  *
  * The UI is built ahead of time and shipped inside the package, so this only
@@ -325,6 +383,29 @@ async function main() {
   // Show debug information if requested
   if (args.debug) {
     printDebugInfo();
+  }
+
+  // --dry-run belongs to the import, not to the flows: on its own it would
+  // read as "run nothing", which is not something this CLI offers
+  if (args.dryRun && !args.importEnv) {
+    exitWithError('--dry-run only applies to --import-env: pass the document you want previewed');
+    return;
+  }
+
+  // Variables first: a flow is refused before it starts when an application it
+  // uses has no env file for the environment, so the document has to be on
+  // disk by the time that is checked
+  if (args.importEnv) {
+    if (!await importEnvironment({ file: args.importEnv, dryRun: args.dryRun })) { return; }
+
+    // A document on its own is an import and nothing else, and a preview stops
+    // before it could run anything
+    const runs = Boolean(args.file) || args.view !== null || args.server || args.capabilities;
+
+    if (args.dryRun || !runs) {
+      process.exit(0);
+      return;
+    }
   }
 
   // Check if we're using the server or a file
