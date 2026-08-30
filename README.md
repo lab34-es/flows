@@ -5,8 +5,8 @@
 **Trigger, understand and test E2E flows and behaviours.**
 
 [![CI](https://github.com/lab34-es/flows/actions/workflows/ci.yml/badge.svg)](https://github.com/lab34-es/flows/actions/workflows/ci.yml)
-[![Coverage](https://raw.githubusercontent.com/lab34-es/flows/master/.github/badges/coverage.svg)](https://github.com/lab34-es/flows/actions/workflows/ci.yml)
-[![CodeQL](https://raw.githubusercontent.com/lab34-es/flows/master/.github/badges/codeql.svg)](https://github.com/lab34-es/flows/security/code-scanning)
+[![Coverage](https://raw.githubusercontent.com/lab34-es/flows/badges/coverage.svg)](https://github.com/lab34-es/flows/actions/workflows/ci.yml)
+[![CodeQL](https://raw.githubusercontent.com/lab34-es/flows/badges/codeql.svg)](https://github.com/lab34-es/flows/security/code-scanning)
 [![npm](https://img.shields.io/npm/v/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
 [![license](https://img.shields.io/npm/l/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
 
@@ -185,8 +185,9 @@ unless all of it passes:
 The threshold lives in [`jest.config.js`](jest.config.js) (`coverageThreshold`),
 so the number is defined once and CI simply runs `npm run test:coverage`.
 Coverage is collected from *all* of `src/`, not only the files a test happens to
-import. The same gates run again against the exact commit being released, in
-[`.github/workflows/npm-publish.yml`](.github/workflows/npm-publish.yml).
+import. The release runs on the same gates: the `release` and `publish` jobs of
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) depend on all of them,
+so nothing ships from a red master.
 
 ### Dependency pinning
 
