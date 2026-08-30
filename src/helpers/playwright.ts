@@ -38,7 +38,8 @@ const ALLOWED_METHODS = [
   'dragAndDrop',
   'evaluate',
   'keyboard',
-  'mouse'
+  'mouse',
+  'upload'
 ];
 
 /**
@@ -698,6 +699,34 @@ export const run = (ctx, yamlFile, stepParams, options: Record<string, any> = {}
               timeout: parameters.timeout
             });
             break;
+          case 'upload': {
+            // What a page offers as a button is an `<input type="file">` the
+            // stylesheet hides, and a hidden element is one nothing can be
+            // clicked into: the file goes on the input itself, which is what
+            // makes the page believe somebody picked it in the dialog.
+            //
+            // A path is read the way the yaml was -- from the application
+            // folder -- so a script names the file next to it rather than
+            // wherever the run happens to have been started from.
+            const files = (Array.isArray(parameters.files) ? parameters.files
+              : [parameters.files || parameters.file])
+              .filter(Boolean)
+              .map(file => path.isAbsolute(file) ? file : path.join(ctx.path, file));
+
+            // Thrown rather than exited on: a file that is not there is the
+            // run's own failure, and the flow has to be able to report it
+            files.forEach(file => {
+              if (!fs.existsSync(file)) {
+                throw new Error(`Error in ${yamlFile}: upload file not found: ${file}`);
+              }
+            });
+
+            debug('Uploading %o to selector: %s', files, parameters.selector);
+            await page.setInputFiles(parameters.selector, files, {
+              timeout: parameters.timeout
+            });
+            break;
+          }
           case 'press':
             debug('Pressing key %s on selector: %s', parameters.key, parameters.selector);
             await page.press(parameters.selector, parameters.key, {

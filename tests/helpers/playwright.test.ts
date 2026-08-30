@@ -9,7 +9,7 @@ const browser: any = {};
 const PAGE_METHODS = [
   'goto', 'click', 'type', 'fill', 'press', 'hover', 'dragAndDrop', 'selectOption',
   'check', 'uncheck', 'dblclick', 'focus', 'waitForSelector', 'waitForTimeout',
-  'screenshot', 'evaluate', 'title', 'route', 'on', '$$'
+  'screenshot', 'evaluate', 'title', 'route', 'on', '$$', 'setInputFiles'
 ];
 
 /** What the fake browser keeps in local and session storage. */
@@ -242,6 +242,30 @@ describe('playwright.run - steps', () => {
 
     await single('selectOption', { selector: '#s', values: ['x'] });
     expect(page.selectOption).toHaveBeenCalledWith('#s', ['x'], expect.any(Object));
+  });
+
+  test('upload puts the file on the input, from the application folder', async () => {
+    fs.writeFileSync(path.join(CTX_DIR, 'boxcfg.xml'), '<config/>', 'utf8');
+
+    await single('upload', { selector: 'input[type="file"]', file: 'boxcfg.xml' });
+    expect(page.setInputFiles).toHaveBeenCalledWith(
+      'input[type="file"]',
+      [path.join(CTX_DIR, 'boxcfg.xml')],
+      expect.any(Object)
+    );
+  });
+
+  test('upload takes an absolute path and a list of them', async () => {
+    const absolute = path.join(CTX_DIR, 'boxcfg.xml');
+    fs.writeFileSync(absolute, '<config/>', 'utf8');
+
+    await single('upload', { selector: '#f', files: [absolute, 'boxcfg.xml'] });
+    expect(page.setInputFiles).toHaveBeenCalledWith('#f', [absolute, absolute], expect.any(Object));
+  });
+
+  test('upload rejects when the file is not there', async () => {
+    await expect(single('upload', { selector: '#f', file: 'missing.xml' }))
+      .rejects.toThrow(/upload file not found/);
   });
 
   test('evaluate runs the expression', async () => {

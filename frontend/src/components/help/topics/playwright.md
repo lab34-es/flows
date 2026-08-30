@@ -26,6 +26,9 @@ keywords:
   - 'access token'
   - 'bearer token'
   - 'scrape'
+  - 'upload'
+  - 'file upload'
+  - 'setInputFiles'
   - 'executable does not exist'
 ---
 
@@ -108,6 +111,28 @@ tab is on its own; and the browser it was opened with is the browser it keeps,
 so a later step asking for a different `browserType` or `device` is given the
 one already running.
 
+### Putting a file into the browser
+
+`upload` gives a file to an `<input type="file">`, which is what a page's
+"Choose a file" or "Upload" button is really driving. The file goes on the
+input itself rather than through the file dialog — so it works with the hidden
+inputs most designs use, and there is no native dialog to get stuck on.
+
+```yaml
+- method: upload
+  parameters:
+    selector: 'input[type="file"]'
+    file: 'fixtures/invoice.pdf'   # read from the application's own folder
+```
+
+A relative path is read from the application folder, the way its YAML files
+are, so a script names a file that sits next to it. An absolute path is taken
+as it is, and `files:` takes a list for an input that accepts several. A file
+that is not there fails the step rather than uploading nothing.
+
+The button next to the input is usually still worth waiting for: it is where
+the page says whether the upload is allowed at all.
+
 ### Taking values out of the browser
 
 Three methods bring something back: `scrape` reads it off the page, and
@@ -177,5 +202,7 @@ like any other response body. Name the keys accordingly: the reporter masks a
 value whose key contains `token`, `password`, `secret` or `authorization`.
 
 This part is **experimental**: the set of available methods lives with the
-Playwright helper, and the seeded `playful_website` example application shows a
-complete YAML automation end to end.
+Playwright helper. The seeded `browser` example application shows a complete
+automation end to end -- it serves its own page on localhost, so it runs with
+no internet and no account anywhere, and `flows/examples/04-browser-and-scraping.md`
+drives it.

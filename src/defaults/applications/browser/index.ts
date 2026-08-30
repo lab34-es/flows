@@ -94,6 +94,14 @@ const startSite = (): Promise<string> => new Promise((resolve, reject) => {
 
   server.listen(0, '127.0.0.1', () => {
     site = server;
+
+    // A listening server is a reason for node to stay alive, and this one
+    // outlives the step that started it -- so the run would finish and the
+    // command would never come back. Unreferencing it keeps it serving for
+    // as long as the flow is running and stops it holding the door open
+    // once the flow is done.
+    server.unref();
+
     const { port } = server.address() as AddressInfo;
     resolve(`http://127.0.0.1:${port}`);
   });
