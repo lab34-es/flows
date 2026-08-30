@@ -32,8 +32,8 @@ export const start = async (options: { context?: string } = {}) => {
   app.use((req, res, next) => {
     next();
   });
-  
-  // Define API routes first
+
+  // Define API routes first.
   defineRoutes(app);
 
   // In development (`npm run dev`) the UI is served by the Vite dev server on
@@ -65,7 +65,7 @@ export const start = async (options: { context?: string } = {}) => {
 
   if (frontendDistPath) {
     app.use(express.static(frontendDistPath));
-    
+
     // Handle client-side routing - serve index.html for all non-API routes
     app.use((req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') {
