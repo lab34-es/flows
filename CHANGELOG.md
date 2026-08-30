@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/lab34-es/flows/compare/v1.6.0...v1.6.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* release ([618ac9c](https://github.com/lab34-es/flows/commit/618ac9cf52a8cabd7faa6b827d10138d71ebd314))
+
 ## [1.6.0](https://github.com/lab34-es/flows/compare/v1.5.5...v1.6.0) (2026-08-30)
 
 
