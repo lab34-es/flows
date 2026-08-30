@@ -20,6 +20,7 @@ keywords:
   - 'import'
   - 'share'
   - 'yaml'
+  - 'cli'
 ---
 
 Credentials are never stored in the flows. Each application keeps one env file
@@ -100,6 +101,23 @@ two lines below it.
 
 The document carries **real values**, secrets included. Share it the way you
 would share a password, and keep it out of git.
+
+### Importing from the command line
+
+The same document can be handed to the CLI, which is how a pipeline — or a
+machine nobody has set up yet — gets its values without anyone opening the UI:
+
+    lab34-flows --context ~/lab34-flows --import-env env.yaml
+
+On its own that imports and stops. Give it a run as well and the variables are
+written **first**, so the flows find the env files they need already there:
+
+    lab34-flows --context ~/lab34-flows --import-env env.yaml --view smoke --env uat
+
+It writes what the *Import* section writes, and prints the same three things
+the plan shows: the files it created or updated, the entries it left out, and
+the totals. `--dry-run` prints that report having written nothing, and runs no
+flow. The **Command line** article has the whole reference.
 
 ### Files that need no document
 
