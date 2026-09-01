@@ -229,7 +229,7 @@ export function ExecutionOutput({ stepData, inputRequest = null, onAnswerInput =
               <CodeBlock code={asJson(response.headers)} language="json" />
             </Section>
           )}
-          <Section title="Response body" defaultOpen>
+          <Section title="Response body">
             {response.body !== undefined && response.body !== null && response.body !== '' ? (
               <CodeBlock
                 code={typeof response.body === 'string' ? response.body : asJson(response.body)}
