@@ -144,7 +144,10 @@ describe('bases.load / bases.save', () => {
       views: [{
         type: 'table',
         name: 'Critical',
-        filters: { and: ['priority > 4'] },
+        filters: {
+          conjunction: 'and',
+          conditions: [{ property: 'priority', operator: 'greaterThan', value: 4 }]
+        },
         order: ['file.name', 'owner', 'formula.grade'],
         sort: [{ property: 'priority', direction: 'desc' }],
         columnSize: { owner: 160 }
@@ -215,7 +218,14 @@ describe('bases.query', () => {
     const result = await bases.query({
       folder: '',
       document: {
-        views: [{ type: 'table', name: 'Critical', filters: { and: ['priority > 4'] } }]
+        views: [{
+          type: 'table',
+          name: 'Critical',
+          filters: {
+            conjunction: 'and',
+            conditions: [{ property: 'priority', operator: 'greaterThan', value: 4 }]
+          }
+        }]
       }
     });
 
@@ -226,22 +236,38 @@ describe('bases.query', () => {
     const result = await bases.query({
       folder: '',
       document: {
-        filters: { and: ['file.inFolder("payments")'] },
-        views: [{ type: 'table', name: 'Critical', filters: { and: ['priority > 4'] } }]
+        filters: {
+          conjunction: 'and',
+          conditions: [{ property: 'file', operator: 'inFolder', value: 'payments' }]
+        },
+        views: [{
+          type: 'table',
+          name: 'Critical',
+          filters: {
+            conjunction: 'and',
+            conditions: [{ property: 'priority', operator: 'greaterThan', value: 4 }]
+          }
+        }]
       }
     });
 
     expect(result.rows.map(row => row.name)).toEqual(['fraud.md']);
   });
 
-  it('supports or / not filter groups', async () => {
+  it('supports any / none filter groups', async () => {
     const result = await bases.query({
       folder: '',
       document: {
         views: [{
           type: 'table',
           name: 'Mixed',
-          filters: { or: ['owner == "bruno"', 'file.hasTag("smoke")'] }
+          filters: {
+            conjunction: 'or',
+            conditions: [
+              { property: 'owner', operator: 'is', value: 'bruno' },
+              { property: 'file', operator: 'hasTag', value: 'smoke' }
+            ]
+          }
         }]
       }
     });
@@ -250,7 +276,14 @@ describe('bases.query', () => {
     const negated = await bases.query({
       folder: '',
       document: {
-        views: [{ type: 'table', name: 'Not ana', filters: { not: ['owner == "ana"'] } }]
+        views: [{
+          type: 'table',
+          name: 'Not ana',
+          filters: {
+            conjunction: 'none',
+            conditions: [{ property: 'owner', operator: 'is', value: 'ana' }]
+          }
+        }]
       }
     });
     expect(negated.rows.map(row => row.name)).toEqual(['partial.md']);
@@ -268,14 +301,24 @@ describe('bases.query', () => {
     expect((await bases.query({ folder: '', view: 'Nope', document })).view.name).toBe('First');
   });
 
-  it('reports a broken filter without dropping the view', async () => {
+  it('reports an operator it does not know once, not once per flow', async () => {
     const result = await bases.query({
       folder: '',
-      document: { views: [{ type: 'table', name: 'Broken', filters: { and: ['nope(1)'] } }] }
+      document: {
+        views: [{
+          type: 'table',
+          name: 'Broken',
+          filters: {
+            conjunction: 'and',
+            conditions: [{ property: 'owner', operator: 'nope', value: 'ana' }]
+          }
+        }]
+      }
     });
 
     expect(result.rows).toHaveLength(0);
-    expect(result.errors.join(' ')).toContain('nope');
+    // Three flows hit the same broken condition; it is one problem, not three
+    expect(result.errors).toEqual(['Unknown operator "nope"']);
   });
 
   it('offers every property the listed flows carry', async () => {
@@ -324,7 +367,16 @@ describe('bases.query', () => {
   it('filters on a nested property', async () => {
     const result = await bases.query({
       folder: '',
-      document: { views: [{ type: 'table', name: 'Xrayed', filters: { and: ['xray.status == "Done"'] } }] }
+      document: {
+        views: [{
+          type: 'table',
+          name: 'Xrayed',
+          filters: {
+            conjunction: 'and',
+            conditions: [{ property: 'xray.status', operator: 'is', value: 'Done' }]
+          }
+        }]
+      }
     });
 
     expect(result.rows.map(row => row.name)).toEqual(['cart.md']);

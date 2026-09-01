@@ -371,11 +371,27 @@ export function FolderPage() {
 
           <FilterEditor
             filters={activeView.filters}
-            available={result?.availableProperties || []}
+            documentFilters={doc.filters}
+            meta={{
+              properties: result?.filterProperties || [],
+              types: result?.propertyTypes || {},
+              values: result?.propertyValues || {},
+              folders: result?.folders || [],
+              names: doc.properties,
+            }}
             matched={result?.rows.length || 0}
             total={result?.total || 0}
             errors={result?.errors || []}
-            onChange={(filters) => patchView({ filters })}
+            folder={folder}
+            document={doc}
+            viewName={activeView.name}
+            onChange={({ filters, documentFilters }) => persist({
+              ...doc,
+              filters: documentFilters,
+              views: doc.views.map((view) => (
+                view.name === activeView.name ? { ...view, filters } : view
+              )),
+            })}
           />
 
           <Button

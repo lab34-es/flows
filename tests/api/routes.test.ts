@@ -286,6 +286,48 @@ describe('/api/views', () => {
     (bases.query as jest.Mock).mockRejectedValue(new Error('bad formula'));
     expect((await request(app).get('/api/views/query')).status).toBe(400);
   });
+
+  test('GET /operators serves the filter catalog', async () => {
+    (bases.filters.catalog as jest.Mock).mockReturnValue({
+      conjunctions: [{ id: 'and', label: 'All of the following are true' }],
+      operators: [{ id: 'is', label: 'is', types: ['text'], input: 'same' }],
+      types: ['text']
+    });
+
+    const res = await request(app).get('/api/views/operators');
+    expect(res.status).toBe(200);
+    expect(res.body.operators[0].id).toBe('is');
+  });
+
+  test('POST /preview counts what a candidate view would list, without saving', async () => {
+    (bases.query as jest.Mock).mockResolvedValue({
+      rows: [{ name: 'a.md' }, { name: 'b.md' }],
+      total: 7,
+      errors: [],
+      columns: []
+    });
+
+    const document = { views: [{ name: 'All' }] };
+    const res = await request(app).post('/api/views/preview')
+      .send({ folder: 'payments', view: 'All', document });
+
+    expect(res.status).toBe(200);
+    // Counts only: the rows themselves are not what the editor asked for
+    expect(res.body).toEqual({ matched: 2, total: 7, errors: [] });
+    expect(bases.query).toHaveBeenCalledWith({ folder: 'payments', view: 'All', document });
+    expect(bases.save).not.toHaveBeenCalled();
+  });
+
+  test('POST /preview defaults the folder and leaves the view unset', async () => {
+    (bases.query as jest.Mock).mockResolvedValue({ rows: [], total: 0, errors: [] });
+    await request(app).post('/api/views/preview').send({});
+    expect(bases.query).toHaveBeenCalledWith({ folder: '', view: undefined, document: undefined });
+  });
+
+  test('POST /preview maps an evaluation failure to 400', async () => {
+    (bases.query as jest.Mock).mockRejectedValue(new Error('bad formula'));
+    expect((await request(app).post('/api/views/preview').send({})).status).toBe(400);
+  });
 });
 
 describe('/api/test-runs', () => {

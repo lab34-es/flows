@@ -36,8 +36,11 @@ Bases](https://help.obsidian.md/bases) uses:
       - type: table
         name: Critical
         filters:
-          and:
-            - priority > 5
+          conjunction: and
+          conditions:
+            - property: note.priority
+              operator: greaterThan
+              value: 5
         order: [file.name, note.owner, note.priority, formula.coverage]
         sort:
           - property: note.priority
@@ -52,7 +55,8 @@ is remembered in your browser, so `views.yaml` holds no folder references.
   also offers its fields: `xray: { testKey: … }` is there as
   `note.xray.testKey`, a column of its own.
 - **Sort** — stack several: the first that separates two flows wins.
-- **Filter** — see *Filters and formulas*.
+- **Filter** — which flows the view keeps: a property, an operator and a
+  value, picked rather than typed. See *Filters and formulas*.
 - **⋯ › Formulas** — columns worked out from the others.
 - **Run all** — executes the flows the view is showing, as one test run.
 - **CLI** — the command that runs this same view from a terminal or a
