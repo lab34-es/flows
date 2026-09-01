@@ -11,13 +11,16 @@ export type Token =
 
 /**
  * The little expression language behind "bases" views, modelled on Obsidian
- * Bases: the strings that show up in a view's `filters`, and the right-hand
- * side of every entry in `formulas`.
+ * Bases: the right-hand side of every entry in `formulas`.
  *
- *   puntuacion_idoneidad > 2
+ * Filters do not come through here. They are structured conditions picked
+ * from dropdowns (see `./filters`), so that what a person chooses can never
+ * be a syntax error. The comparison primitives below are shared, so a filter
+ * and a formula agree on what "contains" or "empty" means.
+ *
  *   note.zona_usda_min <= 9 && note.tipo_hoja == "caduca"
- *   file.inFolder("payments") && !file.hasTag("wip")
  *   if(note.envergadura_copa_m >= 6, "yes", "no")
+ *   default(note.owner, "nobody")
  *
  * Four namespaces are available:
  *

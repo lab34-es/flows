@@ -307,8 +307,15 @@
 .flow-block-gap-inert {
   @apply pointer-events-none;
 }
+/* The band that answers to the pointer reaches well past the line itself, so
+   getting between two blocks is a matter of being near the boundary rather
+   than of hitting it exactly. It stops short of the text: the blocks keep six
+   pixels of padding on each side, and the band takes only four of them, which
+   is leading above the first line rather than anything you would click to put
+   the caret in. The rule and the "+" light up over the whole band, so seeing
+   them is the promise that a click here writes between the blocks */
 .flow-block-gap::before {
-  @apply absolute inset-x-0 -inset-y-1 cursor-text content-[''];
+  @apply absolute inset-x-0 -inset-y-2.5 cursor-text content-[''];
 }
 .flow-block-gap::after {
   @apply bg-primary/50 pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity content-[''];
@@ -321,8 +328,9 @@
   @apply opacity-100;
 }
 /* The notebook-cell toolbar at the top-right of a block: move up, move down,
-   and a grip to drag the block anywhere. It exists only while the block is
-   hovered or selected, floating just over the block's top edge */
+   a grip to drag the block anywhere, and a bin to take it out. It exists only
+   while the block is hovered or selected, floating just over the block's top
+   edge */
 .flow-block-tools {
   @apply bg-card absolute -top-3 right-2 z-20 hidden items-center gap-0.5 rounded-md border p-0.5 shadow-sm;
 }
@@ -335,6 +343,9 @@
 }
 .flow-block-tool:disabled {
   @apply pointer-events-none opacity-40;
+}
+.flow-block-tool-danger {
+  @apply hover:bg-destructive/10 hover:text-destructive;
 }
 .flow-block-drag {
   @apply cursor-grab active:cursor-grabbing;

@@ -5,6 +5,10 @@ import YAML from 'yaml';
 import * as paths from '../paths';
 import * as flows from '../flows';
 import * as expression from './expression';
+import * as filterModel from './filters';
+
+// The filter model, re-exported so `bases.filters` is the one way in
+export * as filters from './filters';
 
 /** One sort clause of a view. */
 export interface ViewSort {
@@ -44,11 +48,17 @@ export interface FlowEntry {
  * "Bases": the saved views a folder of flows is rendered with.
  *
  * Every view lives in a single `views.yaml` file at the root of the context
- * directory, in the same shape Obsidian Bases uses:
+ * directory, in the shape Obsidian Bases uses — with one deliberate
+ * difference: filters are structured conditions rather than expression
+ * strings, so a filter can be picked from dropdowns and can never be a syntax
+ * error. See `./filters`.
  *
  *   filters:            # applied to every view
- *     and:
- *       - 'flow.steps > 0'
+ *     conjunction: and
+ *     conditions:
+ *       - property: flow.steps
+ *         operator: greaterThan
+ *         value: 0
  *   formulas:
  *     coverage: 'if(note.reviewed, "✅", "⚠️")'
  *   properties:
@@ -58,8 +68,11 @@ export interface FlowEntry {
  *     - type: table
  *       name: All flows
  *       filters:
- *         and:
- *           - 'note.priority == "high"'
+ *         conjunction: and
+ *         conditions:
+ *           - property: note.priority
+ *             operator: is
+ *             value: high
  *       order: [file.name, note.owner, formula.coverage]
  *       sort:
  *         - property: note.owner
@@ -72,10 +85,6 @@ export interface FlowEntry {
  */
 
 const VIEWS_FILE = 'views.yaml';
-
-// Where a column id can point. Anything else is shorthand for a frontmatter
-// property, so `owner` and `note.owner` are the same column.
-const NAMESPACES = ['note', 'file', 'flow', 'formula'];
 
 // Frontmatter keys that the document view renders on their own, above the
 // property list — they are still ordinary properties everywhere else.
@@ -99,17 +108,10 @@ const DEFAULT_VIEW = {
 
 /* ---------------------------------------------------------------- helpers */
 
-/**
- * Fully qualify a column id: a bare name means a frontmatter property.
- * @param {string} id
- * @returns {string}
- */
-const normalizeProperty = (id) => {
-  const name = String(id ?? '').trim();
-  if (!name) { return ''; }
-  const namespace = name.split('.')[0];
-  return NAMESPACES.includes(namespace) && name.includes('.') ? name : `note.${name}`;
-};
+// A column id is qualified the same way a filter's property is: the rule
+// lives with the filters, and is re-exported here for everything that reads
+// a views.yaml key
+const normalizeProperty = filterModel.normalizeProperty;
 
 export { normalizeProperty };
 
@@ -243,7 +245,7 @@ const normalizeDocument = (raw): BasesDocument => {
       type: view.type === 'list' ? 'list' : 'table',
       name: String(view.name ?? '').trim() || `View ${index + 1}`,
       slug: uniqueSlug(String(view.name ?? '').trim() || `View ${index + 1}`, index),
-      filters: view.filters ?? null,
+      filters: filterModel.normalize(view.filters),
       order: (Array.isArray(view.order) ? view.order : [])
         .map(normalizeProperty)
         .filter(Boolean),
@@ -264,7 +266,7 @@ const normalizeDocument = (raw): BasesDocument => {
     }));
 
   return {
-    filters: source.filters ?? null,
+    filters: filterModel.normalize(source.filters),
     formulas,
     properties,
     views
@@ -500,48 +502,16 @@ export { collectFlows };
 /* ----------------------------------------------------------- the filters */
 
 /**
- * Evaluate a filter node: either a group ({ and: [...] }, { or: [...] },
- * { not: [...] }) or a single expression string. Errors are collected rather
- * than thrown — one broken filter must not take the whole view down.
+ * Whether a flow passes a filter node. The filters themselves live in
+ * `./filters`, as structured conditions rather than as text to be parsed —
+ * see the comment there for the shape and why it is not an expression.
  *
- * @param {*} node
+ * @param {*} node - A normalized filter group, or null for "keep everything"
  * @param {Object} scope
- * @param {Array<string>} errors - Collected filter errors
+ * @param {Array<string>} errors - Collected, one line per distinct problem
  * @returns {boolean}
  */
-const matchesFilter = (node, scope, errors) => {
-  if (node === null || node === undefined || node === '') { return true; }
-
-  if (typeof node === 'boolean') { return node; }
-
-  if (typeof node === 'string') {
-    const result = expression.test(node, scope);
-    if (result.error) { errors.push(`${node} — ${result.error}`); }
-    return result.matches;
-  }
-
-  if (Array.isArray(node)) {
-    return node.every(child => matchesFilter(child, scope, errors));
-  }
-
-  if (typeof node === 'object') {
-    const keys = Object.keys(node);
-
-    // An object with no known conjunction is an "and" of its entries
-    return keys.every(key => {
-      const child = node[key];
-      const children = Array.isArray(child) ? child : [child];
-
-      if (key === 'and') { return children.every(item => matchesFilter(item, scope, errors)); }
-      if (key === 'or') { return children.some(item => matchesFilter(item, scope, errors)); }
-      if (key === 'not') { return !children.some(item => matchesFilter(item, scope, errors)); }
-
-      return matchesFilter(child, scope, errors);
-    });
-  }
-
-  return true;
-};
+const matchesFilter = (node, scope, errors: string[] = []) => filterModel.matches(node, scope, errors);
 
 export { matchesFilter };
 
@@ -561,32 +531,6 @@ const serialize = (value) => {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serialize(item)]));
   }
   return value;
-};
-
-/**
- * Read a frontmatter property by its path.
- *
- * A key that literally holds a dot wins, so a document that really does have
- * a "xray.testKey" key keeps working; otherwise the path is walked, which is
- * what turns an embedded object into the `note.xray.testKey` column.
- *
- * @param {Object} meta - Frontmatter
- * @param {string} key - The column id without its `note.` namespace
- * @returns {*} null when nothing is there
- */
-const readNoteValue = (meta, key) => {
-  if (!meta || typeof meta !== 'object') { return null; }
-  if (Object.prototype.hasOwnProperty.call(meta, key)) { return meta[key]; }
-
-  let current = meta;
-
-  for (const segment of String(key).split('.')) {
-    if (!current || typeof current !== 'object' || Array.isArray(current)) { return null; }
-    if (!Object.prototype.hasOwnProperty.call(current, segment)) { return null; }
-    current = current[segment];
-  }
-
-  return current === undefined ? null : current;
 };
 
 /**
@@ -614,37 +558,6 @@ const collectNoteProperties = (meta, into: Set<string>, prefix = 'note', depth =
       collectNoteProperties(meta[key], into, id, depth + 1);
     }
   });
-};
-
-/**
- * Read one column out of a scope, never throwing: a formula that fails
- * renders as null and reports the reason.
- * @param {string} columnId - A normalized column id
- * @param {Object} scope
- * @returns {{ value: *, error: string|null }}
- */
-const readColumn = (columnId, scope) => {
-  const [namespace, ...rest] = columnId.split('.');
-  const key = rest.join('.');
-
-  try {
-    if (namespace === 'note') {
-      return { value: readNoteValue(scope.note || {}, key), error: null };
-    }
-    if (namespace === 'file' || namespace === 'flow') {
-      const source = scope[namespace] || {};
-      const value = source[key];
-      return { value: typeof value === 'function' ? null : (value ?? null), error: null };
-    }
-    if (namespace === 'formula') {
-      return { value: scope.formula ? scope.formula[key] ?? null : null, error: null };
-    }
-  }
-  catch (ex) {
-    return { value: null, error: `${columnId} — ${ex.message}` };
-  }
-
-  return { value: null, error: null };
 };
 
 /* -------------------------------------------------------------- ordering */
@@ -745,6 +658,81 @@ const sortRows = (rows, sort) => {
   });
 };
 
+/* -------------------------------------------------------- the properties */
+
+// How many flows are read to work out what the folder's properties hold. A
+// filter editor needs a good guess, not a census, and a folder can hold
+// thousands of flows
+const SAMPLED_FLOWS = 500;
+
+// How many distinct values a property offers in its value picker before the
+// list stops being something anyone would scroll
+const DISTINCT_VALUES = 100;
+
+/**
+ * What the filter editor needs to draw itself: every property the folder's
+ * flows carry, what type each one holds, and the values it is actually seen
+ * with — so a filter is picked from what exists instead of typed from memory.
+ *
+ * Read from the folder before any filter runs: a filter that currently
+ * matches nothing must still be editable.
+ *
+ * @param {Array<Object>} scopes - { entry, scope } for every flow in the folder
+ * @param {Object} formulas - name -> expression
+ * @returns {{ properties: Array<string>, types: Object, values: Object, folders: Array<string> }}
+ */
+const describeProperties = (scopes, formulas) => {
+  const sample = scopes.slice(0, SAMPLED_FLOWS);
+
+  const noteProperties = new Set<string>();
+  sample.forEach(({ scope }) => collectNoteProperties(scope.note, noteProperties));
+
+  const properties = [
+    ...FILE_PROPERTIES,
+    ...FLOW_PROPERTIES,
+    ...[...noteProperties].sort((a, b) => a.localeCompare(b)),
+    ...Object.keys(formulas).sort((a, b) => a.localeCompare(b)).map(name => `formula.${name}`)
+  ];
+
+  const seen: Record<string, any[]> = {};
+  const distinct: Record<string, Set<string>> = {};
+
+  sample.forEach(({ scope }) => {
+    properties.forEach(id => {
+      const { value } = filterModel.readColumn(id, scope);
+      if (value === null || value === undefined || value === '') { return; }
+
+      seen[id] = seen[id] || [];
+      seen[id].push(value);
+
+      distinct[id] = distinct[id] || new Set<string>();
+      // A list offers its items, not the list itself: "has any of" picks a tag
+      (Array.isArray(value) ? value : [value]).forEach(item => {
+        if (distinct[id].size >= DISTINCT_VALUES) { return; }
+        const serialized = serialize(item);
+        if (typeof serialized === 'string' || typeof serialized === 'number') {
+          distinct[id].add(String(serialized));
+        }
+      });
+    });
+  });
+
+  const types: Record<string, string> = {};
+  const values: Record<string, string[]> = {};
+
+  properties.forEach(id => {
+    types[id] = filterModel.inferType(id, seen[id] || []);
+    const options = [...(distinct[id] || [])].sort((a, b) => a.localeCompare(b));
+    if (options.length) { values[id] = options; }
+  });
+
+  const folders = [...new Set<string>(
+    scopes.map(({ scope }) => String(scope.file.folder || '')).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+
+  return { properties, types, values, folders };
+};
+
 /* -------------------------------------------------------- the evaluation */
 
 /**
@@ -775,6 +763,9 @@ const query = async ({ folder = '', view: viewName, document }: {
 
   const scopes = entries.map(entry => ({ entry, scope: buildScope(entry, doc.formulas) }));
 
+  // What the filter editor offers, read before the filters narrow anything
+  const described = describeProperties(scopes, doc.formulas);
+
   const matching = scopes.filter(({ scope }) => {
     // The document-wide filters apply to every view, on top of the view's own
     if (!matchesFilter(doc.filters, scope, errors)) { return false; }
@@ -804,7 +795,7 @@ const query = async ({ folder = '', view: viewName, document }: {
   const rows = matching.map(({ entry, scope }) => {
     const values: Record<string, any> = {};
     valueColumns.forEach(columnId => {
-      const { value, error } = readColumn(columnId, scope);
+      const { value, error } = filterModel.readColumn(columnId, scope);
       values[columnId] = serialize(value);
       if (error && !errors.includes(error)) { errors.push(error); }
     });
@@ -848,6 +839,10 @@ const query = async ({ folder = '', view: viewName, document }: {
     formulas: doc.formulas,
     columns,
     availableProperties,
+    filterProperties: described.properties,
+    propertyTypes: described.types,
+    propertyValues: described.values,
+    folders: described.folders,
     rows: ordered,
     errors
   };

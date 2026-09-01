@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, GripVertical, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 
 import Markdown from '@/components/shared/Markdown';
 import BlockSource from '@/components/flow/BlockSource';
@@ -155,8 +155,9 @@ const RenderedBlock = React.memo(function RenderedBlock({ text }: { text: string
  * - Arrows walk from block to block, entering each one's source.
  *
  * Blocks also move as a whole, the way notebook cells do: each block shows a
- * small toolbar on hover — arrows to move it one place up or down, and a grip
- * to drag it anywhere — and Alt+↑/↓ moves the selected block from the keyboard.
+ * small toolbar on hover — arrows to move it one place up or down, a grip to
+ * drag it anywhere, and a bin to take it out — and Alt+↑/↓ moves the selected
+ * block from the keyboard.
  */
 export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: BlockEditorProps) {
   const [doc, setDoc] = useState(() => parseDocument(value));
@@ -321,6 +322,37 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
       ? blocks[Math.max(0, index - 1)]
       : blocks[Math.min(blocks.length - 1, index)];
     startEdit(target.id, focus === 'previous' ? sourceOf(target).length : 0);
+  }, [commit, startEdit]);
+
+  /**
+   * Take the block out from its toolbar. Nothing merges and the caret does
+   * not walk into a neighbour the way Backspace does: the document simply
+   * has one block fewer, and no block is left open for writing — unless the
+   * one removed was the last, and the document needs somewhere to write.
+   *
+   * @param {number} index - The block to remove
+   */
+  const deleteBlockAt = useCallback((index: number) => {
+    const blocks = [...docRef.current.blocks];
+    const block = blocks[index];
+    if (!block) return;
+
+    // A block that goes cannot also be the blank one waiting to be written in
+    if (pendingRef.current === block.id) pendingRef.current = null;
+    blocks.splice(index, 1);
+
+    setEditingId(null);
+    setSelectedId(null);
+    setSlash(null);
+
+    if (!blocks.length) {
+      const fresh = createBlock('', '\n');
+      commit([fresh]);
+      startEdit(fresh.id, 0);
+      return;
+    }
+
+    commit(blocks);
   }, [commit, startEdit]);
 
   const moveTo = useCallback((index: number, where: 'start' | 'end') => {
@@ -891,9 +923,9 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
 
   /**
    * The notebook-cell toolbar at the top-right of a hovered block: move it
-   * one place up or down, or take the grip and drag it anywhere. The arrows
-   * take the mousedown so the caret stays where it is; the grip cannot, or
-   * the browser would never start the drag.
+   * one place up or down, take the grip and drag it anywhere, or take the
+   * block out altogether. The buttons take the mousedown so the caret stays
+   * where it is; the grip cannot, or the browser would never start the drag.
    */
   const renderTools = (block: Block, index: number) => (
     <div className="flow-block-tools" onClick={(event) => event.stopPropagation()}>
@@ -930,6 +962,16 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
         onClick={(event) => { event.stopPropagation(); moveBlockBy(block.id, 1); }}
       >
         <ArrowDown className="size-3.5" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-label="Delete this block"
+        title="Delete"
+        className="flow-block-tool flow-block-tool-danger"
+        onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
+        onClick={(event) => { event.stopPropagation(); deleteBlockAt(index); }}
+      >
+        <Trash2 className="size-3.5" aria-hidden="true" />
       </button>
     </div>
   );

@@ -55,6 +55,12 @@ export const viewsApi = {
   save: (document) => api.put('/api/views', document),
   query: (folder, view) =>
     api.get('/api/views/query', { params: { folder: folder || '', view: view || undefined } }),
+  // The conjunctions and operators the filter editor draws itself from, so it
+  // can never offer one the backend does not implement
+  operators: () => api.get('/api/views/operators'),
+  // How many flows a candidate view would list, without saving it
+  preview: (folder, view, document) =>
+    api.post('/api/views/preview', { folder: folder || '', view, document }),
 };
 
 // Recorded executions: every run (flow page, folder "Run all", CLI) lands in
