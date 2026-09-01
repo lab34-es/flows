@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/lab34-es/flows/compare/v1.6.1...v1.7.0) (2026-09-01)
+
+
+### Features
+
+* filters v2 for flows ([#45](https://github.com/lab34-es/flows/issues/45)) ([2e7bdaf](https://github.com/lab34-es/flows/commit/2e7bdaf304d038ffe70dd6a0fb8a0e4d4f51b9f8))
+
 ## [1.6.1](https://github.com/lab34-es/flows/compare/v1.6.0...v1.6.1) (2026-08-30)
 
 
