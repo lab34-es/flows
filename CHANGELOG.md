@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/lab34-es/flows/compare/v1.7.0...v1.8.0) (2026-09-02)
+
+
+### Features
+
+* add remote flow execution on MQTT-connected agents ([#47](https://github.com/lab34-es/flows/issues/47)) ([a5b61bc](https://github.com/lab34-es/flows/commit/a5b61bc36aa1f81a53f9085d4f9300d04f23d467))
+
 ## [1.7.0](https://github.com/lab34-es/flows/compare/v1.6.1...v1.7.0) (2026-09-01)
 
 
