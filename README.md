@@ -137,6 +137,45 @@ write without writing it.
 Full reference: [Running flows](https://flows.lab34.es/docs/running/) and
 [Command line](https://flows.lab34.es/docs/cli/).
 
+### Running on another machine
+
+When the systems under test are only reachable from somewhere else -- a
+machine inside a network you cannot open a port into -- the flows can run
+there while you keep writing them here. Both machines connect *out* to an MQTT
+broker; nothing listens on either side.
+
+On the machine that can reach the systems, start an agent. It needs a copy of
+the context (a clone of the same repository) and a name the broker knows it
+by:
+
+```bash
+lab34-flows --context ~/flows-agent --agent --agent-id agent-ourense \
+  --broker mqtts://mqtt.example:443 --username agent-ourense --password '...'
+```
+
+The broker address and username are stored in `config/remote.json` and the
+password in the context's `.env`, so the flags are only needed once. The agent
+prints its public key and stays up, waiting for jobs.
+
+On your machine, run a flow or a view on it:
+
+```bash
+lab34-flows --remote agent-ourense --file flows/my-flow.md --env uat
+lab34-flows --remote agent-ourense --view smoke --env uat
+```
+
+What travels: the commit your context is on (the agent fetches and checks it
+out, so push first), and the values of the env files the flows use, encrypted
+to the agent's key so the broker never sees them. What comes back: every event
+of the run, printed as it happens, a prompt on your terminal when a step asks
+for a value, and the test-run folder, written into your own `test-runs` as if
+it had run here.
+
+The agent's key is trusted the first time it is seen and refused if it ever
+changes, the way ssh treats a host key. The broker itself needs TLS, one user
+per machine and an ACL that confines each agent to `flows/agents/<name>/#`;
+any MQTT 5 broker does (EMQX, Mosquitto, HiveMQ).
+
 ## Documentation
 
 You can access the entire documentation at  at **[flows.lab34.es/docs](https://flows.lab34.es/docs/)**. 

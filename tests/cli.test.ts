@@ -23,6 +23,21 @@ jest.mock('../src/helpers/envTransfer', () => ({
 }));
 jest.mock('../src/helpers/reporter', () => ({ get: jest.fn(() => ({ server: { emit: jest.fn() } })) }));
 jest.mock('../src/helpers/cli', () => ({ logo: jest.fn(), wisdom: jest.fn(), isInteractive: false }));
+jest.mock('../src/helpers/bootstrap', () => ({ ensureTypeScriptConfig: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('../src/helpers/remote/config', () => ({
+  agentIdentity: jest.fn(),
+  brokerSettings: jest.fn()
+}));
+jest.mock('../src/helpers/remote/broker', () => ({ connect: jest.fn() }));
+jest.mock('../src/helpers/remote/agent', () => ({
+  start: jest.fn(),
+  will: jest.fn(() => ({ topic: 'flows/agents/a1/status', payload: {}, retain: true }))
+}));
+jest.mock('../src/helpers/remote/client', () => ({ run: jest.fn() }));
+jest.mock('../src/helpers/remote/terminal', () => ({
+  describe: jest.fn((event) => (event === 'remote:job' ? '  agent: line' : null)),
+  prompt: jest.fn()
+}));
 jest.mock('../src/api', () => ({ start: jest.fn().mockResolvedValue(undefined) }));
 
 const spawn = jest.fn();
@@ -39,6 +54,11 @@ import * as testRuns from '../src/helpers/testRuns';
 import * as bases from '../src/helpers/bases';
 import * as envTransfer from '../src/helpers/envTransfer';
 import * as api from '../src/api';
+import * as remoteConfig from '../src/helpers/remote/config';
+import * as remoteBroker from '../src/helpers/remote/broker';
+import * as remoteAgent from '../src/helpers/remote/agent';
+import * as remoteClient from '../src/helpers/remote/client';
+import * as remoteTerminal from '../src/helpers/remote/terminal';
 
 /** Import cli.ts fresh and let its async main() settle. */
 const runCli = async () => {
@@ -451,6 +471,162 @@ describe('cli --import-env', () => {
 
     expect(logged()).toContain('--import-env');
     expect(logged()).toContain('--dry-run');
+  });
+});
+
+describe('cli --agent', () => {
+  const identity = { id: 'agent-ourense', publicKey: 'PUB', privateKey: 'PRIV', fingerprint: 'aa:bb' };
+  const connection = {
+    publish: jest.fn(), subscribe: jest.fn(), onClose: jest.fn(), onReconnect: jest.fn(), end: jest.fn()
+  };
+
+  beforeEach(() => {
+    (paths.contextRoot as jest.Mock).mockResolvedValue('/ctx');
+    (remoteConfig.agentIdentity as jest.Mock).mockResolvedValue(identity);
+    (remoteConfig.brokerSettings as jest.Mock).mockResolvedValue({
+      url: 'mqtts://mqtt.example:443', username: 'agent-ourense', password: 'pw'
+    });
+    (remoteBroker.connect as jest.Mock).mockResolvedValue(connection);
+    (remoteAgent.start as jest.Mock).mockResolvedValue({ stop: jest.fn() });
+  });
+
+  test('connects under its name, with a last will, and waits for jobs', async () => {
+    ARGV = { agent: true, 'agent-id': 'agent-ourense', broker: 'mqtts://mqtt.example:443', username: 'agent-ourense', password: 'pw' };
+    await runCli();
+
+    expect(remoteConfig.agentIdentity).toHaveBeenCalledWith('agent-ourense');
+    expect(remoteConfig.brokerSettings).toHaveBeenCalledWith({ url: 'mqtts://mqtt.example:443', username: 'agent-ourense', password: 'pw' });
+    expect(applications.loadAll).toHaveBeenCalled();
+    expect(remoteBroker.connect).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'mqtts://mqtt.example:443', clientId: 'flows-agent-agent-ourense', will: expect.objectContaining({ retain: true })
+    }));
+    expect(remoteAgent.start).toHaveBeenCalledWith({ identity, connection });
+
+    const out = logged();
+    expect(out).toContain('Public key:  PUB');
+    expect(out).toContain('Fingerprint: aa:bb');
+    expect(out).toContain('Waiting for jobs');
+    expect(process.exit).not.toHaveBeenCalled();
+  });
+
+  test('the camelCase spelling of --agent-id is the same flag', async () => {
+    ARGV = { agent: true, agentId: 'agent-vigo' };
+    await runCli();
+    expect(remoteConfig.agentIdentity).toHaveBeenCalledWith('agent-vigo');
+  });
+
+  test('a missing name or broker is fatal, before anything connects', async () => {
+    (remoteConfig.agentIdentity as jest.Mock).mockRejectedValue(new Error('No agent name'));
+    ARGV = { agent: true };
+    await runCli();
+    expect(errored()).toContain('No agent name');
+    expect(remoteBroker.connect).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  test('a broker that refuses the connection is fatal', async () => {
+    (remoteBroker.connect as jest.Mock).mockRejectedValue(new Error('Could not connect to mqtts://mqtt.example:443: Not authorized'));
+    ARGV = { agent: true };
+    await runCli();
+    expect(errored()).toContain('Not authorized');
+    expect(remoteAgent.start).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('cli --remote', () => {
+  const passed = {
+    id: 'job-1',
+    dir: '/ctx/test-runs/run-1',
+    warnings: [],
+    testRun: { id: 'run-1', status: 'passed', flows: [{ file: 'a.md', status: 'passed' }] }
+  };
+
+  beforeEach(() => {
+    (remoteClient.run as jest.Mock).mockResolvedValue(passed);
+    (remoteConfig.brokerSettings as jest.Mock).mockResolvedValue({ url: 'mqtts://mqtt.example:443' });
+  });
+
+  test('requires an environment and something to run', async () => {
+    ARGV = { remote: 'agent-ourense', file: 'a.md' };
+    await runCli();
+    expect(errored()).toContain('No environment specified');
+
+    jest.clearAllMocks();
+    ARGV = { remote: 'agent-ourense', env: 'uat' };
+    await runCli();
+    expect(errored()).toContain('Name what to run on the agent');
+    expect(remoteClient.run).not.toHaveBeenCalled();
+  });
+
+  test('runs a flow on the agent and exits with the run', async () => {
+    ARGV = { remote: 'agent-ourense', file: 'a.md', env: 'uat' };
+    await runCli();
+
+    expect(remoteClient.run).toHaveBeenCalledWith(expect.objectContaining({
+      agent: 'agent-ourense', environment: 'uat', file: 'a.md', view: undefined, onInput: remoteTerminal.prompt
+    }));
+
+    // Events are printed through the terminal helper
+    const { onEvent } = (remoteClient.run as jest.Mock).mock.calls[0][0];
+    onEvent('remote:job', { status: 'accepted' });
+    onEvent('flowexecution:update', { topic: 'diagram' });
+    expect(logged()).toContain('  agent: line');
+
+    expect(logged()).toContain('agent-ourense: 1 passed, 0 failed');
+    expect(logged()).toContain('Recorded as test run run-1');
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  test('runs a view, scoped to a folder, and stores the broker flags first', async () => {
+    ARGV = {
+      remote: 'agent-ourense', view: 'smoke', folder: 'payments', env: 'uat',
+      broker: 'wss://x/mqtt', username: 'jose', password: 'pw'
+    };
+    await runCli();
+
+    expect(remoteConfig.brokerSettings).toHaveBeenCalledWith({ url: 'wss://x/mqtt', username: 'jose', password: 'pw' });
+    expect(remoteClient.run).toHaveBeenCalledWith(expect.objectContaining({
+      view: 'smoke', folder: 'payments', file: undefined
+    }));
+  });
+
+  test('a broker flag that is not usable is fatal', async () => {
+    (remoteConfig.brokerSettings as jest.Mock).mockRejectedValue(new Error('Broker URL must start with mqtt://'));
+    ARGV = { remote: 'agent-ourense', file: 'a.md', env: 'uat', broker: 'https://x' };
+    await runCli();
+    expect(errored()).toContain('Broker URL must start with');
+    expect(remoteClient.run).not.toHaveBeenCalled();
+  });
+
+  test('a failed flow makes the command exit with it, warnings and all', async () => {
+    (remoteClient.run as jest.Mock).mockResolvedValue({
+      ...passed,
+      warnings: ['2 commit(s) not pushed'],
+      testRun: { id: 'run-2', status: 'failed', flows: [{ file: 'a.md', status: 'failed', error: 'boom' }] }
+    });
+    ARGV = { remote: 'agent-ourense', file: 'a.md', env: 'uat' };
+    await runCli();
+
+    expect((console.warn as jest.Mock).mock.calls.join(' ')).toContain('Warning: 2 commit(s) not pushed');
+    expect(logged()).toContain('failed: a.md — boom');
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  test('an agent that cannot take the job is reported', async () => {
+    (remoteClient.run as jest.Mock).mockRejectedValue(new Error('Agent "agent-ourense" is offline'));
+    ARGV = { remote: 'agent-ourense', file: 'a.md', env: 'uat' };
+    await runCli();
+    expect(errored()).toContain('Agent "agent-ourense" is offline');
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  test('the help mentions both modes', async () => {
+    ARGV = { help: true };
+    await runCli();
+    expect(logged()).toContain('--agent');
+    expect(logged()).toContain('--remote');
+    expect(logged()).toContain('--broker');
   });
 });
 
