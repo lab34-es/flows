@@ -26,7 +26,8 @@ jest.mock('../src/helpers/cli', () => ({ logo: jest.fn(), wisdom: jest.fn(), isI
 jest.mock('../src/helpers/bootstrap', () => ({ ensureTypeScriptConfig: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('../src/helpers/remote/config', () => ({
   agentIdentity: jest.fn(),
-  brokerSettings: jest.fn()
+  brokerSettings: jest.fn(),
+  connectOptions: jest.fn((settings, extra) => ({ url: settings.url, username: settings.username, ...extra }))
 }));
 jest.mock('../src/helpers/remote/broker', () => ({ connect: jest.fn() }));
 jest.mock('../src/helpers/remote/agent', () => ({
@@ -495,7 +496,9 @@ describe('cli --agent', () => {
     await runCli();
 
     expect(remoteConfig.agentIdentity).toHaveBeenCalledWith('agent-ourense');
-    expect(remoteConfig.brokerSettings).toHaveBeenCalledWith({ url: 'mqtts://mqtt.example:443', username: 'agent-ourense', password: 'pw' });
+    expect(remoteConfig.brokerSettings).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'mqtts://mqtt.example:443', username: 'agent-ourense', password: 'pw'
+    }));
     expect(applications.loadAll).toHaveBeenCalled();
     expect(remoteBroker.connect).toHaveBeenCalledWith(expect.objectContaining({
       url: 'mqtts://mqtt.example:443', clientId: 'flows-agent-agent-ourense', will: expect.objectContaining({ retain: true })
@@ -507,6 +510,16 @@ describe('cli --agent', () => {
     expect(out).toContain('Fingerprint: aa:bb');
     expect(out).toContain('Waiting for jobs');
     expect(process.exit).not.toHaveBeenCalled();
+  });
+
+  test('the certificate flags reach the broker settings', async () => {
+    ARGV = { agent: true, provider: 'aws-iot', broker: 'mqtts://x:443', cert: 'a.crt', key: 'a.key', ca: 'ca.pem' };
+    await runCli();
+    expect(remoteConfig.brokerSettings).toHaveBeenCalledWith({
+      url: 'mqtts://x:443', username: undefined, password: undefined,
+      provider: 'aws-iot', cert: 'a.crt', key: 'a.key', ca: 'ca.pem'
+    });
+    expect(remoteBroker.connect).toHaveBeenCalledWith(expect.objectContaining({ clientId: 'flows-agent-agent-ourense' }));
   });
 
   test('the camelCase spelling of --agent-id is the same flag', async () => {
@@ -585,7 +598,9 @@ describe('cli --remote', () => {
     };
     await runCli();
 
-    expect(remoteConfig.brokerSettings).toHaveBeenCalledWith({ url: 'wss://x/mqtt', username: 'jose', password: 'pw' });
+    expect(remoteConfig.brokerSettings).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'wss://x/mqtt', username: 'jose', password: 'pw'
+    }));
     expect(remoteClient.run).toHaveBeenCalledWith(expect.objectContaining({
       view: 'smoke', folder: 'payments', file: undefined
     }));

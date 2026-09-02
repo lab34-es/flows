@@ -119,12 +119,9 @@ const start = async (server: { emit: (...args: any[]) => void }, overrides?: Par
       const suffix = Math.random().toString(36).slice(2, 8);
       const username = (settings.username || 'user').replace(/[^A-Za-z0-9_-]/g, '');
 
-      connection = await deps.connect({
-        url: settings.url,
-        username: settings.username,
-        password: settings.password,
+      connection = await deps.connect(remoteConfig.connectOptions(settings, {
         clientId: `flows-ui-${username}-${suffix}`
-      });
+      }));
       connectionError = null;
 
       connection.onClose(() => console.warn('Lost the broker: reconnecting'));
@@ -152,7 +149,7 @@ const stop = async () => {
   agents.clear();
 
   if (current) {
-    await current.end().catch(() => {});
+    await Promise.resolve(current.end()).catch(() => {});
   }
 };
 
@@ -172,11 +169,21 @@ const getSettings = async () => {
   const stored = await remoteConfig.load();
   const password = await env.read(remoteConfig.PASSWORD_KEY);
 
+  const brokerStored = stored.broker || {};
+
   return {
     broker: {
-      url: (stored.broker && stored.broker.url) || '',
-      username: (stored.broker && stored.broker.username) || ''
+      url: brokerStored.url || '',
+      username: brokerStored.username || '',
+      provider: brokerStored.provider || 'generic',
+      tls: {
+        cert: (brokerStored.tls && brokerStored.tls.cert) || '',
+        key: (brokerStored.tls && brokerStored.tls.key) || '',
+        ca: (brokerStored.tls && brokerStored.tls.ca) || ''
+      },
+      maxPacketSize: brokerStored.maxPacketSize || null
     },
+    providers: remoteConfig.PROVIDERS,
     hasPassword: Boolean(password),
     configured: Boolean(stored.broker && stored.broker.url),
     connected: Boolean(connection),
@@ -191,28 +198,50 @@ const getSettings = async () => {
 /**
  * Store the broker settings and connect with them.
  *
- * @param {Object} body - { url, username, password }: password undefined
- *   keeps the stored one, null clears it
+ * @param {Object} body - { url, username, password, provider, cert, key, ca,
+ *   maxPacketSize }: password undefined keeps the stored one, null clears it;
+ *   an empty cert, key or ca clears that path
  * @returns {Promise<Object>} What getSettings returns
  */
 const saveSettings = async (body) => {
   const input = (body && typeof body === 'object') ? body : {};
   const stored = await remoteConfig.load();
+  const brokerStored = stored.broker || {};
 
-  const url = input.url === undefined
-    ? ((stored.broker && stored.broker.url) || '')
-    : String(input.url || '').trim();
+  const url = input.url === undefined ? (brokerStored.url || '') : String(input.url || '').trim();
   const username = input.username === undefined
-    ? ((stored.broker && stored.broker.username) || '')
+    ? (brokerStored.username || '')
     : String(input.username || '').trim();
+  const provider = remoteConfig.cleanProvider(input.provider) || brokerStored.provider || 'generic';
+  const tls = remoteConfig.cleanTls({ cert: input.cert, key: input.key, ca: input.ca }, brokerStored.tls);
 
   if (url && !/^(mqtts?|wss?):\/\//.test(url)) {
     throw new Error('The broker URL must start with mqtt://, mqtts://, ws:// or wss://');
   }
 
+  let maxPacketSize = brokerStored.maxPacketSize;
+  if (input.maxPacketSize !== undefined) {
+    const value = Number(input.maxPacketSize);
+    if (input.maxPacketSize === null || input.maxPacketSize === '') {
+      maxPacketSize = undefined;
+    }
+    else if (!Number.isInteger(value) || value < 1024) {
+      throw new Error('The packet limit must be a whole number of bytes, at least 1024');
+    }
+    else {
+      maxPacketSize = value;
+    }
+  }
+
   const next = { ...stored };
   if (url) {
-    next.broker = { url, ...(username ? { username } : {}) };
+    next.broker = {
+      url,
+      ...(username ? { username } : {}),
+      ...(provider !== 'generic' ? { provider } : {}),
+      ...(tls ? { tls } : {}),
+      ...(maxPacketSize ? { maxPacketSize } : {})
+    };
   }
   else {
     delete next.broker;
@@ -235,12 +264,9 @@ const saveSettings = async (body) => {
  */
 const test = async () => {
   const settings = await remoteConfig.brokerSettings();
-  const probe = await deps.connect({
-    url: settings.url,
-    username: settings.username,
-    password: settings.password,
+  const probe = await deps.connect(remoteConfig.connectOptions(settings, {
     clientId: `flows-ui-test-${Math.random().toString(36).slice(2, 8)}`
-  });
+  }));
 
   // The ACL has to let this side see the agents, or nothing else will work
   await probe.subscribe(topics.allStatus(), () => {});

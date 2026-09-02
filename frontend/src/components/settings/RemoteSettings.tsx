@@ -17,6 +17,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -33,6 +40,15 @@ import { settingsApi } from '@/services/api';
 
 const formatSeen = (at?: number) => (at ? new Date(at).toLocaleString() : '—');
 
+const PROVIDERS = [
+  { id: 'generic', label: 'Any MQTT 5 broker', hint: 'EMQX, Mosquitto, HiveMQ… with a username and password.' },
+  {
+    id: 'aws-iot',
+    label: 'AWS IoT Core',
+    hint: 'Authenticates with a client certificate, on port 443 behind ALPN. Messages over 128 KB are split for you.',
+  },
+];
+
 /**
  * The broker this UI listens to for agents. The password is write-only: the
  * API keeps it in the context's .env and only says whether one is stored.
@@ -47,6 +63,10 @@ function BrokerForm() {
   const [url, setUrl] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [provider, setProvider] = useState('generic');
+  const [cert, setCert] = useState('');
+  const [key, setKey] = useState('');
+  const [ca, setCa] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -60,6 +80,10 @@ function BrokerForm() {
     setUrl(data.broker?.url || '');
     setUsername(data.broker?.username || '');
     setPassword('');
+    setProvider(data.broker?.provider || 'generic');
+    setCert(data.broker?.tls?.cert || '');
+    setKey(data.broker?.tls?.key || '');
+    setCa(data.broker?.tls?.ca || '');
   }, []);
 
   const load = useCallback(async () => {
@@ -83,7 +107,7 @@ function BrokerForm() {
     setSaved(false);
     setTestResult(null);
     try {
-      const payload: Record<string, any> = { url, username };
+      const payload: Record<string, any> = { url, username, provider, cert, key, ca };
       // The password is only sent when the user typed a new one
       if (password) { payload.password = password; }
 
@@ -127,7 +151,13 @@ function BrokerForm() {
 
   const dirty = url !== (settings.broker?.url || '')
     || username !== (settings.broker?.username || '')
+    || provider !== (settings.broker?.provider || 'generic')
+    || cert !== (settings.broker?.tls?.cert || '')
+    || key !== (settings.broker?.tls?.key || '')
+    || ca !== (settings.broker?.tls?.ca || '')
     || Boolean(password);
+
+  const aws = provider === 'aws-iot';
 
   return (
     <Card>
@@ -145,19 +175,87 @@ function BrokerForm() {
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid gap-2">
+          <Label htmlFor="remote-provider">Broker type</Label>
+          <Select value={provider} onValueChange={setProvider}>
+            <SelectTrigger id="remote-provider" className="w-full" aria-label="Broker type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PROVIDERS.map((item) => (
+                <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">
+            {PROVIDERS.find((item) => item.id === provider)?.hint}
+          </p>
+        </div>
+
+        <div className="grid gap-2">
           <Label htmlFor="remote-url">Broker URL</Label>
           <Input
             id="remote-url"
             value={url}
-            placeholder="mqtts://mqtt.example.com:443"
+            placeholder={aws ? 'mqtts://xxxxxxxx-ats.iot.eu-west-1.amazonaws.com:443' : 'mqtts://mqtt.example.com:443'}
             onChange={(event) => setUrl(event.target.value)}
           />
           <p className="text-muted-foreground text-xs">
-            <span className="font-mono">mqtts://host:port</span> for MQTT over TLS, or{' '}
-            <span className="font-mono">wss://host/path</span> for WebSocket, which passes
-            firewalls that only let HTTPS out. Leave it empty to turn remote runs off.
+            {aws ? (
+              <>
+                Your account's device data endpoint (<span className="font-mono">aws iot describe-endpoint
+                --endpoint-type iot:Data-ATS</span>), on port 443 or 8883.
+              </>
+            ) : (
+              <>
+                <span className="font-mono">mqtts://host:port</span> for MQTT over TLS, or{' '}
+                <span className="font-mono">wss://host/path</span> for WebSocket, which passes
+                firewalls that only let HTTPS out.
+              </>
+            )}
+            {' '}Leave it empty to turn remote runs off.
           </p>
         </div>
+
+        {aws && (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="remote-cert">Certificate file</Label>
+              <Input
+                id="remote-cert"
+                value={cert}
+                placeholder="/home/jose/.flows/ui.pem.crt"
+                onChange={(event) => setCert(event.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                A path on the machine running this server: the PEM certificate AWS IoT issued
+                for it, with its own policy. Every agent has its own certificate.
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="remote-key">Private key file</Label>
+              <Input
+                id="remote-key"
+                value={key}
+                placeholder="/home/jose/.flows/ui.pem.key"
+                onChange={(event) => setKey(event.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="remote-ca">CA file</Label>
+              <Input
+                id="remote-ca"
+                value={ca}
+                placeholder="Optional: /home/jose/.flows/AmazonRootCA1.pem"
+                onChange={(event) => setCa(event.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                Only when Amazon's root CA is not in the system's trust store.
+              </p>
+            </div>
+          </>
+        )}
 
         <div className="grid gap-2">
           <Label htmlFor="remote-username">Username</Label>
@@ -165,12 +263,14 @@ function BrokerForm() {
             id="remote-username"
             autoComplete="off"
             value={username}
-            placeholder="jose"
+            placeholder={aws ? 'Optional: only with a custom authorizer' : 'jose'}
             onChange={(event) => setUsername(event.target.value)}
           />
           <p className="text-muted-foreground text-xs">
-            One user per machine on the broker, with an ACL that lets this one read every
-            agent's status and results and write their requests.
+            {aws
+              ? 'Leave it empty with a certificate. Only a custom authorizer takes a username and password.'
+              : 'One user per machine on the broker, with an ACL that lets this one read every '
+                + "agent's status and results and write their requests."}
           </p>
         </div>
 
@@ -183,7 +283,9 @@ function BrokerForm() {
             type="password"
             autoComplete="off"
             value={password}
-            placeholder={settings.hasPassword ? 'Stored — type to replace it' : 'The broker password'}
+            placeholder={settings.hasPassword
+              ? 'Stored — type to replace it'
+              : (aws ? 'Optional: only with a custom authorizer' : 'The broker password')}
             onChange={(event) => setPassword(event.target.value)}
           />
         </div>

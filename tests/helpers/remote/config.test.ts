@@ -50,7 +50,7 @@ describe('remote/config.brokerSettings', () => {
   test('flags are stored: the URL and username in config, the password in .env', async () => {
     const settings = await remoteConfig.brokerSettings({ url: 'mqtts://mqtt.example:443', username: 'jose', password: 'pw' });
 
-    expect(settings).toEqual({ url: 'mqtts://mqtt.example:443', username: 'jose', password: 'pw' });
+    expect(settings).toEqual({ url: 'mqtts://mqtt.example:443', username: 'jose', password: 'pw', provider: 'generic' });
     expect(getConfig()).toEqual({ broker: { url: 'mqtts://mqtt.example:443', username: 'jose' } });
     expect(getEnv()).toEqual({ FLOWS_BROKER_PASSWORD: 'pw' });
 
@@ -64,7 +64,7 @@ describe('remote/config.brokerSettings', () => {
     process.env.FLOWS_BROKER_PASSWORD = 'env-pw';
 
     await expect(remoteConfig.brokerSettings()).resolves.toEqual({
-      url: 'wss://env.example/mqtt', username: 'stored', password: 'env-pw'
+      url: 'wss://env.example/mqtt', username: 'stored', password: 'env-pw', provider: 'generic'
     });
 
     await expect(remoteConfig.brokerSettings({ url: 'mqtt://flag:1883' })).resolves.toMatchObject({ url: 'mqtt://flag:1883' });

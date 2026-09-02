@@ -177,12 +177,9 @@ const run = async (options: RunOptions, deps: ClientDeps = defaultDeps): Promise
   const steps = await stepsOf(options, deps);
   const document = await environmentDocument(steps, environment, warnings);
 
-  const connection = await deps.connect({
-    url: settings.url,
-    username: settings.username,
-    password: settings.password,
+  const connection = await deps.connect(remoteConfig.connectOptions(settings, {
     clientId: `flows-${(settings.username || 'user').replace(/[^A-Za-z0-9_-]/g, '')}-${randomUUID().slice(0, 8)}`
-  });
+  }));
 
   const jobId = randomUUID();
 

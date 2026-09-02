@@ -74,6 +74,67 @@ lab34-flows --remote agent-ourense --file flows/my-flow.md --env uat
 lab34-flows --remote agent-ourense --view smoke --env uat
 ```
 
+## AWS IoT Core
+
+AWS IoT Core works as the broker too, with three differences the tool takes
+care of once you pick *AWS IoT Core* as the broker type:
+
+- **A certificate instead of a password.** Every machine — this one and each
+  agent — gets its own thing, certificate and policy in the AWS console (or
+  `aws iot create-keys-and-certificate`). Point the settings, or the
+  `--cert` and `--key` flags, at the PEM files. Amazon's root CA is usually
+  in the system store; `--ca` names it when it is not.
+- **Port 443.** The URL is your account's data endpoint,
+  `mqtts://xxxxxxxx-ats.iot.<region>.amazonaws.com:443`; the tool offers the
+  ALPN protocol AWS expects there. 8883 works as well.
+- **128 KB per message.** AWS refuses anything larger, and a run's results
+  can be more. Messages are split into pieces under the limit and put back
+  together on the other side, transparently.
+
+Each certificate's policy names what that machine may do. For an agent
+called `agent-ourense`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "iot:Connect",
+      "Resource": "arn:aws:iot:REGION:ACCOUNT:client/flows-agent-agent-ourense" },
+    { "Effect": "Allow", "Action": ["iot:Publish", "iot:RetainPublish"],
+      "Resource": "arn:aws:iot:REGION:ACCOUNT:topic/flows/agents/agent-ourense/*" },
+    { "Effect": "Allow", "Action": "iot:Subscribe",
+      "Resource": "arn:aws:iot:REGION:ACCOUNT:topicfilter/flows/agents/agent-ourense/jobs/*" },
+    { "Effect": "Allow", "Action": "iot:Receive",
+      "Resource": "arn:aws:iot:REGION:ACCOUNT:topic/flows/agents/agent-ourense/*" }
+  ]
+}
+```
+
+And for a person's machine, whose client ids start with `flows-ui-` and
+`flows-<username>-`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "iot:Connect",
+      "Resource": ["arn:aws:iot:REGION:ACCOUNT:client/flows-ui-*",
+                   "arn:aws:iot:REGION:ACCOUNT:client/flows-user-*"] },
+    { "Effect": "Allow", "Action": "iot:Publish",
+      "Resource": "arn:aws:iot:REGION:ACCOUNT:topic/flows/agents/*/jobs/*" },
+    { "Effect": "Allow", "Action": "iot:Subscribe",
+      "Resource": "arn:aws:iot:REGION:ACCOUNT:topicfilter/flows/agents/*" },
+    { "Effect": "Allow", "Action": "iot:Receive",
+      "Resource": "arn:aws:iot:REGION:ACCOUNT:topic/flows/agents/*" }
+  ]
+}
+```
+
+`iot:RetainPublish` is what lets an agent leave its status on the broker,
+and its last will with it. The client id of a person's run connection is
+`flows-<username>-<random>`, or `flows-user-<random>` with no username, so
+the `client/` resources have to allow that prefix.
+
 ## Trust
 
 An agent's key is trusted the first time a run reaches it and refused if it
