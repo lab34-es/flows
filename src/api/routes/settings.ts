@@ -4,6 +4,7 @@ const router = express.Router();
 import * as ai from '../../helpers/ai';
 import * as jira from '../../helpers/jira';
 import * as sharepoint from '../../helpers/sharepoint';
+import * as relay from '../../helpers/remote/relay';
 
 const sendError = (res, error, status = 400) => {
   const message = (error && error.message) || String(error);
@@ -100,6 +101,42 @@ router.put('/sharepoint', (req, res) => {
 router.post('/sharepoint/test', (req, res) => {
   sharepoint.test()
     .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
+// Remote agents: the broker this UI listens to, and the agents it has seen.
+// The password is never sent back.
+router.get('/remote', (req, res) => {
+  relay.getSettings()
+    .then(settings => res.send(settings))
+    .catch(error => sendError(res, error, 500));
+});
+
+// { url, username, password }: password undefined keeps it, null clears it.
+// Saving reconnects with the new settings
+router.put('/remote', (req, res) => {
+  relay.saveSettings(req.body)
+    .then(settings => res.send(settings))
+    .catch(error => sendError(res, error));
+});
+
+// Connect once with the stored settings, and check the ACL lets us see agents
+router.post('/remote/test', (req, res) => {
+  relay.test()
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
+// Every agent seen since the server connected, for a page that opened late;
+// changes arrive over the socket as "agents:update"
+router.get('/remote/agents', (req, res) => {
+  res.send({ agents: relay.list() });
+});
+
+// Forget an agent's key, after it was reinstalled on purpose
+router.delete('/remote/agents/:id/key', (req, res) => {
+  relay.forgetAgent(req.params.id)
+    .then(() => res.send({ success: true }))
     .catch(error => sendError(res, error));
 });
 

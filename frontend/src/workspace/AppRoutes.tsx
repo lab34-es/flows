@@ -15,6 +15,7 @@ import ImportVariables from '@/components/environment/ImportVariables';
 import AiSettings from '@/components/settings/AiSettings';
 import XraySettings from '@/components/settings/XraySettings';
 import SharepointSettings from '@/components/settings/SharepointSettings';
+import RemoteSettings from '@/components/settings/RemoteSettings';
 import UiSettings from '@/components/settings/UiSettings';
 import HelpPage from '@/pages/HelpPage';
 import HelpIndex from '@/components/help/HelpIndex';
@@ -46,6 +47,7 @@ export function AppRoutes() {
         <Route path="ai" element={<AiSettings />} />
         <Route path="xray" element={<XraySettings />} />
         <Route path="sharepoint" element={<SharepointSettings />} />
+        <Route path="remote" element={<RemoteSettings />} />
         <Route path="ui" element={<UiSettings />} />
       </Route>
       <Route path="/help" element={<HelpPage />}>

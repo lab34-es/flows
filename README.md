@@ -171,6 +171,11 @@ of the run, printed as it happens, a prompt on your terminal when a step asks
 for a value, and the test-run folder, written into your own `test-runs` as if
 it had run here.
 
+The same from the web UI: enter the broker under *Settings → Remote agents*,
+pick an agent in the top bar next to the environment, and the Run buttons send
+the flows there. The run shows up in the notebook and in the test runs as any
+other, questions from steps included.
+
 The agent's key is trusted the first time it is seen and refused if it ever
 changes, the way ssh treats a host key. The broker itself needs TLS, one user
 per machine and an ACL that confines each agent to `flows/agents/<name>/#`;

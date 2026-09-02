@@ -35,8 +35,8 @@ interface Job {
   environment: string;
   /** Run one flow, by its path inside flows/ */
   flow?: { path: string };
-  /** Run every flow a view matches */
-  view?: { name?: string; folder?: string };
+  /** Run every flow a view matches, or the files the sender lists */
+  view?: { name?: string; folder?: string; files?: string[] };
   /** The commit the flows should be run from: fetched and checked out first */
   ref?: string;
   /** The env files' values, sealed to this agent's key */
@@ -215,6 +215,7 @@ const start = async ({ identity, connection }: AgentOptions, deps: AgentDeps = d
         await deps.testRuns().startFolderRun({
           folder: (job.view && job.view.folder) || '',
           view: job.view && job.view.name,
+          files: job.view && Array.isArray(job.view.files) ? job.view.files.map(String) : undefined,
           environment: job.environment,
           io
         });

@@ -32,6 +32,8 @@ export const flowsApi = {
     api.post('/api/flows/create/ai', { prompt }, { timeout: AI_TIMEOUT }),
   editAI: (prompt, content) =>
     api.post('/api/flows/edit/ai', { prompt, content }, { timeout: AI_TIMEOUT }),
+  // { value, environment, path } runs here; with `agent` the committed copy
+  // of `path` runs on that agent, followed over the same socket
   start: (data) => api.post('/api/flows/start', data),
   // What a running step is asking the person for, and the answer to it
   pendingInputs: () => api.get('/api/flows/input'),
@@ -71,12 +73,14 @@ export const testRunsApi = {
   getFlow: (id, path) =>
     api.get(`/api/test-runs/${encodeURIComponent(id)}/flow?path=${encodeURIComponent(path)}`),
   // Run every flow a folder view matches, as one test run
-  start: ({ environment, folder, view, files }: {
+  start: ({ environment, folder, view, files, agent }: {
     environment: string;
     folder?: string;
     view?: string;
     files?: string[];
-  }) => api.post('/api/test-runs', { environment, folder, view, files }),
+    /** Run on this agent instead of here */
+    agent?: string;
+  }) => api.post('/api/test-runs', { environment, folder, view, files, agent }),
 };
 
 export const applicationsApi = {
@@ -163,6 +167,15 @@ export const settingsApi = {
   // Signs in and resolves the site and library for real: give it the room a
   // round trip to Microsoft needs
   testSharepoint: () => api.post('/api/settings/sharepoint/test', {}, { timeout: SHAREPOINT_TIMEOUT }),
+  // Remote agents: the MQTT broker this UI listens to. The password is
+  // write-only; the agents seen so far come with the settings and, live, over
+  // the socket as "agents:update"
+  getRemote: () => api.get('/api/settings/remote'),
+  saveRemote: (settings) => api.put('/api/settings/remote', settings),
+  testRemote: () => api.post('/api/settings/remote/test'),
+  remoteAgents: () => api.get('/api/settings/remote/agents'),
+  forgetRemoteAgentKey: (id) =>
+    api.delete(`/api/settings/remote/agents/${encodeURIComponent(id)}/key`),
 };
 
 export const jiraApi = {

@@ -3,6 +3,7 @@ const router = express.Router();
 
 import * as flows from '../../helpers/flows';
 import * as inputs from '../../helpers/inputs';
+import * as relay from '../../helpers/remote/relay';
 
 const sendError = (res, error, status = 400) => {
   const message = (error && error.message) || String(error);
@@ -47,10 +48,16 @@ router.post('/edit/ai', (req, res) => {
     .catch(error => sendError(res, error));
 });
 
+// { value, environment, path } runs here; add { agent } to run the committed
+// copy of `path` on that agent instead, followed over the same socket
 router.post('/start', (req, res) => {
-  flows.start(req.body, {
-    io: req.app.get('io')
-  })
+  const { agent } = req.body || {};
+
+  const started = agent
+    ? relay.startFlow({ agent, environment: req.body.environment, path: req.body.path })
+    : flows.start(req.body, { io: req.app.get('io') });
+
+  started
     .then(flow => {
       res.send({ execution: flow.execution });
     })
@@ -60,7 +67,7 @@ router.post('/start', (req, res) => {
 // The requests a running flow is waiting an answer for. Only ever one in
 // practice, but a client that connected late has no other way of finding it.
 router.get('/input', (req, res) => {
-  res.send({ inputs: inputs.list() });
+  res.send({ inputs: [...inputs.list(), ...relay.listInputs()] });
 });
 
 // Answer -- or give up on -- what a step asked the person running the flow
@@ -73,9 +80,10 @@ router.post('/input', (req, res) => {
     return sendError(res, new Error('Invalid request: "id" is required'));
   }
 
-  const settled = cancel
+  // A question asked by a step running here, or by one running on an agent
+  const settled = (cancel
     ? inputs.cancel(id, 'Input was cancelled')
-    : inputs.answer(id, value);
+    : inputs.answer(id, value)) || relay.answerInput(id, value, Boolean(cancel));
 
   if (!settled) {
     return res.status(404).send({ error: 'That input is no longer being waited for' });

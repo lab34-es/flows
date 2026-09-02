@@ -40,7 +40,7 @@ export function FlowPage() {
   const [searchParams] = useSearchParams();
   const flowPath = searchParams.get('path');
 
-  const { environment, refreshTree } = useAppState();
+  const { environment, refreshTree, agent } = useAppState();
   const { executions, startRun, clearRun, answerInput, anyRunning } = useExecutions();
   const { theme } = useTheme();
 
@@ -329,7 +329,7 @@ export function FlowPage() {
     }
 
     setTab('document');
-    await startRun(flowPath, { value: draft, environment, path: flowData.relativePath });
+    await startRun(flowPath, { value: draft, environment, path: flowData.relativePath, agent });
   };
 
   /**
@@ -593,10 +593,12 @@ export function FlowPage() {
                 ? 'Select an environment in the sidebar first'
                 : readiness && !readiness.ready
                   ? `This flow is missing env files for “${environment}”`
-                  : `Run on “${environment}”`
+                  : agent
+                    ? `Run the committed copy on agent “${agent}”, against “${environment}”`
+                    : `Run on “${environment}”`
             }
           >
-            <Play /> Run{environment ? ` · ${environment}` : ''}
+            <Play /> Run{environment ? ` · ${environment}` : ''}{agent ? ` · ${agent}` : ''}
           </Button>
         </div>
       </div>

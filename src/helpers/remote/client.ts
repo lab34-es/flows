@@ -35,6 +35,8 @@ interface RunOptions {
   /** Name (or slug) of a view; '' means the first one */
   view?: string;
   folder?: string;
+  /** The flows to run instead of evaluating the view, as the folder page lists them */
+  files?: string[];
   /** The local Socket.IO server, to show the run in the UI */
   io?: { emit: (...args: any[]) => void };
   /** Every event, as it arrives */
@@ -116,6 +118,7 @@ const stepsOf = async (options: RunOptions, deps: ClientDeps) => {
   }
 
   const { targets } = await deps.testRuns().prepareFolderRun({
+    files: options.files,
     folder: options.folder || '',
     view: options.view,
     environment: options.environment
@@ -213,7 +216,9 @@ const run = async (options: RunOptions, deps: ClientDeps = defaultDeps): Promise
     const job: Job = {
       id: jobId,
       environment,
-      ...(options.file ? { flow: { path: options.file } } : { view: { name: options.view, folder: options.folder || '' } }),
+      ...(options.file
+        ? { flow: { path: options.file } }
+        : { view: { name: options.view, folder: options.folder || '', ...(options.files ? { files: options.files } : {}) } }),
       ...(ref ? { ref } : {}),
       ...(document ? { env: crypto.seal(known.publicKey, document) } : {})
     };
