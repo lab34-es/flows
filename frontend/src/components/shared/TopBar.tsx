@@ -1,5 +1,5 @@
 import React from 'react';
-import { CircleHelp, Globe, Settings } from 'lucide-react';
+import { CircleHelp, Globe, Radio, Settings } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import ContextIndicator from '@/components/shared/ContextIndicator';
+import { AgentDot } from '@/components/shared/AgentStatus';
+import { agentLabel } from '@/lib/agents';
 import { useAppState } from '@/context/AppStateContext';
 import { useActiveLocation, useWorkspace } from '@/workspace/WorkspaceContext';
 
@@ -22,7 +24,13 @@ import { useActiveLocation, useWorkspace } from '@/workspace/WorkspaceContext';
 export function TopBar() {
   const { openTab } = useWorkspace();
   const location = useActiveLocation();
-  const { environments, environment, setEnvironment } = useAppState();
+  const { environments, environment, setEnvironment, agents, agent, setAgent } = useAppState();
+
+  // The selector only appears once there is somewhere else to run: a broker
+  // with at least one agent seen, or an agent picked earlier
+  const LOCAL = '__local__';
+  const showAgents = agents.length > 0 || Boolean(agent);
+  const picked = agents.find((item) => item.agent === agent);
 
   const onSettings = location.pathname.startsWith('/settings');
   const onHelp = location.pathname.startsWith('/help');
@@ -46,6 +54,33 @@ export function TopBar() {
             ))}
           </SelectContent>
         </Select>
+
+        {showAgents && (
+          <Select value={agent || LOCAL} onValueChange={(value) => setAgent(value === LOCAL ? '' : value)}>
+            <SelectTrigger
+              size="sm"
+              className="w-48"
+              aria-label="Where flows run"
+              title={agent ? `Flows run on “${agent}” (${agentLabel(picked)})` : 'Flows run on this machine'}
+            >
+              <Radio className="size-3.5" />
+              <SelectValue placeholder="Run here" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value={LOCAL}>This machine</SelectItem>
+              {agents.map((item) => (
+                <SelectItem key={item.agent} value={item.agent}>
+                  <AgentDot agent={item} /> {item.agent}
+                </SelectItem>
+              ))}
+              {agent && !picked && (
+                <SelectItem value={agent}>
+                  <AgentDot agent={null} /> {agent}
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        )}
 
         <Button
           variant={onHelp ? 'secondary' : 'ghost'}

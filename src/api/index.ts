@@ -9,6 +9,7 @@ const server = http.createServer(app);
 import defineRoutes from './routes';
 import * as ioHelper from '../helpers/io';
 import * as bootstrap from '../helpers/bootstrap';
+import * as relay from '../helpers/remote/relay';
 
 // Initialize Socket.IO with the server
 const socketIO = ioHelper.io(server);
@@ -23,6 +24,10 @@ export const start = async (options: { context?: string } = {}) => {
 
   // Seed bundled example applications and flows on first run
   await bootstrap.ensureDefaults();
+
+  // Listen for remote agents, when a broker is configured. A broker that is
+  // down must not keep the UI from starting: the Settings screen says why
+  relay.start(socketIO).catch(ex => console.error('Could not start listening for agents:', ex.message));
 
   // Same-origin and curl-style requests carry no Origin header and pass;
   // cross-origin browser requests are only allowed from the tool's own UIs

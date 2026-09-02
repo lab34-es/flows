@@ -1,12 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { flowsApi, applicationsApi, environmentApi, contextApi, testRunsApi } from '@/services/api';
+import { flowsApi, applicationsApi, environmentApi, contextApi, testRunsApi, settingsApi } from '@/services/api';
 import { socket } from '@/services/socket';
 import { indexChanges, scopedStatus } from '@/lib/git';
 
 const AppStateContext = createContext<any>(null);
 
 const ENV_STORAGE_KEY = 'lab34-flows:environment';
+// '' is this machine; otherwise the name of the agent runs are sent to
+const AGENT_STORAGE_KEY = 'lab34-flows:agent';
 
 // Git state goes stale on its own -- a pull in a terminal, a file written by
 // another tool -- so it is re-read on a timer as well as after our own writes.
@@ -28,6 +30,11 @@ export function AppStateProvider({ children }) {
   );
   const [contextInfo, setContextInfo] = useState<any>(null);
   const [testRuns, setTestRuns] = useState<any[]>([]);
+  // The remote agents the server has seen on the broker, and where runs go
+  const [agents, setAgents] = useState<any[]>([]);
+  const [agent, setAgentState] = useState(
+    () => localStorage.getItem(AGENT_STORAGE_KEY) || ''
+  );
 
   const refreshContext = useCallback(async () => {
     try {
@@ -85,6 +92,20 @@ export function AppStateProvider({ children }) {
     localStorage.setItem(ENV_STORAGE_KEY, value);
   }, []);
 
+  const refreshAgents = useCallback(async () => {
+    try {
+      const response = await settingsApi.remoteAgents();
+      setAgents(response.data?.agents || []);
+    } catch (error) {
+      console.error('Error loading remote agents:', error);
+    }
+  }, []);
+
+  const setAgent = useCallback((value) => {
+    setAgentState(value || '');
+    localStorage.setItem(AGENT_STORAGE_KEY, value || '');
+  }, []);
+
   const refreshTestRuns = useCallback(async () => {
     try {
       const response = await testRunsApi.list();
@@ -99,8 +120,16 @@ export function AppStateProvider({ children }) {
     refreshApplications();
     refreshEnvironments();
     refreshTestRuns();
+    refreshAgents();
     // refreshTree() reads the context state too
-  }, [refreshTree, refreshApplications, refreshEnvironments, refreshTestRuns]);
+  }, [refreshTree, refreshApplications, refreshEnvironments, refreshTestRuns, refreshAgents]);
+
+  // The server pushes the whole list every time an agent's status changes
+  useEffect(() => {
+    const onUpdate = (event) => { setAgents(event?.agents || []); };
+    socket.on('agents:update', onUpdate);
+    return () => { socket.off('agents:update', onUpdate); };
+  }, []);
 
   // The backend says so every time a run is created, progresses or ends --
   // a handful of events per run, so re-reading the list is cheap enough
@@ -152,8 +181,12 @@ export function AppStateProvider({ children }) {
       gitIndex,
       testRuns,
       refreshTestRuns,
+      agents,
+      agent,
+      setAgent,
+      refreshAgents,
     }),
-    [tree, treeLoading, refreshTree, applications, applicationsLoading, applicationsRevision, refreshApplications, environments, environment, setEnvironment, refreshEnvironments, contextInfo, refreshContext, gitIndex, testRuns, refreshTestRuns]
+    [tree, treeLoading, refreshTree, applications, applicationsLoading, applicationsRevision, refreshApplications, environments, environment, setEnvironment, refreshEnvironments, contextInfo, refreshContext, gitIndex, testRuns, refreshTestRuns, agents, agent, setAgent, refreshAgents]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
