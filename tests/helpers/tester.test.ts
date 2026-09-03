@@ -116,6 +116,42 @@ describe('tester.test - $expr: assertions', () => {
   });
 });
 
+describe('tester.test - expressions and the memory', () => {
+  test('an expression reads what an earlier step remembered', async () => {
+    const flow = { memory: { barcode: '3232999' } };
+
+    const report = await tester.test(
+      flow,
+      { body: { barcode: '$expr: value === memory.barcode' } },
+      { body: { barcode: '3232999' } }
+    );
+
+    expect(report.hasErrors).toBe(false);
+  });
+
+  test('the flow itself is in scope too', async () => {
+    const flow = { memory: { acCode: '42108' } };
+
+    const report = await tester.test(
+      flow,
+      { body: { data: '$expr: value.some(i => i.ac === flow.memory.acCode)' } },
+      { body: { data: [{ ac: '42108' }] } }
+    );
+
+    expect(report.hasErrors).toBe(false);
+  });
+
+  test('a flow with nothing in memory still evaluates', async () => {
+    const report = await tester.test(
+      {},
+      { body: { barcode: '$expr: value === memory.barcode' } },
+      { body: { barcode: '3232999' } }
+    );
+
+    expect(report.hasErrors).toBe(true);
+  });
+});
+
 describe('tester.test - latent applications', () => {
   test('collects the errors a latent application reports', async () => {
     const code = { test: jest.fn().mockResolvedValue(['boom']) };
@@ -134,6 +170,20 @@ describe('tester.test - latent applications', () => {
 
   test('an application that reports nothing falsy is skipped', async () => {
     const code = { test: jest.fn().mockResolvedValue(null) };
+    const flow = { latentApplications: [{ application: 'mqtt', code }] };
+
+    const report = await tester.test(
+      flow,
+      { latentApplications: [{ application: 'mqtt' }] },
+      {}
+    );
+
+    expect(report.latentApplications).toEqual([]);
+    expect(report.hasErrors).toBe(false);
+  });
+
+  test('an application that reports an empty list of errors passes the step', async () => {
+    const code = { test: jest.fn().mockResolvedValue([]) };
     const flow = { latentApplications: [{ application: 'mqtt', code }] };
 
     const report = await tester.test(

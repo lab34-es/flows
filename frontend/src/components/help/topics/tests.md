@@ -45,5 +45,17 @@ JavaScript, where `value` is the actual value being tested:
 | Property exists | `$expr: typeof value === 'object' && 'id' in value` |
 | Date after | `$expr: new Date(value) > new Date('2023-01-01')` |
 
+### Asserting against what an earlier step remembered
+
+A `test` block is **not** templated: `{{ memory.barcode }}` written in one is
+compared as the twenty characters it is, not as the barcode. To assert against
+something an earlier step left behind, use an expression — `memory` is in
+scope beside `value`, and so is the whole `flow`:
+
+    test:
+      body:
+        barcode: "$expr: value === memory.barcode"
+        data: "$expr: value.some(i => i.barcode === memory.barcode)"
+
 Cover the unhappy paths too: asserting that a missing resource returns `404`
 is what catches the regression that starts answering `200`.

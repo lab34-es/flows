@@ -14,6 +14,7 @@ import * as httpClient from './helpers/httpClient';
 import * as httpServer from './helpers/httpServer';
 import * as inputs from './helpers/inputs';
 import * as mimicFiles from './helpers/mimicFiles';
+import * as mqttClient from './helpers/mqttClient';
 import * as pgClient from './helpers/pgClient';
 import * as playwright from './helpers/playwright';
 import * as replacer from './helpers/replacer';
@@ -26,6 +27,7 @@ import * as validate from './helpers/validate';
  */
 export type { DescribedError } from './helpers/errors';
 export type { InputRequest, TextOptions } from './helpers/inputs';
+export type { PublishOptions } from './helpers/mqttClient';
 
 export type {
   Context,
@@ -50,6 +52,7 @@ export {
   httpServer,
   inputs,
   mimicFiles,
+  mqttClient,
   pgClient,
   playwright,
   replacer,

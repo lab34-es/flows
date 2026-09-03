@@ -60,6 +60,17 @@ describe('mqtt.start', () => {
     read.mockRestore();
   });
 
+  test('port, credentials and certificate checking are passed through', async () => {
+    await latentMqtt.start({}, {
+      client: 'c3b',
+      connection: { host: 'b', port: 8883, username: 'u', password: 'p', rejectUnauthorized: false }
+    });
+
+    expect((mqtt.connect as jest.Mock).mock.calls[0][0]).toEqual(expect.objectContaining({
+      port: 8883, username: 'u', password: 'p', rejectUnauthorized: false
+    }));
+  });
+
   test('subscribes to a single topic', async () => {
     await latentMqtt.start({}, {
       client: 'c4', connection: { host: 'b' }, subscribe: { topic: 'orders' }
@@ -154,6 +165,174 @@ describe('mqtt.test', () => {
     await jest.advanceTimersByTimeAsync(3000);
     await expect(pending).resolves.toHaveLength(1);
     jest.useRealTimers();
+  });
+});
+
+describe('mqtt.test - topics', () => {
+  beforeEach(async () => {
+    await latentMqtt.start({}, { client: 'topics', connection: { host: 'b' } });
+    lastClient().emit(
+      'message',
+      'msg/cloud/1234/command',
+      Buffer.from(JSON.stringify({ hdf: { cat: 'order-status' }, bdy: [{ id: 'o1', cmp: 'c1' }] }))
+    );
+  });
+
+  afterEach(() => latentMqtt.stop('topics'));
+
+  test('a single-level wildcard stands for the part the flow does not know', async () => {
+    await expect(latentMqtt.test({}, {
+      client: 'topics', test: [{ topic: 'msg/cloud/+/command', message: { hdf: { cat: 'order-status' } } }]
+    }, {})).resolves.toEqual([]);
+  });
+
+  test('a multi-level wildcard covers the rest of the topic', async () => {
+    await expect(latentMqtt.test({}, {
+      client: 'topics', test: [{ topic: 'msg/cloud/#', message: {} }]
+    }, {})).resolves.toEqual([]);
+  });
+
+  test('a wildcard does not match a topic of a different depth', async () => {
+    await expect(latentMqtt.test({}, {
+      client: 'topics', test: [{ topic: 'msg/cloud/+', message: {} }]
+    }, {})).resolves.toHaveLength(1);
+  });
+
+  test('the topic is interpolated against the memory as it stands', async () => {
+    const flow = { memory: { device: '1234' } };
+
+    await expect(latentMqtt.test(flow, {
+      client: 'topics', test: [{ topic: 'msg/cloud/{{ memory.device }}/command', message: {} }]
+    }, {})).resolves.toEqual([]);
+  });
+
+  test('a topic naming something nothing has remembered yet is reported as written', async () => {
+    const notMatched: any = await latentMqtt.test({ memory: {} }, {
+      client: 'topics', test: [{ topic: 'msg/cloud/{{ memory.device }}/request', message: {} }]
+    }, {});
+
+    expect(notMatched[0].topic).toBe('msg/cloud/{{ memory.device }}/request');
+  });
+});
+
+describe('mqtt.test - what the message has to say', () => {
+  beforeEach(async () => {
+    await latentMqtt.start({}, { client: 'deep', connection: { host: 'b' } });
+    lastClient().emit(
+      'message',
+      'msg/cloud/1234/command',
+      Buffer.from(JSON.stringify({
+        hdf: { cat: 'order-status', tms: 12 },
+        bdy: [{ id: 'order-1', cmp: 'compartment-1', sta: 'created' }]
+      }))
+    );
+  });
+
+  afterEach(() => latentMqtt.stop('deep'));
+
+  test('a nested expectation is compared value by value', async () => {
+    await expect(latentMqtt.test({}, {
+      client: 'deep',
+      test: [{ topic: 'msg/cloud/1234/command', message: { hdf: { cat: 'order-status' } } }]
+    }, {})).resolves.toEqual([]);
+  });
+
+  test('a nested expectation that differs is reported', async () => {
+    await expect(latentMqtt.test({}, {
+      client: 'deep',
+      test: [{ topic: 'msg/cloud/1234/command', message: { hdf: { cat: 'barcode' } } }]
+    }, {})).resolves.toHaveLength(1);
+  });
+
+  test('an expression is evaluated over the actual value', async () => {
+    await expect(latentMqtt.test({}, {
+      client: 'deep',
+      test: [{ topic: 'msg/cloud/1234/command', message: { bdy: '$expr: value.some(b => b.cmp)' } }]
+    }, {})).resolves.toEqual([]);
+  });
+
+  test('an expression that throws does not take the run down', async () => {
+    await expect(latentMqtt.test({}, {
+      client: 'deep',
+      test: [{ topic: 'msg/cloud/1234/command', message: { bdy: '$expr: value.nope()' } }]
+    }, {})).resolves.toHaveLength(1);
+  });
+
+  test('an expression reads what an earlier step remembered', async () => {
+    const flow = { memory: { orderId: 'order-1' } };
+
+    await expect(latentMqtt.test(flow, {
+      client: 'deep',
+      test: [{
+        topic: 'msg/cloud/1234/command',
+        message: { bdy: '$expr: value.some(b => b.id === memory.orderId)' }
+      }]
+    }, {})).resolves.toEqual([]);
+  });
+
+  test('a list expectation is matched item by item', async () => {
+    await expect(latentMqtt.test({}, {
+      client: 'deep',
+      test: [{ topic: 'msg/cloud/1234/command', message: { bdy: [{ sta: 'created' }] } }]
+    }, {})).resolves.toEqual([]);
+  });
+
+  test('a payload that is not JSON is kept as text rather than thrown away', async () => {
+    lastClient().emit('message', 'raw', Buffer.from('not json'));
+
+    await expect(latentMqtt.test({}, {
+      client: 'deep', test: [{ topic: 'raw', message: '$expr: value === "not json"' }]
+    }, {})).resolves.toEqual([]);
+  });
+});
+
+describe('mqtt.test - keeping what arrived', () => {
+  let flow: any;
+
+  beforeEach(async () => {
+    flow = { memory: { barcode: '3232' } };
+    await latentMqtt.start({}, { client: 'keeper', connection: { host: 'b' } });
+    lastClient().emit(
+      'message',
+      'msg/cloud/1234/command',
+      Buffer.from(JSON.stringify({
+        hdf: { cat: 'order-status' },
+        bdy: [{ id: 'order-1', cmp: 'compartment-1' }]
+      }))
+    );
+  });
+
+  afterEach(() => latentMqtt.stop('keeper'));
+
+  test('writes what the mapping names into the flow memory', async () => {
+    await latentMqtt.test(flow, {
+      client: 'keeper',
+      test: [{
+        topic: 'msg/cloud/+/command',
+        message: { hdf: { cat: 'order-status' } },
+        memory: {
+          orderId: '{{ message.bdy.0.id }}',
+          compartmentId: '{{ message.bdy.0.cmp }}',
+          onTopic: '{{ topic }}'
+        }
+      }]
+    }, {});
+
+    expect(flow.memory).toEqual({
+      barcode: '3232',
+      orderId: 'order-1',
+      compartmentId: 'compartment-1',
+      onTopic: 'msg/cloud/1234/command'
+    });
+  });
+
+  test('a message that never arrived writes nothing', async () => {
+    await latentMqtt.test(flow, {
+      client: 'keeper',
+      test: [{ topic: 'never', message: {}, memory: { orderId: '{{ message.bdy.0.id }}' } }]
+    }, {});
+
+    expect(flow.memory.orderId).toBeUndefined();
   });
 });
 
