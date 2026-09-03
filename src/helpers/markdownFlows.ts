@@ -383,6 +383,26 @@ const parse = (content): ParsedMarkdownFlow => {
 };
 
 /**
+ * Whether a step is meant to run.
+ *
+ * Steps are enabled by default: a document that never mentions `enabled`
+ * behaves exactly as it always did. Only an explicit `enabled: false` takes a
+ * step out of the run -- which is what the toggle in the step cell writes, and
+ * what a person can write by hand to park a step without deleting it.
+ *
+ * @param {Object} step - A parsed step
+ * @returns {boolean}
+ */
+const isStepEnabled = (step): boolean => {
+  const enabled = step ? step.enabled : undefined;
+  if (enabled === undefined || enabled === null) { return true; }
+  // YAML gives a boolean back, but `enabled: "false"` is a string, and it
+  // plainly means the same thing
+  if (typeof enabled === 'string') { return enabled.trim().toLowerCase() !== 'false'; }
+  return enabled !== false;
+};
+
+/**
  * Build the flow object expected by the runners from a markdown document.
  * Throws when the document contains invalid step blocks.
  *
@@ -589,6 +609,7 @@ const extractResults = (content) => {
 export {
   parse,
   parseFrontmatter,
+  isStepEnabled,
   withFrontmatter,
   splitSegments,
   isStepInfo,

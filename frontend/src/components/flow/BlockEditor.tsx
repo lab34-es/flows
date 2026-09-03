@@ -18,8 +18,10 @@ import {
   parseDocument,
   serializeDocument,
   stepBody,
+  stepEnabled,
   stepIndexes,
   withFenceBody,
+  withStepEnabled,
 } from '@/lib/markdown-blocks';
 import { type SlashCommand, expandTemplate, filterSlashCommands } from '@/lib/slash-commands';
 
@@ -229,6 +231,23 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
     setEditingId(id);
     setSlash(null);
   }, []);
+
+  /**
+   * Turn a step on or off, by writing its own `enabled` key. The switch edits
+   * the document like any other edit does — the file is what carries the
+   * state, so it survives a reload and reads the same on the CLI.
+   *
+   * @param {string} id - The block holding the step
+   * @param {boolean} enabled - What the switch was moved to
+   */
+  const setStepEnabled = useCallback((id: string, enabled: boolean) => {
+    const blocks = docRef.current.blocks.map((block) => (
+      block.id === id
+        ? { ...block, text: withFenceBody(block.text, withStepEnabled(stepBody(block.text), enabled)) }
+        : block
+    ));
+    commit(blocks);
+  }, [commit]);
 
   const selectBlock = useCallback((id: string) => {
     focusBlockRef.current = id;
@@ -1024,6 +1043,8 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
               onSourceClick={(event) => {
                 startEdit(block.id, caretFromPoint(event.nativeEvent, stepBody(block.text)));
               }}
+              enabled={stepEnabled(stepBody(block.text))}
+              onToggleEnabled={(next: boolean) => setStepEnabled(block.id, next)}
             />
           );
         }

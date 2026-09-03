@@ -21,6 +21,7 @@ const STATUS_BORDERS = {
   passed: 'border-l-success',
   failed: 'border-l-destructive',
   error: 'border-l-destructive',
+  skipped: 'border-l-muted-foreground/40',
 };
 
 /**
@@ -141,6 +142,11 @@ export function TestRunFlowPage() {
                   )}
                   {segment.error && (
                     <span className="text-destructive text-xs">{segment.error}</span>
+                  )}
+                  {step?.enabled === false && (
+                    <span className="text-muted-foreground ml-auto text-[10px] uppercase tracking-wide">
+                      disabled
+                    </span>
                   )}
                 </div>
 

@@ -205,6 +205,39 @@ describe('markdownFlows', () => {
     });
   });
 
+  describe('isStepEnabled', () => {
+    it('treats a step that never mentions enabled as enabled', () => {
+      expect(markdownFlows.isStepEnabled({ application: 'a', method: 'b' })).toBe(true);
+    });
+
+    it('only an explicit false takes a step out of the run', () => {
+      expect(markdownFlows.isStepEnabled({ enabled: false })).toBe(false);
+      expect(markdownFlows.isStepEnabled({ enabled: true })).toBe(true);
+      expect(markdownFlows.isStepEnabled({ enabled: null })).toBe(true);
+    });
+
+    it('reads the string a hand-written "false" leaves behind', () => {
+      expect(markdownFlows.isStepEnabled({ enabled: 'false' })).toBe(false);
+      expect(markdownFlows.isStepEnabled({ enabled: ' False ' })).toBe(false);
+      expect(markdownFlows.isStepEnabled({ enabled: 'yes' })).toBe(true);
+    });
+
+    it('survives a missing step', () => {
+      expect(markdownFlows.isStepEnabled(null)).toBe(true);
+    });
+
+    it('comes off a parsed document', () => {
+      const doc = [
+        '```step',
+        'enabled: false',
+        'application: a',
+        'method: b',
+        '```'
+      ].join('\n');
+      expect(markdownFlows.parse(doc).steps.map(markdownFlows.isStepEnabled)).toEqual([false]);
+    });
+  });
+
   describe('toFlow', () => {
     it('builds a runner-compatible flow', () => {
       const flow = markdownFlows.toFlow(SAMPLE);

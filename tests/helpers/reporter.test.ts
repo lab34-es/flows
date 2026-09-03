@@ -35,7 +35,7 @@ describe('reporter.get', () => {
       'stepStart', 'stepUpdate', 'mimicStart', 'request', 'mimicRequest',
       'mimicResponse', 'mimicResponseBody', 'mimicFile', 'response', 'test',
       'playwrightStep', 'execution', 'diagram', 'stepTestError',
-      'inputRequest', 'inputResolved'
+      'inputRequest', 'inputResolved', 'stepSkip'
     ]) {
       expect(typeof reporter[method]).toBe('function');
     }
@@ -72,6 +72,19 @@ describe('reporter.stepStart', () => {
 
   test('an unknown step id is an error', () => {
     expect(() => build().stepStart('nope')).toThrow(/Step with id nope not found/);
+  });
+});
+
+describe('reporter.stepSkip', () => {
+  test('announces the step it walked past, with its own number', () => {
+    build().stepSkip('second');
+    expect(printed()).toContain('STEP 2');
+    expect(printed()).toContain('second');
+    expect(printed()).toContain('skipped');
+  });
+
+  test('an unknown step id is an error', () => {
+    expect(() => build().stepSkip('nope')).toThrow(/Step with id nope not found/);
   });
 });
 

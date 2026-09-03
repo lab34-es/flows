@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import CodeBlock from '@/components/shared/CodeBlock';
 import ExecutionOutput from '@/components/flow/ExecutionOutput';
 import XrayChip from '@/components/flow/XrayChip';
@@ -13,6 +14,7 @@ const STATUS_BORDERS = {
   passed: 'border-l-success',
   failed: 'border-l-destructive',
   error: 'border-l-destructive',
+  skipped: 'border-l-muted-foreground/40',
 };
 
 /**
@@ -22,6 +24,9 @@ const STATUS_BORDERS = {
  * In the Document view the YAML is editable: `sourceEditor` replaces the
  * highlighted block with the textarea holding the step's own source, and
  * `onSourceClick` is what asks for it.
+ *
+ * The switch in the corner of the header is the step's `enabled` key: off
+ * writes `enabled: false` into the YAML, and the run walks past the step.
  */
 export function StepCell({
   segment,
@@ -33,6 +38,8 @@ export function StepCell({
   onAnswerInput = null,
   sourceEditor = null,
   onSourceClick = null,
+  enabled = true,
+  onToggleEnabled = null,
 }: any) {
   const application = step?.application;
   const method = step?.method;
@@ -41,9 +48,11 @@ export function StepCell({
   return (
     <div
       data-role="step-cell"
+      data-enabled={enabled ? 'true' : 'false'}
       className={cn(
         'my-4 overflow-hidden rounded-lg border border-l-4 bg-card shadow-sm',
-        STATUS_BORDERS[executionStatus] || 'border-l-border'
+        STATUS_BORDERS[executionStatus] || 'border-l-border',
+        !enabled && 'border-dashed border-l-muted-foreground/40'
       )}
     >
       {/* Cell header */}
@@ -82,13 +91,32 @@ export function StepCell({
             compact
           />
         )}
+
+        {/* The step's own switch, in the corner of its header */}
+        <div className="ml-auto flex items-center gap-2">
+          {!enabled && (
+            <span className="text-muted-foreground text-[10px] uppercase tracking-wide">disabled</span>
+          )}
+          {onToggleEnabled && (
+            <Switch
+              checked={enabled}
+              onCheckedChange={onToggleEnabled}
+              aria-label={enabled ? 'Disable this step' : 'Enable this step'}
+              title={enabled ? 'Disable this step' : 'Enable this step'}
+            />
+          )}
+        </div>
       </div>
 
-      {/* Step definition (YAML) — highlighted, or its own source while edited */}
+      {/* Step definition (YAML) — highlighted, or its own source while edited.
+          A step that is off is dimmed, the way a disabled control is */}
       {sourceEditor ? (
         <div className="bg-muted/30 px-4 py-3">{sourceEditor}</div>
       ) : (
-        <div onClick={onSourceClick || undefined} className={onSourceClick ? 'cursor-text' : undefined}>
+        <div
+          onClick={onSourceClick || undefined}
+          className={cn(onSourceClick && 'cursor-text', !enabled && 'opacity-50')}
+        >
           <CodeBlock code={segment.content} language="yaml" className="rounded-none border-0" />
         </div>
       )}

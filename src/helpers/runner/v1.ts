@@ -14,6 +14,7 @@ import * as reporterHelper from '../reporter';
 import * as errors from '../errors';
 import * as inputs from '../inputs';
 import * as playwright from '../playwright';
+import { isStepEnabled } from '../markdownFlows';
 
 let steps: Record<string, any>[] = [];
 const applications = apps.applications;
@@ -182,10 +183,17 @@ const processor = async (flow, opts) => {
 
     steps = flow.steps;
 
+    // What the run will actually do. A step turned off with `enabled: false`
+    // stays in the document -- and in `flow.steps`, so the cells keep lining
+    // up with it -- but nothing is prepared on its behalf: no env file is
+    // demanded for an application only it calls, and no mimic of its own is
+    // loaded.
+    const plannedSteps = steps.filter(isStepEnabled);
+
     // Everything this flow needs, checked before a single step runs: a known
     // environment, and an env file in each application the flow uses. The
     // applications it does not use are not looked at.
-    const readiness = await apps.environmentReadiness(steps, environment);
+    const readiness = await apps.environmentReadiness(plannedSteps, environment);
 
     if (!readiness.known) {
       flow.execution.status = 'error';
@@ -234,7 +242,7 @@ const processor = async (flow, opts) => {
       }
     }
 
-    if (!mimicing.validate(steps)) {
+    if (!mimicing.validate(plannedSteps)) {
       flow.execution.status = 'error';
       flow.execution.error = {
         name: 'InvalidMimic',
@@ -245,7 +253,7 @@ const processor = async (flow, opts) => {
       throw flow.execution.error;
     }
 
-    mimicdApplications = await mimicing.load(steps);
+    mimicdApplications = await mimicing.load(plannedSteps);
 
     await tester.getReady(flow);
 
@@ -261,6 +269,19 @@ const processor = async (flow, opts) => {
       console.log('');
 
       const step = flow.steps[i];
+
+      // A step that was switched off is reported as skipped and left alone:
+      // it never runs, and it never fails the flow
+      if (!isStepEnabled(step)) {
+        flow.steps[i].execution = {
+          times: {},
+          attempt: 0,
+          status: 'skipped'
+        };
+        flow.reporter.stepSkip(step.id);
+        flow.reporter.stepUpdate(step.id);
+        continue;
+      }
 
       try {
         // Execute the method and log the result. Pass each property in step.data as a separate argument.

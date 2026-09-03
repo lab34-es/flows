@@ -194,11 +194,17 @@ export { resultsFor };
 
 /**
  * How the steps of an executed flow went, for the run summary.
+ *
+ * A step turned off with `enabled: false` was never going to run, so it is
+ * not part of the total either -- a run of five steps with two switched off
+ * reads 3/3, not 3/5.
+ *
  * @param {Object} flow
  * @returns {{total: number, passed: number, failed: number}}
  */
 const statsFor = (flow) => {
-  const steps = flow && Array.isArray(flow.steps) ? flow.steps : [];
+  const all = flow && Array.isArray(flow.steps) ? flow.steps : [];
+  const steps = all.filter(markdownFlows.isStepEnabled);
   return {
     total: steps.length,
     passed: steps.filter(step => step && step.execution && step.execution.status === 'passed').length,

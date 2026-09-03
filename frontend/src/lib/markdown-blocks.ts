@@ -134,6 +134,62 @@ export const isStepBlock = (block: Block): boolean => blockKind(block.text) === 
 export const stepBody = (text: string): string => fenceParts(text)?.body ?? '';
 
 /**
+ * A top-level `enabled:` key of a step's YAML. Nested keys are indented, so
+ * column 0 is what makes this the step's own switch rather than something
+ * inside its parameters.
+ */
+const ENABLED_LINE = /^enabled[ \t]*:[ \t]*([^\n]*)$/;
+
+/**
+ * Whether a step is meant to run. Kept in sync with `isStepEnabled` in
+ * helpers/markdownFlows: steps are enabled by default, and only an explicit
+ * `enabled: false` takes one out of the run.
+ *
+ * Read straight off the YAML rather than off the parsed step, so the toggle
+ * answers on the keystroke instead of waiting for the next re-parse.
+ *
+ * @param {string} body - The YAML inside a `step` block
+ * @returns {boolean}
+ */
+export const stepEnabled = (body: string): boolean => {
+  const match = normalize(body).split('\n').map((line) => ENABLED_LINE.exec(line)).find(Boolean);
+  if (!match) return true;
+  return match[1].split('#')[0].trim().toLowerCase() !== 'false';
+};
+
+/**
+ * The same YAML with the step switched on or off.
+ *
+ * Switching a step on removes the key rather than writing `enabled: true`:
+ * the default is what a flow says by not mentioning it, and a document that
+ * was never toggled must come back byte for byte as it was.
+ *
+ * @param {string} body - The YAML inside a `step` block
+ * @param {boolean} enabled - What the switch was moved to
+ * @returns {string}
+ */
+export const withStepEnabled = (body: string, enabled: boolean): string => {
+  const lines = normalize(body).split('\n');
+  const at = lines.findIndex((line) => ENABLED_LINE.test(line));
+
+  if (enabled) {
+    if (at < 0) return normalize(body);
+    lines.splice(at, 1);
+    return lines.join('\n');
+  }
+
+  if (at >= 0) {
+    lines[at] = 'enabled: false';
+    return lines.join('\n');
+  }
+
+  // First line, where a reader meets it before the step's own keys
+  return lines.some((line) => line.trim() !== '')
+    ? ['enabled: false', ...lines].join('\n')
+    : 'enabled: false';
+};
+
+/**
  * Number the step blocks in fence order, the way the parser does, so cell
  * `n` lines up with `steps[n]` and with the run's `stepOrder[n]`.
  */

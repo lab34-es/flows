@@ -15,6 +15,7 @@ jest.mock('../../src/helpers/reporter', () => {
   const recorder = {
     server: { emit: jest.fn() },
     stepStart: jest.fn(),
+    stepSkip: jest.fn(),
     stepUpdate: jest.fn(),
     execution: jest.fn(),
     diagram: jest.fn(),
@@ -480,6 +481,83 @@ describe('v1.run - test assertions', () => {
     await runCli(flow);
 
     expect(flow.steps[0].execution.error.message).toContain('delay must be a number');
+  });
+});
+
+describe('v1.run - steps that are switched off', () => {
+  test('a step with enabled: false is skipped, and the rest still runs', async () => {
+    const flow = flowWith(
+      { application: 'calculator', method: 'add', enabled: false },
+      { application: 'calculator', method: 'add', parameters: { body: { a: 1 } } }
+    );
+
+    await runCli(flow);
+
+    expect(calculatorAdd).toHaveBeenCalledTimes(1);
+    expect(flow.steps[0].execution.status).toBe('skipped');
+    expect(flow.steps[1].execution.status).toBe('passed');
+    expect(flow.execution.status).toBe('passed');
+  });
+
+  test('the skipped step keeps its place, so the cells still line up', async () => {
+    const flow = flowWith(
+      { application: 'calculator', method: 'add' },
+      { application: 'calculator', method: 'add', enabled: false, slug: 'parked' },
+      { application: 'calculator', method: 'add' }
+    );
+
+    await runCli(flow);
+
+    expect(flow.steps).toHaveLength(3);
+    expect(flow.steps[1].id).toBe('parked');
+    expect(recorder.stepSkip).toHaveBeenCalledWith('parked');
+    expect(recorder.stepStart).not.toHaveBeenCalledWith('parked');
+  });
+
+  test('a step that is off needs no env file of its own', async () => {
+    const flow = flowWith(
+      { application: 'unconfigured', method: 'add', enabled: false },
+      { application: 'calculator', method: 'add' }
+    );
+
+    await runCli(flow);
+
+    expect((apps.environmentReadiness as jest.Mock).mock.calls[0][0])
+      .toEqual([expect.objectContaining({ application: 'calculator' })]);
+    expect(flow.execution.status).toBe('passed');
+  });
+
+  test('a step that is off loads no mimic of its own', async () => {
+    const flow = flowWith(
+      { application: 'calculator', method: 'add', enabled: false, mimic: [{ application: 'ghost' }] },
+      { application: 'calculator', method: 'add' }
+    );
+
+    await runCli(flow);
+
+    expect((mimicing.load as jest.Mock).mock.calls[0][0]).toHaveLength(1);
+    expect((mimicing.validate as jest.Mock).mock.calls[0][0]).toHaveLength(1);
+  });
+
+  test('a flow whose every step is off passes without calling anything', async () => {
+    const flow = flowWith(
+      { application: 'calculator', method: 'add', enabled: false },
+      { application: 'calculator', method: 'add', enabled: 'false' }
+    );
+
+    await runCli(flow);
+
+    expect(calculatorAdd).not.toHaveBeenCalled();
+    expect(flow.execution.status).toBe('passed');
+  });
+
+  test('enabled: true runs the step, like saying nothing at all', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add', enabled: true });
+
+    await runCli(flow);
+
+    expect(calculatorAdd).toHaveBeenCalledTimes(1);
+    expect(flow.steps[0].execution.status).toBe('passed');
   });
 });
 
