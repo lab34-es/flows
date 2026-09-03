@@ -385,6 +385,37 @@ describe('applications.environmentReadiness', () => {
     expect(apps.readinessError(readiness)).toBeNull();
   });
 
+  test('a flow whose only step for an application is switched off can run without its file', async () => {
+    write('shop/env/uat.env', 'A=1\n');
+    // "xyz" has no uat file at all, and the only step calling it is off
+    write('xyz/env/local.env', 'B=1\n');
+
+    const readiness = await apps.environmentReadiness(
+      [{ application: 'shop' }, { application: 'xyz', enabled: false }],
+      'uat'
+    );
+
+    expect(readiness).toMatchObject({ applications: ['shop'], missing: [], ready: true });
+    expect(apps.readinessError(readiness)).toBeNull();
+  });
+
+  test('one step still on is enough to ask an application for its file', async () => {
+    write('shop/env/uat.env', 'A=1\n');
+    write('xyz/env/local.env', 'B=1\n');
+
+    const readiness = await apps.environmentReadiness(
+      [
+        { application: 'xyz', enabled: false },
+        { application: 'xyz' },
+        { application: 'shop' }
+      ],
+      'uat'
+    );
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.missing.map(item => item.application)).toEqual(['xyz']);
+  });
+
   test('the application the flow uses is the one that has to have the file', async () => {
     write('shop/env/uat.env', 'A=1\n');
     write('payments/env/local.env', 'B=1\n');
