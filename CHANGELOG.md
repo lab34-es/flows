@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/lab34-es/flows/compare/v1.9.0...v1.10.0) (2026-09-03)
+
+
+### Features
+
+* ability to enable/disable specific steps of a flow ([#53](https://github.com/lab34-es/flows/issues/53)) ([3f9ad67](https://github.com/lab34-es/flows/commit/3f9ad67f13d46e32cf100c81b680cfebbd3aac96))
+
 ## [1.9.0](https://github.com/lab34-es/flows/compare/v1.8.0...v1.9.0) (2026-09-03)
 
 
