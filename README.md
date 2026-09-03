@@ -179,7 +179,11 @@ other, questions from steps included.
 The agent's key is trusted the first time it is seen and refused if it ever
 changes, the way ssh treats a host key. The broker itself needs TLS, one user
 per machine and an ACL that confines each agent to `flows/agents/<name>/#`;
-any MQTT 5 broker does (EMQX, Mosquitto, HiveMQ).
+any MQTT 5 broker does (EMQX, Mosquitto, HiveMQ). AWS IoT Core works as well:
+pass `--provider aws-iot` with the `--cert` and `--key` PEM files of the
+machine's certificate, and the tool speaks on 443 behind ALPN and splits
+messages under AWS's 128 KB limit. The help article *Remote agents* has the
+IoT policies to attach.
 
 ## Documentation
 

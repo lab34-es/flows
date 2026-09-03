@@ -123,6 +123,12 @@ Options:
                   Stored in config/remote.json the first time, with --username;
                   --password goes to the context's .env. FLOWS_BROKER_URL,
                   FLOWS_BROKER_USERNAME and FLOWS_BROKER_PASSWORD work too
+  --provider      Kind of broker: "generic" (any MQTT 5 broker, the default)
+                  or "aws-iot" (AWS IoT Core: certificate auth, ALPN on 443,
+                  messages split under its 128 KB limit)
+  --cert, --key   PEM files of the client certificate and its key, for a
+                  broker that authenticates with one. --ca names the CA to
+                  trust when it is not in the system store
   --debug         Print debug information including environment variables
   --version, -v   Print the installed version and exit
   --help          Show this help message
@@ -142,6 +148,7 @@ Examples:
   lab34-flows --context ~/flows-agent --agent --agent-id agent-ourense --broker mqtts://mqtt.example:443 --username agent-ourense --password s3cret
   lab34-flows --remote agent-ourense --file flows/my-flow.md --env production
   lab34-flows --remote agent-ourense --view smoke --env uat
+  lab34-flows --agent --agent-id agent-ourense --provider aws-iot --broker mqtts://xxxx-ats.iot.eu-west-1.amazonaws.com:443 --cert agent.pem.crt --key agent.pem.key
   `);
   process.exit(0);
 }
@@ -211,6 +218,10 @@ function parseArguments() {
     broker: typeof argv.broker === 'string' ? argv.broker : null,
     username: typeof argv.username === 'string' ? argv.username : null,
     password: typeof argv.password === 'string' ? argv.password : null,
+    provider: typeof argv.provider === 'string' ? argv.provider : null,
+    cert: typeof argv.cert === 'string' ? argv.cert : null,
+    key: typeof argv.key === 'string' ? argv.key : null,
+    ca: typeof argv.ca === 'string' ? argv.ca : null,
     env: argv.env || null,
     context: argv.context || null,
     debug: argv.debug || false,
@@ -389,6 +400,17 @@ async function startServer() {
   await api.start();
 }
 
+/** The broker flags, as brokerSettings takes them. Null means "not typed". */
+const brokerFlags = (args) => ({
+  url: args.broker || undefined,
+  username: args.username || undefined,
+  password: args.password || undefined,
+  provider: args.provider || undefined,
+  cert: args.cert || undefined,
+  key: args.key || undefined,
+  ca: args.ca || undefined
+});
+
 /**
  * Run as an agent: sit on the broker and run the flows other machines send.
  *
@@ -409,9 +431,7 @@ async function startAgent(args) {
   let settings;
   try {
     identity = await remoteConfig.agentIdentity(args.agentId);
-    settings = await remoteConfig.brokerSettings({
-      url: args.broker, username: args.username, password: args.password
-    });
+    settings = await remoteConfig.brokerSettings(brokerFlags(args));
   }
   catch (error) {
     exitWithError(error.message);
@@ -422,20 +442,18 @@ async function startAgent(args) {
   await applications.loadAll();
 
   console.log(`Agent:       ${identity.id}`);
-  console.log(`Broker:      ${settings.url}${settings.username ? ` as ${settings.username}` : ''}`);
+  console.log(`Broker:      ${settings.url}${settings.username ? ` as ${settings.username}` : ''}` +
+    `${settings.provider === 'aws-iot' ? ' (AWS IoT Core)' : ''}${settings.tls && settings.tls.cert ? ' with certificate' : ''}`);
   console.log(`Context:     ${await paths.contextRoot()}`);
   console.log(`Public key:  ${identity.publicKey}`);
   console.log(`Fingerprint: ${identity.fingerprint}`);
 
   let connection;
   try {
-    connection = await brokerHelper.connect({
-      url: settings.url,
-      username: settings.username,
-      password: settings.password,
+    connection = await brokerHelper.connect(remoteConfig.connectOptions(settings, {
       clientId: `flows-agent-${identity.id}`,
       will: agent.will(identity.id)
-    });
+    }));
   }
   catch (error) {
     exitWithError(error.message);
@@ -467,9 +485,9 @@ async function runRemote(args) {
 
   cli.logo(packageJson.version);
 
-  if (args.broker || args.username || args.password) {
+  if (args.broker || args.username || args.password || args.provider || args.cert || args.key || args.ca) {
     try {
-      await remoteConfig.brokerSettings({ url: args.broker, username: args.username, password: args.password });
+      await remoteConfig.brokerSettings(brokerFlags(args));
     }
     catch (error) {
       exitWithError(error.message);
