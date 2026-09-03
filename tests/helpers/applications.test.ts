@@ -323,6 +323,13 @@ describe('applications.applicationsOf', () => {
     expect(apps.applicationsOf([{ application: 'tester' }, { application: '' }, null])).toEqual([]);
     expect(apps.applicationsOf(undefined)).toEqual([]);
   });
+
+  test('a step that is switched off asks for nothing', () => {
+    expect(apps.applicationsOf([
+      { application: 'shop' },
+      { application: 'payments', enabled: false }
+    ])).toEqual(['shop']);
+  });
 });
 
 describe('applications.missingEnvFilesFor', () => {

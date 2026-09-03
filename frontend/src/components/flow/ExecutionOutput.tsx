@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, CircleDashed, Keyboard, Loader2, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, CircleDashed, Keyboard, Loader2, MinusCircle, XCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -12,6 +12,7 @@ const STATUS_META = {
   passed: { label: 'Passed', variant: 'success', Icon: CheckCircle2 },
   failed: { label: 'Failed', variant: 'destructive', Icon: XCircle },
   error: { label: 'Error', variant: 'destructive', Icon: AlertCircle },
+  skipped: { label: 'Skipped', variant: 'secondary', Icon: MinusCircle },
 };
 
 const formatDuration = (times) => {
@@ -180,8 +181,13 @@ export function ExecutionOutput({ stepData, inputRequest = null, onAnswerInput =
     label: execution.status || 'Pending', variant: 'secondary', Icon: CircleDashed,
   };
   const duration = formatDuration(execution.times);
-  const response = stepData.response;
-  const request = stepData.request || stepData.parameters;
+
+  // A step the run walked past has nothing to show but the fact: its
+  // `parameters` are what the document says it would have sent, not a request
+  // anybody made
+  const skipped = execution.status === 'skipped';
+  const response = skipped ? null : stepData.response;
+  const request = skipped ? null : (stepData.request || stepData.parameters);
   const responseStatus = response?.status;
 
   return (

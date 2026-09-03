@@ -424,9 +424,11 @@ export function FlowPage() {
 
   // The applications the document calls, as a stable key: the readiness check
   // only has to be asked again when they -- or the environment -- change, not
-  // on every keystroke
+  // on every keystroke. A step switched off is not going to call anything, so
+  // its application is not one this flow needs an env file for
   const usedApplications = useMemo(
     () => [...new Set<string>((flowData?.steps || [])
+      .filter((step) => step.enabled !== false)
       .map((step) => step.application)
       .filter(Boolean))].sort().join(','),
     [flowData?.steps]

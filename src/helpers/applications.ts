@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import * as paths from './paths';
 import * as appDocs from './appDocs';
 import * as appLoader from './appLoader';
+import { isStepEnabled } from './markdownFlows';
 
 const applications: Record<string, any> = {};
 
@@ -162,13 +163,15 @@ const PLAIN_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 /**
  * The applications a flow needs environment files for: the ones its steps
  * call. `tester` is the runner's own pseudo-application — it has no folder,
- * and no env file to find.
+ * and no env file to find, and a step turned off with `enabled: false` is not
+ * going to call anything either.
  * @param {Array<Object>} steps - The flow's steps
  * @returns {string[]} Unique application names, in the order the flow uses them
  */
 const applicationsOf = (steps): string[] => {
   return [...new Set<string>(
     (steps || [])
+      .filter(isStepEnabled)
       .map(step => step && step.application)
       .filter(application => application && application !== 'tester')
   )];

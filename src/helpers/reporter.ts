@@ -100,6 +100,37 @@ const stepStart = function (stepId) {
   }
 };
 
+/**
+ * Logs a step the run walked past: one turned off with `enabled: false`.
+ * It is announced like any other step so the numbering on the terminal keeps
+ * matching the document, only greyed out and marked as skipped.
+ *
+ * @param {string} stepId - The id of the step that will not run
+ */
+const stepSkip = function (stepId) {
+  const index = _flow.steps.findIndex(step => step.id === stepId);
+
+  if (index === -1) {
+    throw new Error(`Step with id ${stepId} not found`);
+  }
+
+  const reportedStep = _flow.steps[index];
+
+  const stepTxt = ` STEP ${index + 1} `;
+  const stepText = ` ${reportedStep.id} `;
+
+  console.log(
+    [
+      ' ',
+      stepTxt.bgGray.black,
+      ' ',
+      stepText.bgGray.black,
+      ' ',
+      'skipped'.gray
+    ].join('')
+  );
+};
+
 const stepUpdate = function (this: Reporter, stepId) {
   const index = _flow.steps.findIndex(step => step.id === stepId);
 
@@ -513,6 +544,7 @@ const get = function ({ flow, cli, server }): Reporter {
     cli: Boolean(cli),
 
     stepStart,
+    stepSkip,
     stepUpdate,
     mimicStart,
     request,

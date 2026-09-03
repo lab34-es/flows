@@ -157,6 +157,29 @@ describe('testRuns recording', () => {
     expect(results[0].response.body).toEqual({ sum: 3 });
   });
 
+  test('a step that was switched off counts towards neither the total nor the result', async () => {
+    const run = await testRuns.create({
+      trigger: 'flow', environment: 'local', flows: [{ file: 'payments/pay.md', title: 'Pay with card' }]
+    });
+
+    const flow = executedFlow();
+    flow.steps.push({
+      id: 'calculator-subtract',
+      stepIndex: 1,
+      application: 'calculator',
+      method: 'subtract',
+      enabled: false,
+      execution: { status: 'skipped', times: {}, attempt: 0 }
+    } as any);
+
+    testRuns.flowStarted(run, 'payments/pay.md');
+    testRuns.flowFinished(run, 'payments/pay.md', { content: MARKDOWN, flow });
+    await testRuns.finalize(run);
+
+    const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
+    expect(summary.flows[0]).toMatchObject({ status: 'passed', steps: { total: 1, passed: 1, failed: 0 } });
+  });
+
   test('what the reporter masks on screen is masked on disk too', async () => {
     const run = await testRuns.create({ trigger: 'flow', environment: 'local', flows: [{ file: 'a.md' }] });
 
