@@ -1,24 +1,24 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import ThemedShot from '../components/ThemedShot.astro';
-import { withBase } from '../lib/help.js';
-import flowDark from '../assets/screenshots/flow-dark.png';
-import flowLight from '../assets/screenshots/flow-light.png';
-import folderDark from '../assets/screenshots/folder-dark.png';
-import folderLight from '../assets/screenshots/folder-light.png';
-import aiCreateDark from '../assets/screenshots/ai-create-dark.png';
-import aiCreateLight from '../assets/screenshots/ai-create-light.png';
-import aiEditDark from '../assets/screenshots/ai-edit-dark.png';
-import aiEditLight from '../assets/screenshots/ai-edit-light.png';
+import BaseLayout from "../layouts/BaseLayout.astro";
+import ThemedShot from "../components/ThemedShot.astro";
+import { withBase } from "../lib/help.js";
+import flowDark from "../assets/screenshots/flow-dark.png";
+import flowLight from "../assets/screenshots/flow-light.png";
+import folderDark from "../assets/screenshots/folder-dark.png";
+import folderLight from "../assets/screenshots/folder-light.png";
+import aiCreateDark from "../assets/screenshots/ai-create-dark.png";
+import aiCreateLight from "../assets/screenshots/ai-create-light.png";
+import aiEditDark from "../assets/screenshots/ai-edit-dark.png";
+import aiEditLight from "../assets/screenshots/ai-edit-light.png";
 
-const repoUrl = 'https://github.com/lab34-es/flows';
+const repoUrl = "https://github.com/lab34-es/flows";
 
 // Templates as they are written inside a flow — literal, never interpolated.
-const tInt = '{{ randomInt0_9999 }}';
-const tName = '{{ randomName }}';
-const tPostal = '{{ randomPostalCode }}';
-const tShip = '{{ shipmentId }}';
-const tCourier = '{{ randomPostmanId }}';
+const tInt = "{{ randomInt0_9999 }}";
+const tName = "{{ randomName }}";
+const tPostal = "{{ randomPostalCode }}";
+const tShip = "{{ shipmentId }}";
+const tCourier = "{{ randomPostmanId }}";
 
 // Pre-recorded evidence for the demo document. Plain text, no markup.
 const out1 = `{ "shipmentId": "SHP-70491", "orderRef": "ORD-3817",
@@ -29,357 +29,468 @@ const out4 = `rows: [ { "status": "reattempt_scheduled", "attempts": 2,
           "next_attempt_at": "2026-08-19T08:00:00Z" } ]`;
 
 const capabilities = [
-  {
-    title: 'HTTP APIs',
-    body: 'Call any method of your applications. Assert on status, headers and body.',
-  },
-  {
-    title: 'PostgreSQL',
-    body: 'Ask the database directly when the API is not the only source of truth.',
-  },
-  {
-    title: 'MQTT',
-    body: 'Subscribe before the flow starts and assert on what arrives, whenever it arrives.',
-  },
-  {
-    title: 'Mimic',
-    body: 'Fake a dependency per step, failure scenarios included.',
-  },
-  {
-    title: 'Random data',
-    body: 'Fresh names, ids and dates on every attempt, from built-in replacers.',
-  },
-  {
-    title: 'Memory & $expr',
-    body: 'Steps share what they learn. Assertions go beyond equality.',
-  },
-  {
-    title: 'Retry & delay',
-    body: 'Async systems get a second look, not a flake.',
-  },
-  {
-    title: 'Environments',
-    body: 'Credentials live in env files per application, out of the repository.',
-  },
-  {
-    title: 'Written with AI',
-    body: 'Describe the scenario and get a flow built from your own applications. Local Ollama, Gemini or Claude.',
-  },
+    {
+        title: "HTTP APIs",
+        body: "Call any method of your applications. Assert on status, headers and body.",
+    },
+    {
+        title: "PostgreSQL",
+        body: "Ask the database directly when the API is not the only source of truth.",
+    },
+    {
+        title: "MQTT",
+        body: "Subscribe before the flow starts and assert on what arrives, whenever it arrives.",
+    },
+    {
+        title: "Mimic",
+        body: "Fake a dependency per step, failure scenarios included.",
+    },
+    {
+        title: "Random data",
+        body: "Fresh names, ids and dates on every attempt, from built-in replacers.",
+    },
+    {
+        title: "Memory & $expr",
+        body: "Steps share what they learn. Assertions go beyond equality.",
+    },
+    {
+        title: "Retry & delay",
+        body: "Async systems get a second look, not a flake.",
+    },
+    {
+        title: "Environments",
+        body: "Credentials live in env files per application, out of the repository.",
+    },
+    {
+        title: "Written with AI",
+        body: "Describe the scenario and get a flow built from your own applications. Local Ollama, Gemini or Claude.",
+    },
 ];
 
 const ownership = [
-  {
-    title: 'MIT licensed',
-    body: 'Read the source, fork it, keep it forever. No vendor, no per-seat licence.',
-  },
-  {
-    title: 'Local first',
-    body: 'Flows are files in a folder on your machine. Version them in your own git, review them in your own PRs.',
-  },
-  {
-    title: 'Your credentials stay put',
-    body: 'Database passwords, Jira tokens and model keys live in your context folder. They are never sent to the browser.',
-  },
-  {
-    title: 'Works offline',
-    body: 'Seeded examples run with no network at all. A local model keeps even flow writing on your machine.',
-  },
+    {
+        title: "MIT licensed",
+        body: "Read the source, fork it, keep it forever. No vendor, no per-seat licence.",
+    },
+    {
+        title: "Local first",
+        body: "Flows are files in a folder on your machine. Version them in your own git, review them in your own PRs.",
+    },
+    {
+        title: "Your credentials stay put",
+        body: "Database passwords, Jira tokens and model keys live in your context folder. They are never sent to the browser.",
+    },
+    {
+        title: "Works offline",
+        body: "Seeded examples run with no network at all. A local model keeps even flow writing on your machine.",
+    },
 ];
 
-const siteUrl = new URL(withBase('/'), Astro.site).href;
+const siteUrl = new URL(withBase("/"), Astro.site).href;
 const jsonLd = [
-  {
-    '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    name: 'lab34/flows',
-    url: siteUrl,
-  },
-  {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: 'lab34/flows',
-    description:
-      'End-to-end test automation where every test is a Markdown document your team reads, reviews and runs — across HTTP APIs, PostgreSQL databases and MQTT brokers.',
-    url: siteUrl,
-    applicationCategory: 'DeveloperApplication',
-    operatingSystem: 'Windows, macOS, Linux',
-    softwareRequirements: 'Node.js',
-    license: 'https://opensource.org/licenses/MIT',
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
-    downloadUrl: 'https://www.npmjs.com/package/@lab34/flows',
-    codeRepository: repoUrl,
-    author: { '@type': 'Person', name: 'Jose Constela' },
-  },
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "lab34/flows",
+        url: siteUrl,
+    },
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: "lab34/flows",
+        description:
+            "End-to-end test automation where every test is a Markdown document your team reads, reviews and runs — across HTTP APIs, PostgreSQL databases and MQTT brokers.",
+        url: siteUrl,
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Windows, macOS, Linux",
+        softwareRequirements: "Node.js",
+        license: "https://opensource.org/licenses/MIT",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+        downloadUrl: "https://www.npmjs.com/package/@lab34/flows",
+        codeRepository: repoUrl,
+        author: { "@type": "Person", name: "Jose Constela" },
+    },
 ];
 ---
 
 <BaseLayout
-  title="lab34/flows — end-to-end tests your whole team can read"
-  description="lab34/flows turns every end-to-end test into a Markdown document. Your team reads it, reviews it and runs it — across APIs, databases and message brokers."
-  jsonLd={jsonLd}
+    title="lab34/flows — end-to-end tests your whole team can read"
+    description="lab34/flows turns every end-to-end test into a Markdown document. Your team reads it, reviews it and runs it — across APIs, databases and message brokers."
+    jsonLd={jsonLd}
 >
-  <!-- 1 · hero -->
-  <section class="fl-wrap" style="padding-top:104px;padding-bottom:96px">
-    <p class="fl-kicker" style="margin-bottom:28px">End-to-end test automation · MIT</p>
-    <h1 class="fl-h1">Test knowledge shouldn't live in one engineer's code</h1>
-    <p class="fl-lede">
-      lab34/flows turns every end-to-end test into a Markdown document. Your team
-      reads it, reviews it and runs it — across APIs, databases and message
-      brokers.
-    </p>
-    <div class="fl-cta-row">
-      <div class="fl-install">
-        <code><span class="fl-dim">$</span> npm install -g @lab34/flows</code>
-        <button id="copy-cmd" type="button" class="fl-copy" aria-label="Copy install command"
-          >copy</button
-        >
-      </div>
-      <a href={withBase('/docs/')} class="fl-cta">Read the docs →</a>
-    </div>
-    <p class="fl-mono-note" style="margin-top:32px;max-width:70ch">
-      <span class="fl-for-manager">For your manager:</span> every test case is a
-      document anyone can audit, and the pipeline executes it.
-    </p>
-  </section>
-
-  <!-- 2 · the problem -->
-  <section class="fl-wrap">
-    <div class="fl-section">
-      <p class="fl-kicker">The problem</p>
-      <h2 class="fl-h2" style="margin-bottom:48px;max-width:24ch">
-        Where test knowledge goes to die
-      </h2>
-      <div class="fl-cols">
-        <div class="fl-col">
-          <h3 class="fl-h3">Locked in code</h3>
-          <p class="fl-p-sm">
-            Your best engineer wrote the suite. Only they can read it. When they
-            move on, your coverage becomes a black box.
-          </p>
-          <p class="fl-mono-note">
-            <span class="fl-for-manager">For your manager:</span> our tests stop
-            depending on one person.
-          </p>
-        </div>
-        <div class="fl-col">
-          <h3 class="fl-h3">Parked in Jira</h3>
-          <p class="fl-p-sm">
-            Your QA team wrote the test cases. They are precise, reviewed and
-            current. None of them has ever executed.
-          </p>
-          <p class="fl-mono-note">
-            <span class="fl-for-manager">For your manager:</span> the cases we
-            already wrote start running in CI.
-          </p>
-        </div>
-        <div class="fl-col">
-          <h3 class="fl-h3">Split across systems</h3>
-          <p class="fl-p-sm">
-            The real flow crosses an API, a database and a message broker. Each
-            tool tests one piece alone. The bug lives in between.
-          </p>
-          <p class="fl-mono-note">
-            <span class="fl-for-manager">For your manager:</span> one test follows
-            the whole flow, end to end.
-          </p>
-        </div>
-      </div>
-      <p class="fl-claim">
-        One artifact does both jobs. A document people read. A test the pipeline
-        runs.
-      </p>
-    </div>
-  </section>
-
-  <!-- 3 · the flow document -->
-  <section class="fl-wrap-wide">
-    <div class="fl-section">
-      <p class="fl-kicker">An example flow</p>
-      <h2 class="fl-h2" style="max-width:26ch">One document. Three systems. One answer.</h2>
-      <p class="fl-p" style="margin-bottom:12px">
-        This is how a flow looks inside the tool. The example tests a logistics
-        scenario — a delivery fails and the parcel is rescheduled — and checks
-        that the tracking API, the warehouse database and the picking screens
-        still agree. Press Run on any step: the executions are pre-recorded,
-        nothing leaves this page.
-      </p>
-      <p class="fl-mono-note" style="margin:0 0 40px">
-        Notes in the margin name the capability each part demonstrates.
-      </p>
-
-      <!-- document chrome -->
-      <div class="fl-doc" id="flow">
-        <div class="fl-doc-head">
-          <span class="fl-doc-path">flows/logistics/failed-delivery-retry.md</span>
-          <span class="fl-badge">MARKDOWN</span>
-          <span class="fl-badge" data-flow="standby">STANDBY</span>
-          <span class="fl-badge fl-badge-running" data-flow="running" hidden>RUNNING</span>
-          <span class="fl-badge fl-badge-passed" data-flow="passed" hidden>PASSED</span>
-          <span class="fl-spacer"></span>
-          <button type="button" class="fl-btn-reset" data-flow="touched" hidden>reset</button>
-          <button type="button" class="fl-btn-run" data-run="all">▷ Run flow</button>
-        </div>
-
-        <div class="fl-doc-body">
-          <!-- segment: title + frontmatter -->
-          <div class="fl-seg">
-            <div class="fl-seg-main">
-              <h3 class="fl-doc-title">
-                A failed delivery is rescheduled
-              </h3>
-              <p class="fl-p-sm fl-quiet" style="margin-bottom:28px;max-width:66ch">
-                When the courier reports the recipient absent, the parcel is
-                queued for a second attempt and the warehouse is told.
-              </p>
-              <div class="fl-beacon-slot">
-                <button
-                  type="button"
-                  class="fl-beacon"
-                  data-beacon="1"
-                  aria-expanded="false"
-                  aria-label="What is this part? The frontmatter">i</button
+    <!-- 1 · hero -->
+    <section class="fl-wrap" style="padding-top:104px;padding-bottom:96px">
+        <p class="fl-kicker" style="margin-bottom:28px">
+            End-to-end test automation · MIT
+        </p>
+        <h1 class="fl-h1">
+            Test knowledge shouldn't live in one engineer's code
+        </h1>
+        <p class="fl-lede">
+            lab34/flows turns every end-to-end test into a Markdown document.
+            Your team reads it, reviews it and runs it — across APIs, databases
+            and message brokers.
+        </p>
+        <div class="fl-cta-row">
+            <div class="fl-install">
+                <code
+                    ><span class="fl-dim">$</span> npm install -g @lab34/flows</code
                 >
-                <div class="fl-pop" role="note" data-pop="1" hidden>
-                  <p class="fl-pop-label">the frontmatter</p>
-                  <p class="fl-pop-text">
-                    YAML at the top of the file, rendered as editable properties.
-                    Anything you write here — owner, priority, due — becomes a
-                    column in folder views.
-                  </p>
-                </div>
-              </div>
-              <div class="fl-props">
-                <div class="fl-prop"><span class="fl-prop-key">owner</span><span>ana</span></div>
-                <div class="fl-prop"><span class="fl-prop-key">priority</span><span>8</span></div>
-                <div class="fl-prop">
-                  <span class="fl-prop-key">tags</span>
-                  <span class="fl-tags">
-                    <span class="fl-tag">logistics</span>
-                    <span class="fl-tag">last-mile</span>
-                    <span class="fl-tag">smoke</span>
-                  </span>
-                </div>
-                <div class="fl-prop">
-                  <span class="fl-prop-key">reviewed</span><span class="fl-pass">✓ true</span>
-                </div>
-                <div class="fl-prop">
-                  <span class="fl-prop-key">due</span><span>2026-09-30</span>
-                </div>
-                <div class="fl-prop">
-                  <span class="fl-prop-key">xray.testKey</span><span class="fl-brass-text"
-                    >WMS-482</span
-                  >
-                </div>
-                <div class="fl-prop">
-                  <span class="fl-prop-key">latent apps</span><span
-                    >mqtt · client warehouse · wms/shipments/+</span
-                  >
-                </div>
-              </div>
+                <button
+                    id="copy-cmd"
+                    type="button"
+                    class="fl-copy"
+                    aria-label="Copy install command">copy</button
+                >
             </div>
-            <aside class="fl-seg-aside" aria-label="Capability notes">
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: properties</p>
-                <p class="fl-ann-text">Any property you invent becomes a column</p>
-                <a href={withBase('/docs/properties/')}>/docs/properties/</a>
-              </div>
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: Xray link</p>
-                <p class="fl-ann-text">Linked to the Test issue in Jira</p>
-                <a href={withBase('/docs/xray/')}>/docs/xray/</a>
-              </div>
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: latent applications</p>
-                <p class="fl-ann-text">Subscribed before the flow starts</p>
-                <a href={withBase('/docs/latent-applications/')}>/docs/latent-applications/</a>
-              </div>
-            </aside>
-          </div>
+            <a href={withBase("/docs/")} class="fl-cta">Read the docs →</a>
+        </div>
+        <p class="fl-mono-note" style="margin-top:32px;max-width:70ch">
+            <span class="fl-for-manager">For your manager:</span> every test case
+            is a document anyone can audit, and the pipeline executes it.
+        </p>
+    </section>
 
-          <!-- segment: intro prose -->
-          <div class="fl-seg fl-seg-prose">
-            <div class="fl-seg-main" style="max-width:70ch">
-              <div class="fl-beacon-slot">
-                <button
-                  type="button"
-                  class="fl-beacon fl-beacon-2"
-                  data-beacon="2"
-                  aria-expanded="false"
-                  aria-label="What is this part? The prose">i</button
-                >
-                <div class="fl-pop" role="note" data-pop="2" hidden>
-                  <p class="fl-pop-label">the prose</p>
-                  <p class="fl-pop-text">
-                    Plain Markdown between the steps. This is the documentation
-                    half of the document — the part your whole team reads.
-                  </p>
+    <!-- 2 · the problem -->
+    <section class="fl-wrap">
+        <div class="fl-section">
+            <p class="fl-kicker">The problem</p>
+            <h2 class="fl-h2" style="margin-bottom:48px;max-width:24ch">
+                Where test knowledge goes to die
+            </h2>
+            <div class="fl-cols">
+                <div class="fl-col">
+                    <h3 class="fl-h3">Locked in code</h3>
+                    <p class="fl-p-sm">
+                        Your best engineer wrote the suite. Only they can read
+                        it. When they move on, your coverage becomes a black
+                        box.
+                    </p>
+                    <p class="fl-mono-note">
+                        <span class="fl-for-manager">For your manager:</span> our
+                        tests stop depending on one person.
+                    </p>
                 </div>
-              </div>
-              <p class="fl-p-doc">
-                A parcel leaves the warehouse and the courier cannot hand it over:
-                nobody is home. Three systems have to agree on what happens next.
-                The tracking API must accept the failed attempt, the warehouse
-                database must schedule a second one, and the pickers must hear
-                about it over MQTT — because the parcel is going back on a van
-                tomorrow morning and somebody has to pull it off the returns lane
-                before then.
-              </p>
-              <p class="fl-p-doc" style="margin-bottom:0">
-                This is the flow that proves all three still agree. It runs against
-                the real warehouse, with the courier faked: no carrier will fail a
-                delivery on request, and waiting for a real one to go wrong is not
-                a test strategy.
-              </p>
+                <div class="fl-col">
+                    <h3 class="fl-h3">Parked in Jira</h3>
+                    <p class="fl-p-sm">
+                        Your QA team wrote the test cases. They are precise,
+                        reviewed and current. None of them has ever executed.
+                    </p>
+                    <p class="fl-mono-note">
+                        <span class="fl-for-manager">For your manager:</span> the
+                        cases we already wrote start running in CI.
+                    </p>
+                </div>
+                <div class="fl-col">
+                    <h3 class="fl-h3">Split across systems</h3>
+                    <p class="fl-p-sm">
+                        The real flow crosses an API, a database and a message
+                        broker. Each tool tests one piece alone. The bug lives
+                        in between.
+                    </p>
+                    <p class="fl-mono-note">
+                        <span class="fl-for-manager">For your manager:</span> one
+                        test follows the whole flow, end to end.
+                    </p>
+                </div>
             </div>
-            <aside class="fl-seg-aside">
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: flow anatomy</p>
-                <p class="fl-ann-text">This is documentation. It is also the test</p>
-                <a href={withBase('/docs/flow-anatomy/')}>/docs/flow-anatomy/</a>
-              </div>
-            </aside>
-          </div>
+            <p class="fl-claim">
+                One artifact does both jobs. A document people read. A test the
+                pipeline runs.
+            </p>
+        </div>
+    </section>
 
-          <!-- segment: step 1 -->
-          <div class="fl-seg">
-            <div class="fl-seg-main" data-step="1" data-state="standby">
-              <h4 class="fl-h4">The parcel ships</h4>
-              <p class="fl-p-sm" style="margin-bottom:18px;max-width:66ch">
-                A new shipment for a random order. The courier's label service is
-                mimicked, so this step is the same in a laptop with no VPN as it is
-                in staging.
-              </p>
-              <div class="fl-beacon-slot">
-                <button
-                  type="button"
-                  class="fl-beacon fl-beacon-3"
-                  data-beacon="3"
-                  aria-expanded="false"
-                  aria-label="What is this part? A step block">i</button
-                >
-                <div class="fl-pop" role="note" data-pop="3" hidden>
-                  <p class="fl-pop-label">a step block</p>
-                  <p class="fl-pop-text">
-                    A fenced ```step code block — the executable half. Press Run and
-                    the evidence appears right below it.
-                  </p>
+    <!-- 3 · the flow document -->
+    <section class="fl-wrap-wide">
+        <div class="fl-section">
+            <p class="fl-kicker">An example flow</p>
+            <h2 class="fl-h2" style="max-width:26ch">
+                One document. Three systems. One answer.
+            </h2>
+            <p class="fl-p" style="margin-bottom:12px">
+                This is how a flow looks inside the tool. The example tests a
+                logistics scenario — a delivery fails and the parcel is
+                rescheduled — and checks that the tracking API, the warehouse
+                database and the picking screens still agree. Press Run on any
+                step: the executions are pre-recorded, nothing leaves this page.
+            </p>
+            <p class="fl-mono-note" style="margin:0 0 40px">
+                Notes in the margin name the capability each part demonstrates.
+            </p>
+
+            <!-- document chrome -->
+            <div class="fl-doc" id="flow">
+                <div class="fl-doc-head">
+                    <span class="fl-doc-path"
+                        >flows/logistics/failed-delivery-retry.md</span
+                    >
+                    <span class="fl-badge">MARKDOWN</span>
+                    <span class="fl-badge" data-flow="standby">STANDBY</span>
+                    <span
+                        class="fl-badge fl-badge-running"
+                        data-flow="running"
+                        hidden>RUNNING</span
+                    >
+                    <span
+                        class="fl-badge fl-badge-passed"
+                        data-flow="passed"
+                        hidden>PASSED</span
+                    >
+                    <span class="fl-spacer"></span>
+                    <button
+                        type="button"
+                        class="fl-btn-reset"
+                        data-flow="touched"
+                        hidden>reset</button
+                    >
+                    <button type="button" class="fl-btn-run" data-run="all"
+                        >▷ Run flow</button
+                    >
                 </div>
-              </div>
-              <div class="fl-step">
-                <div class="fl-step-head">
-                  <span class="fl-step-n">step 1</span>
-                  <span class="fl-step-call">wms · createShipment</span>
-                  <span class="fl-spacer"></span>
-                  <span class="fl-step-state" data-when="standby">standby</span>
-                  <span class="fl-step-state fl-step-state-running" data-when="running" hidden
-                    >running</span
-                  >
-                  <span class="fl-step-state fl-step-state-passed" data-when="passed" hidden
-                    >passed</span
-                  >
-                  <button type="button" class="fl-btn-run-sm" data-run="1">▷ Run</button>
-                </div>
-                <pre class="fl-code"><span class="fl-k">application:</span> wms
+
+                <div class="fl-doc-body">
+                    <!-- segment: title + frontmatter -->
+                    <div class="fl-seg">
+                        <div class="fl-seg-main">
+                            <h3 class="fl-doc-title">
+                                A failed delivery is rescheduled
+                            </h3>
+                            <p
+                                class="fl-p-sm fl-quiet"
+                                style="margin-bottom:28px;max-width:66ch"
+                            >
+                                When the courier reports the recipient absent,
+                                the parcel is queued for a second attempt and
+                                the warehouse is told.
+                            </p>
+                            <div class="fl-beacon-slot">
+                                <button
+                                    type="button"
+                                    class="fl-beacon"
+                                    data-beacon="1"
+                                    aria-expanded="false"
+                                    aria-label="What is this part? The frontmatter"
+                                    >i</button
+                                >
+                                <div
+                                    class="fl-pop"
+                                    role="note"
+                                    data-pop="1"
+                                    hidden
+                                >
+                                    <p class="fl-pop-label">the frontmatter</p>
+                                    <p class="fl-pop-text">
+                                        YAML at the top of the file, rendered as
+                                        editable properties. Anything you write
+                                        here — owner, priority, due — becomes a
+                                        column in folder views.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="fl-props">
+                                <div class="fl-prop">
+                                    <span class="fl-prop-key">owner</span><span
+                                        >ana</span>
+                                </div>
+                                <div class="fl-prop">
+                                    <span class="fl-prop-key">priority</span
+                                    ><span>8</span>
+                                </div>
+                                <div class="fl-prop">
+                                    <span class="fl-prop-key">tags</span>
+                                    <span class="fl-tags">
+                                        <span class="fl-tag">logistics</span>
+                                        <span class="fl-tag">last-mile</span>
+                                        <span class="fl-tag">smoke</span>
+                                    </span>
+                                </div>
+                                <div class="fl-prop">
+                                    <span class="fl-prop-key">reviewed</span
+                                    ><span class="fl-pass">✓ true</span>
+                                </div>
+                                <div class="fl-prop">
+                                    <span class="fl-prop-key">due</span><span
+                                        >2026-09-30</span
+                                    >
+                                </div>
+                                <div class="fl-prop">
+                                    <span class="fl-prop-key">xray.testKey</span
+                                    ><span class="fl-brass-text">WMS-482</span>
+                                </div>
+                                <div class="fl-prop">
+                                    <span class="fl-prop-key">latent apps</span
+                                    ><span
+                                        >mqtt · client warehouse ·
+                                        wms/shipments/+</span
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                        <aside
+                            class="fl-seg-aside"
+                            aria-label="Capability notes"
+                        >
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">Shows: properties</p>
+                                <p class="fl-ann-text">
+                                    Any property you invent becomes a column
+                                </p>
+                                <a href={withBase("/docs/properties/")}
+                                    >/docs/properties/</a
+                                >
+                            </div>
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">Shows: Xray link</p>
+                                <p class="fl-ann-text">
+                                    Linked to the Test issue in Jira
+                                </p>
+                                <a href={withBase("/docs/xray/")}>/docs/xray/</a
+                                >
+                            </div>
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">
+                                    Shows: latent applications
+                                </p>
+                                <p class="fl-ann-text">
+                                    Subscribed before the flow starts
+                                </p>
+                                <a href={withBase("/docs/latent-applications/")}
+                                    >/docs/latent-applications/</a
+                                >
+                            </div>
+                        </aside>
+                    </div>
+
+                    <!-- segment: intro prose -->
+                    <div class="fl-seg fl-seg-prose">
+                        <div class="fl-seg-main" style="max-width:70ch">
+                            <div class="fl-beacon-slot">
+                                <button
+                                    type="button"
+                                    class="fl-beacon fl-beacon-2"
+                                    data-beacon="2"
+                                    aria-expanded="false"
+                                    aria-label="What is this part? The prose"
+                                    >i</button
+                                >
+                                <div
+                                    class="fl-pop"
+                                    role="note"
+                                    data-pop="2"
+                                    hidden
+                                >
+                                    <p class="fl-pop-label">the prose</p>
+                                    <p class="fl-pop-text">
+                                        Plain Markdown between the steps. This
+                                        is the documentation half of the
+                                        document — the part your whole team
+                                        reads.
+                                    </p>
+                                </div>
+                            </div>
+                            <p class="fl-p-doc">
+                                A parcel leaves the warehouse and the courier
+                                cannot hand it over: nobody is home. Three
+                                systems have to agree on what happens next. The
+                                tracking API must accept the failed attempt, the
+                                warehouse database must schedule a second one,
+                                and the pickers must hear about it over MQTT —
+                                because the parcel is going back on a van
+                                tomorrow morning and somebody has to pull it off
+                                the returns lane before then.
+                            </p>
+                            <p class="fl-p-doc" style="margin-bottom:0">
+                                This is the flow that proves all three still
+                                agree. It runs against the real warehouse, with
+                                the courier faked: no carrier will fail a
+                                delivery on request, and waiting for a real one
+                                to go wrong is not a test strategy.
+                            </p>
+                        </div>
+                        <aside class="fl-seg-aside">
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">Shows: flow anatomy</p>
+                                <p class="fl-ann-text">
+                                    This is documentation. It is also the test
+                                </p>
+                                <a href={withBase("/docs/flow-anatomy/")}
+                                    >/docs/flow-anatomy/</a
+                                >
+                            </div>
+                        </aside>
+                    </div>
+
+                    <!-- segment: step 1 -->
+                    <div class="fl-seg">
+                        <div
+                            class="fl-seg-main"
+                            data-step="1"
+                            data-state="standby"
+                        >
+                            <h4 class="fl-h4">The parcel ships</h4>
+                            <p
+                                class="fl-p-sm"
+                                style="margin-bottom:18px;max-width:66ch"
+                            >
+                                A new shipment for a random order. The courier's
+                                label service is mimicked, so this step is the
+                                same in a laptop with no VPN as it is in
+                                staging.
+                            </p>
+                            <div class="fl-beacon-slot">
+                                <button
+                                    type="button"
+                                    class="fl-beacon fl-beacon-3"
+                                    data-beacon="3"
+                                    aria-expanded="false"
+                                    aria-label="What is this part? A step block"
+                                    >i</button
+                                >
+                                <div
+                                    class="fl-pop"
+                                    role="note"
+                                    data-pop="3"
+                                    hidden
+                                >
+                                    <p class="fl-pop-label">a step block</p>
+                                    <p class="fl-pop-text">
+                                        A fenced ```step code block — the
+                                        executable half. Press Run and the
+                                        evidence appears right below it.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="fl-step">
+                                <div class="fl-step-head">
+                                    <span class="fl-step-n">step 1</span>
+                                    <span class="fl-step-call"
+                                        >wms · createShipment</span
+                                    >
+                                    <span class="fl-spacer"></span>
+                                    <span
+                                        class="fl-step-state"
+                                        data-when="standby">standby</span
+                                    >
+                                    <span
+                                        class="fl-step-state fl-step-state-running"
+                                        data-when="running"
+                                        hidden>running</span
+                                    >
+                                    <span
+                                        class="fl-step-state fl-step-state-passed"
+                                        data-when="passed"
+                                        hidden>passed</span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="fl-btn-run-sm"
+                                        data-run="1">▷ Run</button
+                                    >
+                                </div>
+                                <pre
+                                    class="fl-code"><span class="fl-k">application:</span> wms
 <span class="fl-k">method:</span> createShipment
 <span class="fl-k">parameters:</span>
   <span class="fl-k">body:</span>
@@ -395,74 +506,124 @@ const jsonLd = [
   <span class="fl-k">body:</span>
     <span class="fl-k">status:</span> "in_transit"
     <span class="fl-k">trackingRef:</span> "$expr: typeof value === 'string' &amp;&amp; value.length &gt; 0"</pre>
-              </div>
-              <div aria-live="polite">
-                <div class="fl-result" data-when="passed" hidden>
-                  <div class="fl-beacon-slot">
-                    <button
-                      type="button"
-                      class="fl-beacon"
-                      data-beacon="4"
-                      aria-expanded="false"
-                      aria-label="What is this part? The execution">i</button
-                    >
-                    <div class="fl-pop" role="note" data-pop="4" hidden>
-                      <p class="fl-pop-label">the execution</p>
-                      <p class="fl-pop-text">
-                        Status, timing, response and every assertion — streamed in
-                        right below the block, like a notebook cell.
-                      </p>
+                            </div>
+                            <div aria-live="polite">
+                                <div
+                                    class="fl-result"
+                                    data-when="passed"
+                                    hidden
+                                >
+                                    <div class="fl-beacon-slot">
+                                        <button
+                                            type="button"
+                                            class="fl-beacon"
+                                            data-beacon="4"
+                                            aria-expanded="false"
+                                            aria-label="What is this part? The execution"
+                                            >i</button
+                                        >
+                                        <div
+                                            class="fl-pop"
+                                            role="note"
+                                            data-pop="4"
+                                            hidden
+                                        >
+                                            <p class="fl-pop-label">
+                                                the execution
+                                            </p>
+                                            <p class="fl-pop-text">
+                                                Status, timing, response and
+                                                every assertion — streamed in
+                                                right below the block, like a
+                                                notebook cell.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p class="fl-result-head">
+                                        ● Passed · 212 ms · HTTP 201
+                                    </p>
+                                    <pre class="fl-result-body">{out1}</pre>
+                                    <p class="fl-result-assert">
+                                        ✓ status 201 &nbsp;✓ body.status &nbsp;✓
+                                        body.trackingRef ($expr) — all
+                                        assertions passed
+                                    </p>
+                                    <p class="fl-result-memory">
+                                        memory.shipmentId ← "SHP-70491"
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <aside class="fl-seg-aside fl-seg-aside-step">
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">Shows: replacers</p>
+                                <p class="fl-ann-text">
+                                    Fresh data on every run
+                                </p>
+                                <a href={withBase("/docs/replacers/")}
+                                    >/docs/replacers/</a
+                                >
+                            </div>
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">Shows: mimic</p>
+                                <p class="fl-ann-text">
+                                    The courier, faked — including the failure
+                                </p>
+                                <a href={withBase("/docs/mimic/")}
+                                    >/docs/mimic/</a
+                                >
+                            </div>
+                        </aside>
                     </div>
-                  </div>
-                  <p class="fl-result-head">● Passed · 212 ms · HTTP 201</p>
-                  <pre class="fl-result-body">{out1}</pre>
-                  <p class="fl-result-assert">
-                    ✓ status 201 &nbsp;✓ body.status &nbsp;✓ body.trackingRef ($expr) — all
-                    assertions passed
-                  </p>
-                  <p class="fl-result-memory">memory.shipmentId ← "SHP-70491"</p>
-                </div>
-              </div>
-            </div>
-            <aside class="fl-seg-aside fl-seg-aside-step">
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: replacers</p>
-                <p class="fl-ann-text">Fresh data on every run</p>
-                <a href={withBase('/docs/replacers/')}>/docs/replacers/</a>
-              </div>
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: mimic</p>
-                <p class="fl-ann-text">The courier, faked — including the failure</p>
-                <a href={withBase('/docs/mimic/')}>/docs/mimic/</a>
-              </div>
-            </aside>
-          </div>
 
-          <!-- segment: step 2 -->
-          <div class="fl-seg">
-            <div class="fl-seg-main" data-step="2" data-state="standby">
-              <h4 class="fl-h4">The warehouse agrees</h4>
-              <p class="fl-p-sm" style="margin-bottom:18px;max-width:66ch">
-                The API said <code class="fl-inline-code">in_transit</code>. The database is
-                where the pickers actually look, so ask it directly.
-                <code class="fl-inline-code">{tShip}</code> is what the previous step wrote to
-                flow memory.
-              </p>
-              <div class="fl-step">
-                <div class="fl-step-head">
-                  <span class="fl-step-n">step 2</span>
-                  <span class="fl-step-call">warehouse-db · query</span>
-                  <span class="fl-spacer"></span>
-                  <span class="fl-step-state" data-when="standby">standby</span>
-                  <span class="fl-step-state fl-step-state-running" data-when="running" hidden
-                    >running</span
-                  >
-                  <span class="fl-step-state fl-step-state-passed" data-when="passed" hidden
-                    >passed</span
-                  >
-                  <button type="button" class="fl-btn-run-sm" data-run="2">▷ Run</button>
-                </div>
-                <pre class="fl-code"><span class="fl-k">application:</span> warehouse-db
+                    <!-- segment: step 2 -->
+                    <div class="fl-seg">
+                        <div
+                            class="fl-seg-main"
+                            data-step="2"
+                            data-state="standby"
+                        >
+                            <h4 class="fl-h4">The warehouse agrees</h4>
+                            <p
+                                class="fl-p-sm"
+                                style="margin-bottom:18px;max-width:66ch"
+                            >
+                                The API said <code class="fl-inline-code"
+                                    >in_transit</code
+                                >. The database is where the pickers actually
+                                look, so ask it directly.
+                                <code class="fl-inline-code">{tShip}</code> is what
+                                the previous step wrote to flow memory.
+                            </p>
+                            <div class="fl-step">
+                                <div class="fl-step-head">
+                                    <span class="fl-step-n">step 2</span>
+                                    <span class="fl-step-call"
+                                        >warehouse-db · query</span
+                                    >
+                                    <span class="fl-spacer"></span>
+                                    <span
+                                        class="fl-step-state"
+                                        data-when="standby">standby</span
+                                    >
+                                    <span
+                                        class="fl-step-state fl-step-state-running"
+                                        data-when="running"
+                                        hidden>running</span
+                                    >
+                                    <span
+                                        class="fl-step-state fl-step-state-passed"
+                                        data-when="passed"
+                                        hidden>passed</span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="fl-btn-run-sm"
+                                        data-run="2">▷ Run</button
+                                    >
+                                </div>
+                                <pre
+                                    class="fl-code"><span class="fl-k">application:</span> warehouse-db
 <span class="fl-k">method:</span> query
 <span class="fl-k">parameters:</span>
   <span class="fl-k">body:</span>
@@ -476,58 +637,99 @@ const jsonLd = [
       <span class="fl-k">0:</span>
         <span class="fl-k">status:</span> "in_transit"
         <span class="fl-k">attempts:</span> 1</pre>
-              </div>
-              <div aria-live="polite">
-                <div class="fl-result" data-when="passed" hidden>
-                  <p class="fl-result-head">● Passed · 8 ms · 1 row</p>
-                  <pre class="fl-result-body">{out2}</pre>
-                  <p class="fl-result-assert">
-                    ✓ rows.0.status &nbsp;✓ rows.0.attempts — all assertions passed
-                  </p>
-                </div>
-              </div>
-            </div>
-            <aside class="fl-seg-aside fl-seg-aside-step">
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: flow memory</p>
-                <p class="fl-ann-text">What step one wrote, step two reads</p>
-                <a href={withBase('/docs/memory/')}>/docs/memory/</a>
-              </div>
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: PostgreSQL steps</p>
-                <p class="fl-ann-text">The API is not the only source of truth</p>
-                <a href={withBase('/docs/applications/')}>/docs/applications/</a>
-              </div>
-            </aside>
-          </div>
+                            </div>
+                            <div aria-live="polite">
+                                <div
+                                    class="fl-result"
+                                    data-when="passed"
+                                    hidden
+                                >
+                                    <p class="fl-result-head">
+                                        ● Passed · 8 ms · 1 row
+                                    </p>
+                                    <pre class="fl-result-body">{out2}</pre>
+                                    <p class="fl-result-assert">
+                                        ✓ rows.0.status &nbsp;✓ rows.0.attempts
+                                        — all assertions passed
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <aside class="fl-seg-aside fl-seg-aside-step">
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">Shows: flow memory</p>
+                                <p class="fl-ann-text">
+                                    What step one wrote, step two reads
+                                </p>
+                                <a href={withBase("/docs/memory/")}
+                                    >/docs/memory/</a
+                                >
+                            </div>
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">
+                                    Shows: PostgreSQL steps
+                                </p>
+                                <p class="fl-ann-text">
+                                    The API is not the only source of truth
+                                </p>
+                                <a href={withBase("/docs/applications/")}
+                                    >/docs/applications/</a
+                                >
+                            </div>
+                        </aside>
+                    </div>
 
-          <!-- segment: step 3 -->
-          <div class="fl-seg">
-            <div class="fl-seg-main" data-step="3" data-state="standby">
-              <h4 class="fl-h4">The courier finds nobody home</h4>
-              <p class="fl-p-sm" style="margin-bottom:18px;max-width:66ch">
-                The failure we came for. The response is immediate, but the
-                interesting part is asynchronous: an event on
-                <code class="fl-inline-code">wms/shipments/{tShip}</code> that the picking
-                screens subscribe to. The MQTT client has been connected and
-                subscribed since before the flow started, so nothing is missed while
-                the HTTP call is in flight.
-              </p>
-              <div class="fl-step">
-                <div class="fl-step-head">
-                  <span class="fl-step-n">step 3</span>
-                  <span class="fl-step-call">wms · reportDeliveryAttempt</span>
-                  <span class="fl-spacer"></span>
-                  <span class="fl-step-state" data-when="standby">standby</span>
-                  <span class="fl-step-state fl-step-state-running" data-when="running" hidden
-                    >running</span
-                  >
-                  <span class="fl-step-state fl-step-state-passed" data-when="passed" hidden
-                    >passed</span
-                  >
-                  <button type="button" class="fl-btn-run-sm" data-run="3">▷ Run</button>
-                </div>
-                <pre class="fl-code"><span class="fl-k">application:</span> wms
+                    <!-- segment: step 3 -->
+                    <div class="fl-seg">
+                        <div
+                            class="fl-seg-main"
+                            data-step="3"
+                            data-state="standby"
+                        >
+                            <h4 class="fl-h4">The courier finds nobody home</h4>
+                            <p
+                                class="fl-p-sm"
+                                style="margin-bottom:18px;max-width:66ch"
+                            >
+                                The failure we came for. The response is
+                                immediate, but the interesting part is
+                                asynchronous: an event on
+                                <code class="fl-inline-code"
+                                    >wms/shipments/{tShip}</code
+                                > that the picking screens subscribe to. The MQTT
+                                client has been connected and subscribed since before
+                                the flow started, so nothing is missed while the HTTP
+                                call is in flight.
+                            </p>
+                            <div class="fl-step">
+                                <div class="fl-step-head">
+                                    <span class="fl-step-n">step 3</span>
+                                    <span class="fl-step-call"
+                                        >wms · reportDeliveryAttempt</span
+                                    >
+                                    <span class="fl-spacer"></span>
+                                    <span
+                                        class="fl-step-state"
+                                        data-when="standby">standby</span
+                                    >
+                                    <span
+                                        class="fl-step-state fl-step-state-running"
+                                        data-when="running"
+                                        hidden>running</span
+                                    >
+                                    <span
+                                        class="fl-step-state fl-step-state-passed"
+                                        data-when="passed"
+                                        hidden>passed</span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="fl-btn-run-sm"
+                                        data-run="3">▷ Run</button
+                                    >
+                                </div>
+                                <pre
+                                    class="fl-code"><span class="fl-k">application:</span> wms
 <span class="fl-k">method:</span> reportDeliveryAttempt
 <span class="fl-k">parameters:</span>
   <span class="fl-k">params:</span>
@@ -547,75 +749,135 @@ const jsonLd = [
       <span class="fl-k">retry:</span>
         <span class="fl-k">attempts:</span> 3
         <span class="fl-k">delay:</span> 2</pre>
-              </div>
-              <div aria-live="polite">
-                <div class="fl-result fl-result-waiting" data-when="a1" hidden>
-                  <p class="fl-result-head fl-result-head-waiting">
-                    ● Running · HTTP 202 accepted · waiting on wms/shipments/SHP-70491
-                  </p>
-                  <p class="fl-result-line">
-                    latent · mqtt · attempt 1/3 — no message yet, retrying in 2 s
-                  </p>
-                </div>
-                <div class="fl-result fl-result-waiting" data-when="a2" hidden>
-                  <p class="fl-result-head fl-result-head-waiting">
-                    ● Running · HTTP 202 accepted · waiting on wms/shipments/SHP-70491
-                  </p>
-                  <p class="fl-result-line">
-                    latent · mqtt · attempt 1/3 — no message yet, retrying in 2 s
-                  </p>
-                  <p class="fl-result-line fl-result-line-live">
-                    latent · mqtt · attempt 2/3 — message received on
-                    wms/shipments/SHP-70491
-                  </p>
-                </div>
-                <div class="fl-result" data-when="passed" hidden>
-                  <p class="fl-result-head">● Passed · 2.3 s · HTTP 202 + MQTT event</p>
-                  <pre class="fl-result-body">{out3}</pre>
-                  <p class="fl-result-assert">
-                    ✓ status 202 &nbsp;✓ latent mqtt message (attempt 2/3) — all assertions
-                    passed
-                  </p>
-                </div>
-              </div>
-            </div>
-            <aside class="fl-seg-aside fl-seg-aside-step">
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: MQTT assertions</p>
-                <p class="fl-ann-text">Assert on what happens out of band</p>
-                <a href={withBase('/docs/latent-applications/')}>/docs/latent-applications/</a>
-              </div>
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: retry &amp; delay</p>
-                <p class="fl-ann-text">Async systems get a second look, not a flake</p>
-                <a href={withBase('/docs/step-blocks/')}>/docs/step-blocks/</a>
-              </div>
-            </aside>
-          </div>
+                            </div>
+                            <div aria-live="polite">
+                                <div
+                                    class="fl-result fl-result-waiting"
+                                    data-when="a1"
+                                    hidden
+                                >
+                                    <p
+                                        class="fl-result-head fl-result-head-waiting"
+                                    >
+                                        ● Running · HTTP 202 accepted · waiting
+                                        on wms/shipments/SHP-70491
+                                    </p>
+                                    <p class="fl-result-line">
+                                        latent · mqtt · attempt 1/3 — no message
+                                        yet, retrying in 2 s
+                                    </p>
+                                </div>
+                                <div
+                                    class="fl-result fl-result-waiting"
+                                    data-when="a2"
+                                    hidden
+                                >
+                                    <p
+                                        class="fl-result-head fl-result-head-waiting"
+                                    >
+                                        ● Running · HTTP 202 accepted · waiting
+                                        on wms/shipments/SHP-70491
+                                    </p>
+                                    <p class="fl-result-line">
+                                        latent · mqtt · attempt 1/3 — no message
+                                        yet, retrying in 2 s
+                                    </p>
+                                    <p
+                                        class="fl-result-line fl-result-line-live"
+                                    >
+                                        latent · mqtt · attempt 2/3 — message
+                                        received on wms/shipments/SHP-70491
+                                    </p>
+                                </div>
+                                <div
+                                    class="fl-result"
+                                    data-when="passed"
+                                    hidden
+                                >
+                                    <p class="fl-result-head">
+                                        ● Passed · 2.3 s · HTTP 202 + MQTT event
+                                    </p>
+                                    <pre class="fl-result-body">{out3}</pre>
+                                    <p class="fl-result-assert">
+                                        ✓ status 202 &nbsp;✓ latent mqtt message
+                                        (attempt 2/3) — all assertions passed
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <aside class="fl-seg-aside fl-seg-aside-step">
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">
+                                    Shows: MQTT assertions
+                                </p>
+                                <p class="fl-ann-text">
+                                    Assert on what happens out of band
+                                </p>
+                                <a href={withBase("/docs/latent-applications/")}
+                                    >/docs/latent-applications/</a
+                                >
+                            </div>
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">
+                                    Shows: retry &amp; delay
+                                </p>
+                                <p class="fl-ann-text">
+                                    Async systems get a second look, not a flake
+                                </p>
+                                <a href={withBase("/docs/step-blocks/")}
+                                    >/docs/step-blocks/</a
+                                >
+                            </div>
+                        </aside>
+                    </div>
 
-          <!-- segment: step 4 -->
-          <div class="fl-seg">
-            <div class="fl-seg-main" data-step="4" data-state="standby">
-              <h4 class="fl-h4">And tomorrow it goes out again</h4>
-              <p class="fl-p-sm" style="margin-bottom:18px;max-width:66ch">
-                Second attempt booked, and booked for a future date — not for the
-                morning that has already gone.
-              </p>
-              <div class="fl-step">
-                <div class="fl-step-head">
-                  <span class="fl-step-n">step 4</span>
-                  <span class="fl-step-call">warehouse-db · query</span>
-                  <span class="fl-spacer"></span>
-                  <span class="fl-step-state" data-when="standby">standby</span>
-                  <span class="fl-step-state fl-step-state-running" data-when="running" hidden
-                    >running</span
-                  >
-                  <span class="fl-step-state fl-step-state-passed" data-when="passed" hidden
-                    >passed</span
-                  >
-                  <button type="button" class="fl-btn-run-sm" data-run="4">▷ Run</button>
-                </div>
-                <pre class="fl-code"><span class="fl-k">application:</span> warehouse-db
+                    <!-- segment: step 4 -->
+                    <div class="fl-seg">
+                        <div
+                            class="fl-seg-main"
+                            data-step="4"
+                            data-state="standby"
+                        >
+                            <h4 class="fl-h4">
+                                And tomorrow it goes out again
+                            </h4>
+                            <p
+                                class="fl-p-sm"
+                                style="margin-bottom:18px;max-width:66ch"
+                            >
+                                Second attempt booked, and booked for a future
+                                date — not for the morning that has already
+                                gone.
+                            </p>
+                            <div class="fl-step">
+                                <div class="fl-step-head">
+                                    <span class="fl-step-n">step 4</span>
+                                    <span class="fl-step-call"
+                                        >warehouse-db · query</span
+                                    >
+                                    <span class="fl-spacer"></span>
+                                    <span
+                                        class="fl-step-state"
+                                        data-when="standby">standby</span
+                                    >
+                                    <span
+                                        class="fl-step-state fl-step-state-running"
+                                        data-when="running"
+                                        hidden>running</span
+                                    >
+                                    <span
+                                        class="fl-step-state fl-step-state-passed"
+                                        data-when="passed"
+                                        hidden>passed</span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="fl-btn-run-sm"
+                                        data-run="4">▷ Run</button
+                                    >
+                                </div>
+                                <pre
+                                    class="fl-code"><span class="fl-k">application:</span> warehouse-db
 <span class="fl-k">method:</span> query
 <span class="fl-k">parameters:</span>
   <span class="fl-k">body:</span>
@@ -630,601 +892,673 @@ const jsonLd = [
         <span class="fl-k">status:</span> "reattempt_scheduled"
         <span class="fl-k">attempts:</span> 2
         <span class="fl-k">next_attempt_at:</span> "$expr: new Date(value) &gt; new Date()"</pre>
-              </div>
-              <div aria-live="polite">
-                <div class="fl-result" data-when="passed" hidden>
-                  <p class="fl-result-head">● Passed · 6 ms · 1 row</p>
-                  <pre class="fl-result-body">{out4}</pre>
-                  <p class="fl-result-assert">
-                    ✓ rows.0.status &nbsp;✓ rows.0.attempts &nbsp;✓ next_attempt_at ($expr) —
-                    all assertions passed
-                  </p>
+                            </div>
+                            <div aria-live="polite">
+                                <div
+                                    class="fl-result"
+                                    data-when="passed"
+                                    hidden
+                                >
+                                    <p class="fl-result-head">
+                                        ● Passed · 6 ms · 1 row
+                                    </p>
+                                    <pre class="fl-result-body">{out4}</pre>
+                                    <p class="fl-result-assert">
+                                        ✓ rows.0.status &nbsp;✓ rows.0.attempts
+                                        &nbsp;✓ next_attempt_at ($expr) — all
+                                        assertions passed
+                                    </p>
+                                </div>
+                            </div>
+                            <p
+                                class="fl-p-doc"
+                                style="margin:36px 0 0;max-width:66ch"
+                            >
+                                Nobody had to open three tools to know whether
+                                this behaviour still holds. It is one document,
+                                and it just ran.
+                            </p>
+                        </div>
+                        <aside class="fl-seg-aside fl-seg-aside-step">
+                            <div class="fl-ann">
+                                <p class="fl-ann-label">
+                                    Shows: $expr assertions
+                                </p>
+                                <p class="fl-ann-text">
+                                    Assertions beyond equality
+                                </p>
+                                <a href={withBase("/docs/tests/")}
+                                    >/docs/tests/</a
+                                >
+                            </div>
+                        </aside>
+                    </div>
                 </div>
-              </div>
-              <p class="fl-p-doc" style="margin:36px 0 0;max-width:66ch">
-                Nobody had to open three tools to know whether this behaviour still
-                holds. It is one document, and it just ran.
-              </p>
             </div>
-            <aside class="fl-seg-aside fl-seg-aside-step">
-              <div class="fl-ann">
-                <p class="fl-ann-label">Shows: $expr assertions</p>
-                <p class="fl-ann-text">Assertions beyond equality</p>
-                <a href={withBase('/docs/tests/')}>/docs/tests/</a>
-              </div>
-            </aside>
-          </div>
         </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 4 · notebook execution -->
-  <section class="fl-wrap">
-    <div class="fl-section fl-split">
-      <div>
-        <p class="fl-kicker">Execution</p>
-        <h2 class="fl-h2" style="max-width:22ch">Results land where the question was asked</h2>
-        <p class="fl-p" style="max-width:56ch">
-          You read a step, you run it, and the evidence appears below it: request,
-          response, timings and every assertion. No console to dig through, no
-          report to cross-reference.
-        </p>
-        <p class="fl-p fl-p-last" style="max-width:56ch">
-          The same document runs headless in your pipeline. One command, one exit
-          code.
-        </p>
-        <p class="fl-mono-note">
-          <span class="fl-for-manager">For your manager:</span> the test report is
-          the test itself.
-        </p>
-      </div>
-      <div class="fl-console">
-        <p class="fl-dim">
-          $ lab34-flows --file flows/logistics/failed-delivery-retry.md --env staging
-        </p>
-        <p style="margin-top:8px">
-          wms · createShipment <span class="fl-ok">✓ passed</span>
-          <span class="fl-dim">212 ms</span>
-        </p>
-        <p>
-          warehouse-db · query <span class="fl-ok">✓ passed</span>
-          <span class="fl-dim">8 ms</span>
-        </p>
-        <p>
-          wms · reportDeliveryAttempt <span class="fl-ok">✓ passed</span>
-          <span class="fl-dim">2.3 s · mqtt attempt 2/3</span>
-        </p>
-        <p>
-          warehouse-db · query <span class="fl-ok">✓ passed</span>
-          <span class="fl-dim">6 ms</span>
-        </p>
-        <p class="fl-ok" style="margin-top:8px">4 steps, 0 failures</p>
-        <p class="fl-dim">$ echo $?  →  0</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 5 · coverage -->
-  <section class="fl-wrap">
-    <div class="fl-section">
-      <p class="fl-kicker">Coverage</p>
-      <h2 class="fl-h2" style="max-width:24ch">Coverage your whole team can see</h2>
-      <p class="fl-p" style="margin-bottom:40px;max-width:60ch">
-        Every property in a flow's frontmatter — owner, priority, due, anything you
-        invent — becomes a column. Folders render as tables you can sort, filter
-        and save as views, in one <code class="fl-inline-code">views.yaml</code> your
-        team keeps in git.
-      </p>
-      <div class="fl-table-wrap">
-        <div class="fl-view-bar">
-          <span>Last mile · 4 flows</span>
-          <span class="fl-spacer"></span>
-          <span>All flows</span>
-          <span class="fl-view-on">Release readiness</span>
-          <span>Critical</span>
+    <!-- 4 · notebook execution -->
+    <section class="fl-wrap">
+        <div class="fl-section fl-split">
+            <div>
+                <p class="fl-kicker">Execution</p>
+                <h2 class="fl-h2" style="max-width:22ch">
+                    Results land where the question was asked
+                </h2>
+                <p class="fl-p" style="max-width:56ch">
+                    You read a step, you run it, and the evidence appears below
+                    it: request, response, timings and every assertion. No
+                    console to dig through, no report to cross-reference.
+                </p>
+                <p class="fl-p fl-p-last" style="max-width:56ch">
+                    The same document runs headless in your pipeline. One
+                    command, one exit code.
+                </p>
+                <p class="fl-mono-note">
+                    <span class="fl-for-manager">For your manager:</span> the test
+                    report is the test itself.
+                </p>
+            </div>
+            <div class="fl-console">
+                <p class="fl-dim">
+                    $ lab34-flows --file
+                    flows/logistics/failed-delivery-retry.md --env staging
+                </p>
+                <p style="margin-top:8px">
+                    wms · createShipment <span class="fl-ok">✓ passed</span>
+                    <span class="fl-dim">212 ms</span>
+                </p>
+                <p>
+                    warehouse-db · query <span class="fl-ok">✓ passed</span>
+                    <span class="fl-dim">8 ms</span>
+                </p>
+                <p>
+                    wms · reportDeliveryAttempt <span class="fl-ok"
+                        >✓ passed</span
+                    >
+                    <span class="fl-dim">2.3 s · mqtt attempt 2/3</span>
+                </p>
+                <p>
+                    warehouse-db · query <span class="fl-ok">✓ passed</span>
+                    <span class="fl-dim">6 ms</span>
+                </p>
+                <p class="fl-ok" style="margin-top:8px">4 steps, 0 failures</p>
+                <p class="fl-dim">$ echo $? → 0</p>
+            </div>
         </div>
-        <table class="fl-table">
-          <thead>
-            <tr>
-              <th>name</th>
-              <th>owner</th>
-              <th>priority ↓</th>
-              <th>tags</th>
-              <th>reviewed</th>
-              <th>due</th>
-              <th>coverage*</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="fl-brass-text">proof-of-delivery.md</td>
-              <td>jose</td>
-              <td>9</td>
-              <td class="fl-quiet">pod, critical</td>
-              <td class="fl-quiet">—</td>
-              <td>2026-08-25</td>
-              <td>shallow</td>
-            </tr>
-            <tr>
-              <td class="fl-brass-text">failed-delivery-retry.md</td>
-              <td>ana</td>
-              <td>8</td>
-              <td class="fl-quiet">last-mile, smoke</td>
-              <td class="fl-pass">✓</td>
-              <td>2026-09-30</td>
-              <td>deep</td>
-            </tr>
-            <tr>
-              <td class="fl-brass-text">cod-cash-collection.md</td>
-              <td>marta</td>
-              <td>7</td>
-              <td class="fl-quiet">cod, billing</td>
-              <td class="fl-pass">✓</td>
-              <td>2026-09-08</td>
-              <td>deep</td>
-            </tr>
-            <tr>
-              <td class="fl-brass-text">address-correction.md</td>
-              <td>lucia</td>
-              <td>5</td>
-              <td class="fl-quiet">edge-case</td>
-              <td class="fl-quiet">—</td>
-              <td>2026-09-15</td>
-              <td>shallow</td>
-            </tr>
-          </tbody>
-        </table>
-        <p class="fl-table-foot">
-          * a formula: if(flow.steps &gt; 3, "deep", "shallow") — computed columns,
-          filters and saved views live in views.yaml
-        </p>
-      </div>
-      <p class="fl-mono-note">
-        <span class="fl-for-manager">For your manager:</span> release readiness is a
-        saved view, not a meeting.
-      </p>
-    </div>
-  </section>
+    </section>
 
-  <!-- 6 · xray -->
-  <section class="fl-wrap">
-    <div class="fl-section fl-split">
-      <div>
-        <p class="fl-kicker">Jira · Xray</p>
-        <h2 class="fl-h2" style="max-width:24ch">
-          The test cases you already wrote, finally running
-        </h2>
-        <p class="fl-p" style="max-width:56ch">
-          Pull your Tests from Xray and each one becomes a Markdown document, filed
-          in the same folders you keep in Jira. The title and description stay
-          Jira's; the steps are yours to write. Then the case runs — in the notebook
-          and in CI.
-        </p>
-        <p class="fl-p" style="max-width:56ch">
-          Pulling again is safe. Your steps survive, moved tests move on disk, and
-          git shows exactly what Jira changed.
-        </p>
-        <p class="fl-p-sm fl-quiet" style="max-width:56ch">
-          The integration reads from Jira. It never writes to it.
-        </p>
-        <p class="fl-mono-note">
-          <span class="fl-for-manager">For your manager:</span> the Jira backlog
-          becomes the regression suite.
-        </p>
-      </div>
-      <div class="fl-stack">
-        <div class="fl-mini">
-          <p class="fl-mini-label">in Jira</p>
-          <p class="fl-mini-title">WMS-482 · A failed delivery is rescheduled</p>
-          <p class="fl-mini-meta">Test · To Do · executions: none</p>
+    <!-- 5 · coverage -->
+    <section class="fl-wrap">
+        <div class="fl-section">
+            <p class="fl-kicker">Coverage</p>
+            <h2 class="fl-h2" style="max-width:24ch">
+                Coverage your whole team can see
+            </h2>
+            <p class="fl-p" style="margin-bottom:40px;max-width:60ch">
+                Every property in a flow's frontmatter — owner, priority, due,
+                anything you invent — becomes a column. Folders render as tables
+                you can sort, filter and save as views, in one <code
+                    class="fl-inline-code">views.yaml</code
+                > your team keeps in git.
+            </p>
+            <div class="fl-table-wrap">
+                <div class="fl-view-bar">
+                    <span>Last mile · 4 flows</span>
+                    <span class="fl-spacer"></span>
+                    <span>All flows</span>
+                    <span class="fl-view-on">Release readiness</span>
+                    <span>Critical</span>
+                </div>
+                <table class="fl-table">
+                    <thead>
+                        <tr>
+                            <th>name</th>
+                            <th>owner</th>
+                            <th>priority ↓</th>
+                            <th>tags</th>
+                            <th>reviewed</th>
+                            <th>due</th>
+                            <th>coverage*</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="fl-brass-text">proof-of-delivery.md</td>
+                            <td>jose</td>
+                            <td>9</td>
+                            <td class="fl-quiet">pod, critical</td>
+                            <td class="fl-quiet">—</td>
+                            <td>2026-08-25</td>
+                            <td>shallow</td>
+                        </tr>
+                        <tr>
+                            <td class="fl-brass-text"
+                                >failed-delivery-retry.md</td
+                            >
+                            <td>ana</td>
+                            <td>8</td>
+                            <td class="fl-quiet">last-mile, smoke</td>
+                            <td class="fl-pass">✓</td>
+                            <td>2026-09-30</td>
+                            <td>deep</td>
+                        </tr>
+                        <tr>
+                            <td class="fl-brass-text">cod-cash-collection.md</td
+                            >
+                            <td>marta</td>
+                            <td>7</td>
+                            <td class="fl-quiet">cod, billing</td>
+                            <td class="fl-pass">✓</td>
+                            <td>2026-09-08</td>
+                            <td>deep</td>
+                        </tr>
+                        <tr>
+                            <td class="fl-brass-text">address-correction.md</td>
+                            <td>lucia</td>
+                            <td>5</td>
+                            <td class="fl-quiet">edge-case</td>
+                            <td class="fl-quiet">—</td>
+                            <td>2026-09-15</td>
+                            <td>shallow</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="fl-table-foot">
+                    * a formula: if(flow.steps &gt; 3, "deep", "shallow") —
+                    computed columns, filters and saved views live in views.yaml
+                </p>
+            </div>
+            <p class="fl-mono-note">
+                <span class="fl-for-manager">For your manager:</span> release readiness
+                is a saved view, not a meeting.
+            </p>
         </div>
-        <p class="fl-arrow">↓ pull · write the steps</p>
-        <div class="fl-mini fl-mini-pass">
-          <p class="fl-mini-label">in your flows folder</p>
-          <p class="fl-mini-title">xray/last-mile/WMS-482_failed-delivery-retry.md</p>
-          <p class="fl-mini-meta fl-pass">4 steps · passed · runs on every deploy</p>
-        </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 7 · mimic -->
-  <section class="fl-wrap">
-    <div class="fl-section fl-split">
-      <div>
-        <p class="fl-kicker">Mimic · Environments</p>
-        <h2 class="fl-h2" style="max-width:22ch">Test what you can't touch yet</h2>
-        <p class="fl-p" style="max-width:56ch">
-          No carrier will fail a delivery on request. The third party has no
-          sandbox, or the acceptance environment is booked until Thursday. Declare a
-          mimic in the step and the dependency answers as you scripted — failures
-          included.
-        </p>
-        <p class="fl-p fl-p-last" style="max-width:56ch">
-          The same flow runs on your laptop, on staging and on production. The
-          environment is a flag, not a rewrite; credentials stay in per-application
-          env files.
-        </p>
-        <p class="fl-mono-note">
-          <span class="fl-for-manager">For your manager:</span> unhappy paths get
-          tested before a customer finds them.
-        </p>
-      </div>
-      <div>
-        <pre class="fl-code fl-code-rounded" style="padding:20px 24px;line-height:1.7"><span
-            class="fl-dim"># the courier, scripted per step</span>
+    <!-- 6 · xray -->
+    <section class="fl-wrap">
+        <div class="fl-section fl-split">
+            <div>
+                <p class="fl-kicker">Jira · Xray</p>
+                <h2 class="fl-h2" style="max-width:24ch">
+                    The test cases you already wrote, finally running
+                </h2>
+                <p class="fl-p" style="max-width:56ch">
+                    Pull your Tests from Xray and each one becomes a Markdown
+                    document, filed in the same folders you keep in Jira. The
+                    title and description stay Jira's; the steps are yours to
+                    write. Then the case runs — in the notebook and in CI.
+                </p>
+                <p class="fl-p" style="max-width:56ch">
+                    Pulling again is safe. Your steps survive, moved tests move
+                    on disk, and git shows exactly what Jira changed.
+                </p>
+                <p class="fl-p-sm fl-quiet" style="max-width:56ch">
+                    The integration reads from Jira. It never writes to it.
+                </p>
+                <p class="fl-mono-note">
+                    <span class="fl-for-manager">For your manager:</span> the Jira
+                    backlog becomes the regression suite.
+                </p>
+            </div>
+            <div class="fl-stack">
+                <div class="fl-mini">
+                    <p class="fl-mini-label">in Jira</p>
+                    <p class="fl-mini-title">
+                        WMS-482 · A failed delivery is rescheduled
+                    </p>
+                    <p class="fl-mini-meta">Test · To Do · executions: none</p>
+                </div>
+                <p class="fl-arrow">↓ pull · write the steps</p>
+                <div class="fl-mini fl-mini-pass">
+                    <p class="fl-mini-label">in your flows folder</p>
+                    <p class="fl-mini-title">
+                        xray/last-mile/WMS-482_failed-delivery-retry.md
+                    </p>
+                    <p class="fl-mini-meta fl-pass">
+                        4 steps · passed · runs on every deploy
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7 · mimic -->
+    <section class="fl-wrap">
+        <div class="fl-section fl-split">
+            <div>
+                <p class="fl-kicker">Mimic · Environments</p>
+                <h2 class="fl-h2" style="max-width:22ch">
+                    Test what you can't touch yet
+                </h2>
+                <p class="fl-p" style="max-width:56ch">
+                    No carrier will fail a delivery on request. The third party
+                    has no sandbox, or the acceptance environment is booked
+                    until Thursday. Declare a mimic in the step and the
+                    dependency answers as you scripted — failures included.
+                </p>
+                <p class="fl-p fl-p-last" style="max-width:56ch">
+                    The same flow runs on your laptop, on staging and on
+                    production. The environment is a flag, not a rewrite;
+                    credentials stay in per-application env files.
+                </p>
+                <p class="fl-mono-note">
+                    <span class="fl-for-manager">For your manager:</span> unhappy
+                    paths get tested before a customer finds them.
+                </p>
+            </div>
+            <div>
+                <pre
+                    class="fl-code fl-code-rounded"
+                    style="padding:20px 24px;line-height:1.7"><span class="fl-dim"># the courier, scripted per step</span>
 <span class="fl-k">mimic:</span>
   - <span class="fl-k">application:</span> carrier
     <span class="fl-k">url:</span> "/labels"</pre>
-        <div class="fl-chips">
-          <span class="fl-chip">--env local</span>
-          <span class="fl-chip">--env staging</span>
-          <span class="fl-chip">--env production</span>
-          <span class="fl-chip-bare">← same document</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 8 · capability grid -->
-  <section class="fl-wrap">
-    <div class="fl-section">
-      <p class="fl-kicker">Capabilities</p>
-      <h2 class="fl-h2" style="margin-bottom:48px">What a step can do</h2>
-      <div class="fl-cap-grid">
-        {
-          capabilities.map((capability) => (
-            <div class="fl-cap">
-              <h3>{capability.title}</h3>
-              <p>{capability.body}</p>
+                <div class="fl-chips">
+                    <span class="fl-chip">--env local</span>
+                    <span class="fl-chip">--env staging</span>
+                    <span class="fl-chip">--env production</span>
+                    <span class="fl-chip-bare">← same document</span>
+                </div>
             </div>
-          ))
-        }
-      </div>
-    </div>
-  </section>
-
-  <!-- 9 · what it is not -->
-  <section class="fl-wrap">
-    <div class="fl-section">
-      <p class="fl-kicker">Limits</p>
-      <h2 class="fl-h2" style="margin-bottom:40px">What it is not</h2>
-      <div class="fl-limits">
-        <p class="fl-limit">
-          <span class="fl-limit-tag">not</span>a unit test framework. It tests
-          behaviour across systems, not functions.
-        </p>
-        <p class="fl-limit">
-          <span class="fl-limit-tag">not</span>a load testing tool. One flow, one
-          run, one verdict.
-        </p>
-        <p class="fl-limit">
-          <span class="fl-limit-tag">beta</span>browser automation through Playwright
-          is experimental. Expect rough edges.
-        </p>
-        <p class="fl-limit">
-          <span class="fl-limit-tag">read</span>the Xray integration never writes to
-          Jira. Pull only.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 10 · it's yours -->
-  <section class="fl-wrap">
-    <div class="fl-section">
-      <p class="fl-kicker">MIT · local-first</p>
-      <h2 class="fl-h2" style="margin-bottom:40px">It's yours</h2>
-      <div class="fl-grid-4">
-        {
-          ownership.map((item) => (
-            <div>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </div>
-          ))
-        }
-      </div>
-      <p class="fl-mono-note" style="margin-top:40px">
-        <span class="fl-for-manager">For your manager:</span> no new vendor, no new
-        data processor, nothing leaves the house.
-      </p>
-    </div>
-  </section>
-
-  <!-- 10b · the tool itself -->
-  <section class="fl-wrap-wide">
-    <div class="fl-section">
-      <p class="fl-kicker">The tool</p>
-      <h2 class="fl-h2" style="max-width:24ch">What it looks like on your screen</h2>
-      <p class="fl-p" style="margin-bottom:40px;max-width:62ch">
-        The document, the folder it lives in, and the two ways AI writes one for
-        you — all local, all yours.
-      </p>
-      <div class="fl-shots">
-        <figure class="fl-shot-fig">
-          <ThemedShot
-            light={flowLight}
-            dark={flowDark}
-            alt="A flow after a run: below the step block, the execution details show a Passed badge, the HTTP 200 response body and the assertion results."
-            widths={[440, 880]}
-            sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
-          />
-          <figcaption class="fl-shot-cap">
-            <span class="fl-shot-cap-label">a flow</span> — run like a notebook, with
-            the evidence under each step.
-          </figcaption>
-        </figure>
-        <figure class="fl-shot-fig">
-          <ThemedShot
-            light={folderLight}
-            dark={folderDark}
-            alt="A folder view listing last-mile delivery flows as a table, with one column per frontmatter property: owner, priority, tags, reviewed, due date, a computed coverage column and the step count."
-            widths={[440, 880]}
-            sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
-          />
-          <figcaption class="fl-shot-cap">
-            <span class="fl-shot-cap-label">a folder</span> — every property a column,
-            sortable and saved as a view.
-          </figcaption>
-        </figure>
-        <figure class="fl-shot-fig">
-          <ThemedShot
-            light={aiCreateLight}
-            dark={aiCreateDark}
-            alt="The 'What should this flow test?' dialog after creating a flow with AI: a plain-words prompt describes a lost-parcel claim scenario, with a Generate flow button."
-            widths={[440, 880]}
-            sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
-          />
-          <figcaption class="fl-shot-cap">
-            <span class="fl-shot-cap-label">written by AI</span> — describe the
-            scenario, get a flow built from your applications.
-          </figcaption>
-        </figure>
-        <figure class="fl-shot-fig">
-          <ThemedShot
-            light={aiEditLight}
-            dark={aiEditDark}
-            alt="The 'Edit with AI' dialog over an open flow: an instruction asks to also cover the full-locker case, with a Rewrite flow button and suggested example instructions."
-            widths={[440, 880]}
-            sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
-          />
-          <figcaption class="fl-shot-cap">
-            <span class="fl-shot-cap-label">rewritten by AI</span> — the result stays
-            unsaved until you have read it.
-          </figcaption>
-        </figure>
-      </div>
-
-      <dialog id="shot-lightbox" class="fl-lightbox" aria-label="Screenshot">
-        <div class="fl-lightbox-panel">
-          <div class="fl-lightbox-head">
-            <p class="fl-lightbox-cap" data-lightbox-cap></p>
-            <button type="button" class="fl-lightbox-close" data-lightbox-close>close ✕</button>
-          </div>
-          <div class="fl-lightbox-body">
-            <img class="fl-lightbox-img" alt="" data-lightbox-img />
-          </div>
         </div>
-      </dialog>
-    </div>
-  </section>
+    </section>
 
-  <!-- 11 · who builds it -->
-  <section class="fl-wrap">
-    <div class="fl-section">
-      <p class="fl-kicker">lab34</p>
-      <h2 class="fl-h2">Who builds it</h2>
-      <p class="fl-p fl-p-last" style="max-width:58ch">
-        lab34 is an engineering company in Galicia, Spain, building AI for IT
-        operations. flows is open source — published because working tools are
-        better proof than slides. More at <a href="https://lab34.es">lab34.es</a>.
-      </p>
-    </div>
-  </section>
+    <!-- 8 · capability grid -->
+    <section class="fl-wrap">
+        <div class="fl-section">
+            <p class="fl-kicker">Capabilities</p>
+            <h2 class="fl-h2" style="margin-bottom:48px">What a step can do</h2>
+            <div class="fl-cap-grid">
+                {
+                    capabilities.map((capability) => (
+                        <div class="fl-cap">
+                            <h3>{capability.title}</h3>
+                            <p>{capability.body}</p>
+                        </div>
+                    ))
+                }
+            </div>
+        </div>
+    </section>
 
-  <!-- 12 · close -->
-  <section class="fl-wrap">
-    <div class="fl-section fl-section-last">
-      <h2 class="fl-h2" style="max-width:26ch">Your first flow runs in five minutes</h2>
-      <p class="fl-p" style="margin-bottom:32px;max-width:56ch">
-        The first run seeds example applications and flows that work offline. Open
-        the notebook, press Run, and start replacing the examples with your systems.
-      </p>
-      <pre
-        class="fl-code fl-code-rounded fl-code-lg"
-        style="max-width:640px"><span class="fl-dim">$</span> npm install -g @lab34/flows
+    <!-- 9 · what it is not -->
+    <section class="fl-wrap">
+        <div class="fl-section">
+            <p class="fl-kicker">Limits</p>
+            <h2 class="fl-h2" style="margin-bottom:40px">What it is not</h2>
+            <div class="fl-limits">
+                <p class="fl-limit">
+                    <span class="fl-limit-tag">not</span>a unit test framework.
+                    It tests behaviour across systems, not functions.
+                </p>
+                <p class="fl-limit">
+                    <span class="fl-limit-tag">not</span>a load testing tool.
+                    One flow, one run, one verdict.
+                </p>
+                <p class="fl-limit">
+                    <span class="fl-limit-tag">beta</span>browser automation
+                    through Playwright is experimental. Expect rough edges.
+                </p>
+                <p class="fl-limit">
+                    <span class="fl-limit-tag">read</span>the Xray integration
+                    never writes to Jira. Pull only.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 10 · it's yours -->
+    <section class="fl-wrap">
+        <div class="fl-section">
+            <p class="fl-kicker">MIT · local-first</p>
+            <h2 class="fl-h2" style="margin-bottom:40px">It's yours</h2>
+            <div class="fl-grid-4">
+                {
+                    ownership.map((item) => (
+                        <div>
+                            <h3>{item.title}</h3>
+                            <p>{item.body}</p>
+                        </div>
+                    ))
+                }
+            </div>
+            <p class="fl-mono-note" style="margin-top:40px">
+                <span class="fl-for-manager">For your manager:</span> no new vendor,
+                no new data processor, nothing leaves the house.
+            </p>
+        </div>
+    </section>
+
+    <!-- 10b · the tool itself -->
+    <section class="fl-wrap-wide">
+        <div class="fl-section">
+            <p class="fl-kicker">The tool</p>
+            <h2 class="fl-h2" style="max-width:24ch">
+                What it looks like on your screen
+            </h2>
+            <p class="fl-p" style="margin-bottom:40px;max-width:62ch">
+                The document, the folder it lives in, and the two ways AI writes
+                one for you — all local, all yours.
+            </p>
+            <div class="fl-shots">
+                <figure class="fl-shot-fig">
+                    <ThemedShot
+                        light={flowLight}
+                        dark={flowDark}
+                        alt="A flow after a run: below the step block, the execution details show a Passed badge, the HTTP 200 response body and the assertion results."
+                        widths={[440, 880]}
+                        sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
+                    />
+                    <figcaption class="fl-shot-cap">
+                        <span class="fl-shot-cap-label">a flow</span> — run like a
+                        notebook, with the evidence under each step.
+                    </figcaption>
+                </figure>
+                <figure class="fl-shot-fig">
+                    <ThemedShot
+                        light={folderLight}
+                        dark={folderDark}
+                        alt="A folder view listing last-mile delivery flows as a table, with one column per frontmatter property: owner, priority, tags, reviewed, due date, a computed coverage column and the step count."
+                        widths={[440, 880]}
+                        sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
+                    />
+                    <figcaption class="fl-shot-cap">
+                        <span class="fl-shot-cap-label">a folder</span> — every property
+                        a column, sortable and saved as a view.
+                    </figcaption>
+                </figure>
+                <figure class="fl-shot-fig">
+                    <ThemedShot
+                        light={aiCreateLight}
+                        dark={aiCreateDark}
+                        alt="The 'What should this flow test?' dialog after creating a flow with AI: a plain-words prompt describes a lost-parcel claim scenario, with a Generate flow button."
+                        widths={[440, 880]}
+                        sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
+                    />
+                    <figcaption class="fl-shot-cap">
+                        <span class="fl-shot-cap-label">written by AI</span> — describe
+                        the scenario, get a flow built from your applications.
+                    </figcaption>
+                </figure>
+                <figure class="fl-shot-fig">
+                    <ThemedShot
+                        light={aiEditLight}
+                        dark={aiEditDark}
+                        alt="The 'Edit with AI' dialog over an open flow: an instruction asks to also cover the full-device case, with a Rewrite flow button and suggested example instructions."
+                        widths={[440, 880]}
+                        sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
+                    />
+                    <figcaption class="fl-shot-cap">
+                        <span class="fl-shot-cap-label">rewritten by AI</span> — the
+                        result stays unsaved until you have read it.
+                    </figcaption>
+                </figure>
+            </div>
+
+            <dialog
+                id="shot-lightbox"
+                class="fl-lightbox"
+                aria-label="Screenshot"
+            >
+                <div class="fl-lightbox-panel">
+                    <div class="fl-lightbox-head">
+                        <p class="fl-lightbox-cap" data-lightbox-cap></p>
+                        <button
+                            type="button"
+                            class="fl-lightbox-close"
+                            data-lightbox-close>close ✕</button
+                        >
+                    </div>
+                    <div class="fl-lightbox-body">
+                        <img class="fl-lightbox-img" alt="" data-lightbox-img />
+                    </div>
+                </div>
+            </dialog>
+        </div>
+    </section>
+
+    <!-- 11 · who builds it -->
+    <section class="fl-wrap">
+        <div class="fl-section">
+            <p class="fl-kicker">lab34</p>
+            <h2 class="fl-h2">Who builds it</h2>
+            <p class="fl-p fl-p-last" style="max-width:58ch">
+                lab34 is an engineering company in Galicia, Spain, building AI
+                for IT operations. flows is open source — published because
+                working tools are better proof than slides. More at <a
+                    href="https://lab34.es">lab34.es</a
+                >.
+            </p>
+        </div>
+    </section>
+
+    <!-- 12 · close -->
+    <section class="fl-wrap">
+        <div class="fl-section fl-section-last">
+            <h2 class="fl-h2" style="max-width:26ch">
+                Your first flow runs in five minutes
+            </h2>
+            <p class="fl-p" style="margin-bottom:32px;max-width:56ch">
+                The first run seeds example applications and flows that work
+                offline. Open the notebook, press Run, and start replacing the
+                examples with your systems.
+            </p>
+            <pre
+                class="fl-code fl-code-rounded fl-code-lg"
+                style="max-width:640px"><span class="fl-dim">$</span> npm install -g @lab34/flows
 <span class="fl-dim">$</span> lab34-flows --server
 <span class="fl-dim">→ http://localhost:3001</span></pre>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;margin:32px 0 0">
-        <a href={withBase('/docs/')} class="fl-cta">Read the docs →</a>
-        <a href={repoUrl} class="fl-cta fl-cta-plain">View the source on GitHub</a>
-      </div>
-    </div>
-  </section>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin:32px 0 0">
+                <a href={withBase("/docs/")} class="fl-cta">Read the docs →</a>
+                <a href={repoUrl} class="fl-cta fl-cta-plain"
+                    >View the source on GitHub</a
+                >
+            </div>
+        </div>
+    </section>
 </BaseLayout>
 
 <script>
-  /*
-   * The example document on the home page runs a pre-recorded execution:
-   * pressing Run walks a step through standby → running → passed, and the
-   * evidence panels are revealed in the same order the real tool streams them.
-   */
-  const flow = document.getElementById('flow');
+    /*
+     * The example document on the home page runs a pre-recorded execution:
+     * pressing Run walks a step through standby → running → passed, and the
+     * evidence panels are revealed in the same order the real tool streams them.
+     */
+    const flow = document.getElementById("flow");
 
-  if (flow) {
-    const STEPS = [1, 2, 3, 4];
-    const state = { 1: 'standby', 2: 'standby', 3: 'standby', 4: 'standby' };
-    let latent = 0; // step 3's MQTT retry substate: 0, 1 or 2
-    let timers = [];
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (flow) {
+        const STEPS = [1, 2, 3, 4];
+        const state = {
+            1: "standby",
+            2: "standby",
+            3: "standby",
+            4: "standby",
+        };
+        let latent = 0; // step 3's MQTT retry substate: 0, 1 or 2
+        let timers = [];
+        const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
-    const stopTimers = () => {
-      timers.forEach(clearTimeout);
-      timers = [];
-    };
+        const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+        const stopTimers = () => {
+            timers.forEach(clearTimeout);
+            timers = [];
+        };
 
-    function render() {
-      STEPS.forEach((n) => {
-        const step = flow.querySelector(`[data-step="${n}"]`);
-        if (!step) return;
-        step.dataset.state = state[n];
-        step.querySelectorAll('[data-when]').forEach((node) => {
-          const when = node.dataset.when;
-          let show;
-          if (when === 'a1') show = state[3] === 'running' && latent === 1;
-          else if (when === 'a2') show = state[3] === 'running' && latent >= 2;
-          else show = when === state[n];
-          node.hidden = !show;
-        });
-      });
+        function render() {
+            STEPS.forEach((n) => {
+                const step = flow.querySelector(`[data-step="${n}"]`);
+                if (!step) return;
+                step.dataset.state = state[n];
+                step.querySelectorAll("[data-when]").forEach((node) => {
+                    const when = node.dataset.when;
+                    let show;
+                    if (when === "a1")
+                        show = state[3] === "running" && latent === 1;
+                    else if (when === "a2")
+                        show = state[3] === "running" && latent >= 2;
+                    else show = when === state[n];
+                    node.hidden = !show;
+                });
+            });
 
-      const running = STEPS.some((n) => state[n] === 'running');
-      const passed = STEPS.every((n) => state[n] === 'passed');
-      const touched = STEPS.some((n) => state[n] !== 'standby');
-      flow.querySelectorAll('[data-flow]').forEach((node) => {
-        const key = node.dataset.flow;
-        const show =
-          key === 'running'
-            ? running
-            : key === 'passed'
-              ? passed
-              : key === 'touched'
-                ? touched
-                : !running && !passed;
-        node.hidden = !show;
-      });
-    }
+            const running = STEPS.some((n) => state[n] === "running");
+            const passed = STEPS.every((n) => state[n] === "passed");
+            const touched = STEPS.some((n) => state[n] !== "standby");
+            flow.querySelectorAll("[data-flow]").forEach((node) => {
+                const key = node.dataset.flow;
+                const show =
+                    key === "running"
+                        ? running
+                        : key === "passed"
+                          ? passed
+                          : key === "touched"
+                            ? touched
+                            : !running && !passed;
+                node.hidden = !show;
+            });
+        }
 
-    function runStep(n, done) {
-      if (state[n] === 'running') return;
-      if (reduced) {
-        state[n] = 'passed';
-        if (n === 3) latent = 2;
-        render();
-        done && done();
-        return;
-      }
-      state[n] = 'running';
-      if (n === 3) {
-        latent = 0;
-        render();
-        later(() => {
-          latent = 1;
-          render();
-        }, 350);
-        later(() => {
-          latent = 2;
-          render();
-        }, 1800);
-        later(() => {
-          state[3] = 'passed';
-          render();
-          done && done();
-        }, 2400);
-      } else {
-        render();
-        later(
-          () => {
-            state[n] = 'passed';
+        function runStep(n, done) {
+            if (state[n] === "running") return;
+            if (reduced) {
+                state[n] = "passed";
+                if (n === 3) latent = 2;
+                render();
+                done && done();
+                return;
+            }
+            state[n] = "running";
+            if (n === 3) {
+                latent = 0;
+                render();
+                later(() => {
+                    latent = 1;
+                    render();
+                }, 350);
+                later(() => {
+                    latent = 2;
+                    render();
+                }, 1800);
+                later(() => {
+                    state[3] = "passed";
+                    render();
+                    done && done();
+                }, 2400);
+            } else {
+                render();
+                later(
+                    () => {
+                        state[n] = "passed";
+                        render();
+                        done && done();
+                    },
+                    n === 1 ? 320 : 220,
+                );
+            }
+        }
+
+        function reset() {
+            stopTimers();
+            STEPS.forEach((n) => (state[n] = "standby"));
+            latent = 0;
             render();
-            done && done();
-          },
-          n === 1 ? 320 : 220,
+        }
+
+        function runAll() {
+            if (STEPS.some((n) => state[n] === "running")) return;
+            reset();
+            later(
+                () =>
+                    runStep(1, () =>
+                        runStep(2, () => runStep(3, () => runStep(4))),
+                    ),
+                60,
+            );
+        }
+
+        flow.querySelectorAll("[data-run]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const target = button.dataset.run;
+                if (target === "all") runAll();
+                else runStep(Number(target));
+            });
+        });
+        flow.querySelector('[data-flow="touched"]')?.addEventListener(
+            "click",
+            reset,
         );
-      }
+
+        // "What is this part?" beacons — one note open at a time.
+        const beacons = Array.from(flow.querySelectorAll("[data-beacon]"));
+        function openBeacon(id) {
+            beacons.forEach((button) => {
+                const open = button.dataset.beacon === id;
+                button.setAttribute("aria-expanded", String(open));
+                const note = flow.querySelector(
+                    `[data-pop="${button.dataset.beacon}"]`,
+                );
+                if (note) note.hidden = !open;
+            });
+        }
+        beacons.forEach((button) => {
+            button.addEventListener("click", () => {
+                const open = button.getAttribute("aria-expanded") === "true";
+                openBeacon(open ? null : button.dataset.beacon);
+            });
+        });
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") openBeacon(null);
+        });
+
+        render();
     }
 
-    function reset() {
-      stopTimers();
-      STEPS.forEach((n) => (state[n] = 'standby'));
-      latent = 0;
-      render();
+    /* Screenshots open full size in a modal dialog, in the capture that matches
+     * the theme currently on screen. */
+    const lightbox = document.getElementById("shot-lightbox");
+
+    if (lightbox) {
+        const full = lightbox.querySelector("[data-lightbox-img]");
+        const caption = lightbox.querySelector("[data-lightbox-cap]");
+
+        document.querySelectorAll(".fl-shot-open").forEach((shot) => {
+            shot.addEventListener("click", () => {
+                const dark =
+                    document.documentElement.classList.contains("dark");
+                full.src = dark
+                    ? shot.dataset.fullDark
+                    : shot.dataset.fullLight;
+                full.alt = shot.dataset.alt ?? "";
+                const figcaption = shot
+                    .closest("figure")
+                    ?.querySelector("figcaption");
+                caption.innerHTML = figcaption ? figcaption.innerHTML : "";
+                lightbox.showModal();
+            });
+        });
+
+        // A click on the backdrop lands on the dialog itself.
+        lightbox.addEventListener("click", (event) => {
+            if (event.target === lightbox) lightbox.close();
+        });
+        lightbox
+            .querySelector("[data-lightbox-close]")
+            ?.addEventListener("click", () => lightbox.close());
+        lightbox.addEventListener("close", () => full.removeAttribute("src"));
     }
 
-    function runAll() {
-      if (STEPS.some((n) => state[n] === 'running')) return;
-      reset();
-      later(
-        () => runStep(1, () => runStep(2, () => runStep(3, () => runStep(4)))),
-        60,
-      );
-    }
-
-    flow.querySelectorAll('[data-run]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const target = button.dataset.run;
-        if (target === 'all') runAll();
-        else runStep(Number(target));
-      });
+    // The hero's install command.
+    const copy = document.getElementById("copy-cmd");
+    copy?.addEventListener("click", async () => {
+        try {
+            await navigator.clipboard.writeText("npm install -g @lab34/flows");
+        } catch {
+            /* clipboard unavailable — the command is selectable anyway */
+        }
+        copy.textContent = "copied";
+        setTimeout(() => (copy.textContent = "copy"), 1600);
     });
-    flow
-      .querySelector('[data-flow="touched"]')
-      ?.addEventListener('click', reset);
-
-    // "What is this part?" beacons — one note open at a time.
-    const beacons = Array.from(flow.querySelectorAll('[data-beacon]'));
-    function openBeacon(id) {
-      beacons.forEach((button) => {
-        const open = button.dataset.beacon === id;
-        button.setAttribute('aria-expanded', String(open));
-        const note = flow.querySelector(`[data-pop="${button.dataset.beacon}"]`);
-        if (note) note.hidden = !open;
-      });
-    }
-    beacons.forEach((button) => {
-      button.addEventListener('click', () => {
-        const open = button.getAttribute('aria-expanded') === 'true';
-        openBeacon(open ? null : button.dataset.beacon);
-      });
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') openBeacon(null);
-    });
-
-    render();
-  }
-
-  /* Screenshots open full size in a modal dialog, in the capture that matches
-   * the theme currently on screen. */
-  const lightbox = document.getElementById('shot-lightbox');
-
-  if (lightbox) {
-    const full = lightbox.querySelector('[data-lightbox-img]');
-    const caption = lightbox.querySelector('[data-lightbox-cap]');
-
-    document.querySelectorAll('.fl-shot-open').forEach((shot) => {
-      shot.addEventListener('click', () => {
-        const dark = document.documentElement.classList.contains('dark');
-        full.src = dark ? shot.dataset.fullDark : shot.dataset.fullLight;
-        full.alt = shot.dataset.alt ?? '';
-        const figcaption = shot.closest('figure')?.querySelector('figcaption');
-        caption.innerHTML = figcaption ? figcaption.innerHTML : '';
-        lightbox.showModal();
-      });
-    });
-
-    // A click on the backdrop lands on the dialog itself.
-    lightbox.addEventListener('click', (event) => {
-      if (event.target === lightbox) lightbox.close();
-    });
-    lightbox
-      .querySelector('[data-lightbox-close]')
-      ?.addEventListener('click', () => lightbox.close());
-    lightbox.addEventListener('close', () => full.removeAttribute('src'));
-  }
-
-  // The hero's install command.
-  const copy = document.getElementById('copy-cmd');
-  copy?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText('npm install -g @lab34/flows');
-    } catch {
-      /* clipboard unavailable — the command is selectable anyway */
-    }
-    copy.textContent = 'copied';
-    setTimeout(() => (copy.textContent = 'copy'), 1600);
-  });
 </script>

@@ -131,7 +131,7 @@ Nested values work the same way — `{{ memory.user.id }}`.
 | | |
 |-|-|
 | **Earlier steps only** | A step sees what the steps *above* it wrote. A key nothing has written yet resolves to an empty string. |
-| **Parameters only** | Only `parameters` are templated. `test` assertions are **not**, so `{{ memory.x }}` in a test is compared literally — write the expected value out, or assert it with a `$expr` expression. |
+| **Parameters only** | Only `parameters` are templated. `test` assertions are **not**, so `{{ memory.x }}` in a test is compared literally — write the expected value out, or assert it with a `$expr` expression, where `memory` is in scope: `"$expr: value === memory.barcode"`. |
 | **Everything arrives as text** | `a: "{{ memory.lastResult }}"` passes the string `"42"`, not the number `42`. Methods that expect numbers should accept numeric strings — the `calculator` example does exactly that. |
 | **Reach for the leaf** | `{{ memory.user }}` renders `[object Object]`. Interpolate `{{ memory.user.id }}`, or read the object from application code. |
 | **Text is HTML-escaped** | `{{ }}` turns `&` into `&amp;` and `'` into `&#x27;`. Triple braces `{{{ }}}` skip the escaping, but a value containing a double quote will break the step. |
