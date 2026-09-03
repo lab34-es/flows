@@ -202,7 +202,7 @@ describe('mqtt.test - topics', () => {
     const flow = { memory: { device: '1234' } };
 
     await expect(latentMqtt.test(flow, {
-      client: 'topics', test: [{ topic: 'msg/cloud/{{ memory.device }}/request', message: {} }]
+      client: 'topics', test: [{ topic: 'msg/cloud/{{ memory.device }}/command', message: {} }]
     }, {})).resolves.toEqual([]);
   });
 
