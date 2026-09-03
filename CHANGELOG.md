@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/lab34-es/flows/compare/v1.8.0...v1.9.0) (2026-09-03)
+
+
+### Features
+
+* latent applications for MQTT revisit. ([#51](https://github.com/lab34-es/flows/issues/51)) ([739de4b](https://github.com/lab34-es/flows/commit/739de4b9c98a59dee95bdbe249335577ff4e2513))
+
 ## [1.8.0](https://github.com/lab34-es/flows/compare/v1.7.0...v1.8.0) (2026-09-02)
 
 
