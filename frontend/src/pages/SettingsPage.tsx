@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { CloudUpload, Palette, Sparkles, Ticket } from 'lucide-react';
+import { CloudUpload, Palette, Radio, Sparkles, Ticket } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,12 @@ const SECTIONS = [
     label: 'SharePoint',
     description: 'Where reports are uploaded',
     icon: CloudUpload,
+  },
+  {
+    to: '/settings/remote',
+    label: 'Remote agents',
+    description: 'Run flows on another machine',
+    icon: Radio,
   },
   {
     to: '/settings/ui',

@@ -132,16 +132,17 @@ export function ExecutionProvider({ children }) {
     };
   }, [applyEvent]);
 
-  const startRun = useCallback(async (flowPath, { value, environment, path }) => {
+  const startRun = useCallback(async (flowPath, { value, environment, path, agent }) => {
     setExecutions((prev) => ({
       ...prev,
-      [flowPath]: { steps: {}, stepOrder: [], inputs: {}, status: 'starting', environment },
+      [flowPath]: { steps: {}, stepOrder: [], inputs: {}, status: 'starting', environment, agent },
     }));
 
     try {
       // `path` tells the backend which file this is, so the test run it
-      // records can store the copy under the flow's own name
-      const response = await flowsApi.start({ value, environment, path });
+      // records can store the copy under the flow's own name -- and, with an
+      // agent, which committed file that agent should run
+      const response = await flowsApi.start({ value, environment, path, ...(agent ? { agent } : {}) });
       const execution = response.data.execution;
 
       idToPath.current[execution.id] = flowPath;

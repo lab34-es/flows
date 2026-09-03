@@ -14,6 +14,8 @@ import * as applications from './helpers/applications';
  *   node cli.js --import-env <path-to-yaml> [--view <view> --env <environment>]
  *   node cli.js --capabilities
  *   node cli.js --server
+ *   node cli.js --agent --agent-id <name> --broker <url> --username <user> --password <secret>
+ *   node cli.js --remote <agent> --file <path> --env <environment>
  *
  * Options:
  *   --file         Path to the flow definition file (.md)
@@ -29,6 +31,8 @@ import * as applications from './helpers/applications';
  *   --capabilities List all available capabilities from the contents of ~/flows
  *   --env          Environment to run the flow in (required for --file/--view)
  *   --server       Start the web server with built frontend and API
+ *   --agent        Run as an agent: wait on the broker for flows to run here
+ *   --remote       Run --file or --view on the named agent instead of here
  *   --debug        Print debug information including environment variables
  *   --version      Print the installed version and exit
  *   --help         Show this help message
@@ -84,6 +88,9 @@ Usage:
   lab34-flows --view <view> --env <environment> [--folder <folder>]
   lab34-flows --import-env <path-to-yaml> [--view <view> --env <environment>]
   lab34-flows --server [--context=<context>]
+  lab34-flows --agent --agent-id <name> [--broker <url> --username <user> --password <secret>]
+  lab34-flows --remote <agent> --file <path-to-flow-file> --env <environment>
+  lab34-flows --remote <agent> --view <view> --env <environment>
 
 Options:
   --file          Path to the flow definition file (.md markdown flow) (required if not using --view or --server)
@@ -105,6 +112,17 @@ Options:
   --server        Start the web server with built frontend and API
   --env           Environment to run the flow in (required for --file and --view)
   --context       Context directory (optional)
+  --agent         Run as an agent: connect to the MQTT broker under
+                  --agent-id and run, in this context, the flows other
+                  machines send. The agent's public key is printed at start
+  --remote        Run --file or --view on the named agent rather than on this
+                  machine: the commit this context is on and the env files the
+                  flows use travel to it, and its results land in this
+                  context's test-runs
+  --broker        MQTT broker URL (mqtts://host:port or wss://host/path).
+                  Stored in config/remote.json the first time, with --username;
+                  --password goes to the context's .env. FLOWS_BROKER_URL,
+                  FLOWS_BROKER_USERNAME and FLOWS_BROKER_PASSWORD work too
   --debug         Print debug information including environment variables
   --version, -v   Print the installed version and exit
   --help          Show this help message
@@ -121,6 +139,9 @@ Examples:
   lab34-flows --context my/context/folder --import-env env.yaml --dry-run
   lab34-flows --context my/context/folder --capabilities
   lab34-flows --server --context=myproject
+  lab34-flows --context ~/flows-agent --agent --agent-id agent-ourense --broker mqtts://mqtt.example:443 --username agent-ourense --password s3cret
+  lab34-flows --remote agent-ourense --file flows/my-flow.md --env production
+  lab34-flows --remote agent-ourense --view smoke --env uat
   `);
   process.exit(0);
 }
@@ -183,6 +204,13 @@ function parseArguments() {
     ai: argv.ai || null, // Removed: kept only to show a helpful error
     capabilities: argv.capabilities || false,
     server: argv.server || false,
+    // Remote execution: this machine as an agent, or a run sent to one
+    agent: argv.agent || false,
+    agentId: argv.agentId || argv['agent-id'] || null,
+    remote: typeof argv.remote === 'string' ? argv.remote : null,
+    broker: typeof argv.broker === 'string' ? argv.broker : null,
+    username: typeof argv.username === 'string' ? argv.username : null,
+    password: typeof argv.password === 'string' ? argv.password : null,
     env: argv.env || null,
     context: argv.context || null,
     debug: argv.debug || false,
@@ -362,6 +390,133 @@ async function startServer() {
 }
 
 /**
+ * Run as an agent: sit on the broker and run the flows other machines send.
+ *
+ * Nothing about the flows themselves changes on this side -- they run through
+ * the same runner, from this context. What the agent adds is the connection
+ * and a name.
+ *
+ * @param {Object} args - { agentId, broker, username, password }
+ */
+async function startAgent(args) {
+  const remoteConfig = require('./helpers/remote/config');
+  const brokerHelper = require('./helpers/remote/broker');
+  const agent = require('./helpers/remote/agent');
+
+  cli.logo(packageJson.version);
+
+  let identity;
+  let settings;
+  try {
+    identity = await remoteConfig.agentIdentity(args.agentId);
+    settings = await remoteConfig.brokerSettings({
+      url: args.broker, username: args.username, password: args.password
+    });
+  }
+  catch (error) {
+    exitWithError(error.message);
+    return;
+  }
+
+  await bootstrap.ensureTypeScriptConfig();
+  await applications.loadAll();
+
+  console.log(`Agent:       ${identity.id}`);
+  console.log(`Broker:      ${settings.url}${settings.username ? ` as ${settings.username}` : ''}`);
+  console.log(`Context:     ${await paths.contextRoot()}`);
+  console.log(`Public key:  ${identity.publicKey}`);
+  console.log(`Fingerprint: ${identity.fingerprint}`);
+
+  let connection;
+  try {
+    connection = await brokerHelper.connect({
+      url: settings.url,
+      username: settings.username,
+      password: settings.password,
+      clientId: `flows-agent-${identity.id}`,
+      will: agent.will(identity.id)
+    });
+  }
+  catch (error) {
+    exitWithError(error.message);
+    return;
+  }
+
+  const running = await agent.start({ identity, connection });
+  console.log('\nWaiting for jobs. Ctrl+C to stop.');
+
+  const stop = async () => {
+    console.log('\nStopping...');
+    await running.stop();
+    process.exit(0);
+  };
+
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
+}
+
+/**
+ * Run a flow, or a view, on an agent instead of here.
+ *
+ * @param {Object} args - { remote, file, view, folder, env, broker, username, password }
+ */
+async function runRemote(args) {
+  const remoteConfig = require('./helpers/remote/config');
+  const client = require('./helpers/remote/client');
+  const terminal = require('./helpers/remote/terminal');
+
+  cli.logo(packageJson.version);
+
+  if (args.broker || args.username || args.password) {
+    try {
+      await remoteConfig.brokerSettings({ url: args.broker, username: args.username, password: args.password });
+    }
+    catch (error) {
+      exitWithError(error.message);
+      return;
+    }
+  }
+
+  console.log(`Agent:       ${args.remote}`);
+  console.log(`Environment: ${args.env}`);
+  console.log(args.file ? `Flow:        ${args.file}` : `View:        ${args.view || '(first view)'}`);
+  console.log('');
+
+  let result;
+  try {
+    result = await client.run({
+      agent: args.remote,
+      environment: args.env,
+      file: args.file || undefined,
+      view: args.file ? undefined : args.view,
+      folder: args.folder,
+      onEvent: (event, payload) => {
+        const line = terminal.describe(event, payload);
+        if (line) { console.log(line); }
+      },
+      onInput: terminal.prompt
+    });
+  }
+  catch (error) {
+    exitWithError(error.message);
+    return;
+  }
+
+  result.warnings.forEach(warning => console.warn(`Warning: ${warning}`));
+
+  const { testRun } = result;
+  const passed = (testRun.flows || []).filter(flow => flow.status === 'passed');
+  const failed = (testRun.flows || []).filter(flow => flow.status !== 'passed');
+
+  console.log(`\n${'═'.repeat(60)}`);
+  console.log(`${args.remote}: ${passed.length} passed, ${failed.length} failed`);
+  failed.forEach(flow => console.log(`  failed: ${flow.file}${flow.error ? ` — ${flow.error}` : ''}`));
+  console.log(`Recorded as test run ${testRun.id}`);
+
+  process.exit(testRun.status === 'passed' ? 0 : 1);
+}
+
+/**
  * Main function to execute the CLI
  */
 async function main() {
@@ -422,6 +577,21 @@ async function main() {
   } else if (args.server) {
     // Start the web server
     await startServer();
+  } else if (args.agent) {
+    // Wait on the broker for flows to run here
+    await startAgent(args);
+  } else if (args.remote) {
+    // Run somewhere else, and watch from here
+    if (!args.env) {
+      exitWithError('No environment specified. Use --env <environment>');
+      return;
+    }
+    if (!args.file && args.view === null) {
+      exitWithError('Name what to run on the agent: --file <path-to-flow-file> or --view <view>');
+      return;
+    }
+
+    await runRemote(args);
   } else if (args.view !== null) {
     // Run a whole view: every flow its filters match
     if (!args.env) {
