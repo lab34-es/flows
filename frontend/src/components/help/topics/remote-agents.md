@@ -29,12 +29,14 @@ Both machines connect *out* to an MQTT broker — any MQTT 5 broker over TLS
 does: EMQX, Mosquitto, HiveMQ. Nothing listens on either side, so no firewall
 has to change. The agent announces itself on the broker; when you run a flow
 on it, this machine sends the job and follows the run exactly as if it were
-local: the same events, the same notebook, the same test run at the end.
+local: the same events, the same notebook, the same [test run](/help/test-runs)
+at the end.
 
 What travels to the agent:
 
 - **The commit your context is on.** The agent has its own clone of the
-  context and checks that commit out first, so push before running. The
+  [context](/help/context) and checks that commit out first, so push before
+  running. The
   editor's unsaved draft does not travel — the committed file does.
 - **The values of the env files the flows use**, encrypted to the agent's own
   key. The broker only ever sees ciphertext, and the agent needs none of your

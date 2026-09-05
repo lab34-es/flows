@@ -1,6 +1,6 @@
 ---
 category: integrations
-order: 2
+order: 1
 icon: ticket
 title: 'Jira / Xray'
 summary: 'Link a flow to a Test issue, and pull the tests of your projects.'

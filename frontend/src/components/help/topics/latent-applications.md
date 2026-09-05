@@ -1,6 +1,6 @@
 ---
-category: writing
-order: 7
+category: flows
+order: 6
 icon: radio
 title: 'Latent applications (MQTT)'
 summary: 'Assert on messages produced asynchronously, out of band.'
@@ -89,8 +89,9 @@ assertion keeps it:
             attempts: 30
             delay: 2
 
-It follows the rules of a step's own `memory` block — a lone expression keeps
-its type, a key that resolves to nothing is not written — and reads `message`
+It follows the rules of a step's own `memory` block ([Passing data between
+steps](/help/memory)) — a lone expression keeps its type, a key that resolves
+to nothing is not written — and reads `message`
 (the payload that matched) and `topic` (the one it came in on). Nothing is
 written when the message never arrived.
 

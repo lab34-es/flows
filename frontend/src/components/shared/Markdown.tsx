@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Info, Lightbulb, MessageSquareWarning, OctagonAlert, TriangleAlert } from 'lucide-react';
@@ -40,9 +41,18 @@ export function Markdown({ children, className }: { children?: any; className?: 
             }
             return <pre>{preChildren}</pre>;
           },
-          a({ children: linkChildren, ...props }) {
+          // A link to another help article (`/help/<id>`) stays inside the app,
+          // through the router; every other link opens in a new tab.
+          a({ children: linkChildren, node: _node, href, ...props }) {
+            if (href && href.startsWith('/help/')) {
+              return (
+                <Link to={href} {...props}>
+                  {linkChildren}
+                </Link>
+              );
+            }
             return (
-              <a {...props} target="_blank" rel="noreferrer">
+              <a {...props} href={href} target="_blank" rel="noreferrer">
                 {linkChildren}
               </a>
             );

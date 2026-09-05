@@ -1,6 +1,6 @@
 ---
-category: reference
-order: 2
+category: flows
+order: 5
 icon: wand
 title: 'Replacers reference'
 summary: 'Every {{ template }} you can use in a flow — random data, dates, ids.'
@@ -68,4 +68,7 @@ becomes a different number each time the flow runs.
     barcode(["123456", 3, "789"])   # "123456123789" — numbers add N digits
     oneOf(["a", "b", "c"])          # picks one at random
 
-More replacers can be added in `src/helpers/replacer.js`.
+Replacers are resolved inside a step's `parameters` and inside mimicked
+responses. A `test` block is compared literally, so a random value is asserted
+with a `$expr:` expression instead; see [Assertions](/help/tests). The list is
+part of the package: propose new ones in an issue.

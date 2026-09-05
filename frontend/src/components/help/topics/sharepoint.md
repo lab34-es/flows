@@ -1,6 +1,6 @@
 ---
 category: integrations
-order: 5
+order: 2
 icon: share
 title: 'SharePoint'
 summary: 'Upload the HTML report of a finished test run to a document library.'
@@ -22,7 +22,8 @@ keywords:
   - '.env'
 ---
 
-Every finished test run writes a standalone `report.html` into its run folder.
+Every finished [test run](/help/test-runs) writes a standalone `report.html`
+into its run folder.
 This integration takes that file and puts it in a **SharePoint document
 library**, so the people who never open this tool — and the CI job that has no
 UI at all — find it where they already look for documents.

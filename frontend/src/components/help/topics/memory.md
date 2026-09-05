@@ -1,6 +1,6 @@
 ---
-category: writing
-order: 5
+category: flows
+order: 4
 icon: share
 title: 'Passing data between steps'
 summary: 'Flow memory: what one step writes, the next one reads.'
@@ -92,7 +92,7 @@ The mapping is resolved **after** the step has run, and it can read:
 | | |
 |-|-|
 | `body`, `status`, `headers` | The response of this step. |
-| `steps.<id>....` | Any step so far — `{{ steps.login.response.body.access_token }}`. |
+| `steps.<id>....` | Any step so far, by its id or its `slug` — `{{ steps.login.response.body.access_token }}`. See [Step blocks](/help/step-blocks). |
 | `memory.<key>` | The memory as it stands, including what this step just wrote. |
 
 Three things it does differently from `parameters`:
@@ -131,7 +131,7 @@ Nested values work the same way — `{{ memory.user.id }}`.
 | | |
 |-|-|
 | **Earlier steps only** | A step sees what the steps *above* it wrote. A key nothing has written yet resolves to an empty string. |
-| **Parameters only** | Only `parameters` are templated. `test` assertions are **not**, so `{{ memory.x }}` in a test is compared literally — write the expected value out, or assert it with a `$expr` expression, where `memory` is in scope: `"$expr: value === memory.barcode"`. |
+| **Parameters only** | Only `parameters` are templated. `test` assertions are **not**, so `{{ memory.x }}` in a test is compared literally — write the expected value out, or assert it with a `$expr` expression, where `memory` is in scope: `"$expr: value === memory.barcode"`. See [Assertions](/help/tests). |
 | **Everything arrives as text** | `a: "{{ memory.lastResult }}"` passes the string `"42"`, not the number `42`. Methods that expect numbers should accept numeric strings — the `calculator` example does exactly that. |
 | **Reach for the leaf** | `{{ memory.user }}` renders `[object Object]`. Interpolate `{{ memory.user.id }}`, or read the object from application code. |
 | **Text is HTML-escaped** | `{{ }}` turns `&` into `&amp;` and `'` into `&#x27;`. Triple braces `{{{ }}}` skip the escaping, but a value containing a double quote will break the step. |
@@ -172,3 +172,4 @@ the `@memory` JSDoc tag:
 
 The application page lists them per method under *Memory* — that is where to
 look when you are writing a flow and need to know what a step leaves behind.
+See [Documenting an application](/help/application-docs).

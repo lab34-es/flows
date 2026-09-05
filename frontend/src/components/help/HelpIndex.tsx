@@ -9,6 +9,7 @@ import { iconFor } from '@/components/help/icons';
 import { HELP_GROUPS } from '@/components/help/helpNavigation';
 
 const REPOSITORY = 'https://github.com/lab34-es/flows';
+const DOCS = 'https://flows.lab34.es/docs/';
 
 /**
  * The landing page of the Help section: every article the tool ships with,
@@ -63,12 +64,12 @@ export function HelpIndex() {
         <div>
           <p className="text-sm font-medium">Still stuck?</p>
           <p className="text-muted-foreground text-sm">
-            The README covers every corner of the tool, and issues are read.
+            These articles are also online, and issues are read.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <a href={REPOSITORY} target="_blank" rel="noreferrer">
+            <a href={DOCS} target="_blank" rel="noreferrer">
               <ExternalLink /> Documentation
             </a>
           </Button>

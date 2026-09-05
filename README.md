@@ -134,7 +134,7 @@ pipeline carries its credentials as one file next to the command instead of a
 folder of env files nobody can commit. Add `--dry-run` to see what it would
 write without writing it.
 
-Full reference: [Running flows](https://flows.lab34.es/docs/running/) and
+Full reference: [Test runs](https://flows.lab34.es/docs/test-runs/) and
 [Command line](https://flows.lab34.es/docs/cli/).
 
 ### Running on another machine

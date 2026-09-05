@@ -9,6 +9,9 @@
  * Every article is searchable by title, summary, keywords and body, so keep
  * the keywords list close to the words someone would actually type.
  *
+ * Articles link to each other as \`/help/<id>\`: the app routes those links
+ * through the router, and the website rewrites them to \`/docs/<id>/\`.
+ *
  * `icon` is a key of the ICONS map in `./icons.ts`.
  *
  * The same articles are the source of the documentation website, which imports
@@ -35,12 +38,15 @@ export type HelpTopic = {
 };
 
 export const HELP_CATEGORIES: HelpCategory[] = [
-  { id: 'basics', label: 'Basics' },
-  { id: 'writing', label: 'Writing flows' },
-  { id: 'reference', label: 'Reference' },
-  { id: 'integrations', label: 'Integrations' },
+  { id: 'start', label: 'Getting started' },
+  { id: 'concepts', label: 'Concepts' },
+  { id: 'flows', label: 'Flows' },
+  { id: 'applications', label: 'Applications' },
+  { id: 'environments', label: 'Environments' },
   { id: 'running', label: 'Running' },
-  { id: 'help', label: 'Help & support' },
+  { id: 'ai', label: 'AI' },
+  { id: 'organizing', label: 'Organizing' },
+  { id: 'integrations', label: 'Integrations & help' },
 ];
 
 /** `'it''s'` → `it's`; bare scalars are taken verbatim. */

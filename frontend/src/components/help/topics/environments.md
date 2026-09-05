@@ -1,151 +1,143 @@
 ---
-category: integrations
-order: 4
+category: environments
+order: 1
 icon: key
-title: 'Environments and secrets'
-summary: 'One env file per application per environment — a flow only needs its own, and the values can be handed over.'
+title: 'Environments'
+summary: 'One env file per application per environment. Where they live, how to edit them, and how the values reach a colleague or a pipeline without going through git.'
 keywords:
   - 'environment'
   - 'env'
   - 'secrets'
   - 'credentials'
+  - 'variables'
   - 'staging'
+  - 'uat'
   - 'production'
-  - 'postgres'
-  - 'database'
+  - 'local'
   - 'template'
   - 'example'
-  - 'onboarding'
   - 'export'
   - 'import'
   - 'share'
+  - 'onboarding'
+  - 'ci'
+  - 'cd'
+  - 'pipeline'
   - 'yaml'
-  - 'cli'
+  - 'import-env'
+  - 'BASE_URL'
+  - 'postgres'
+  - 'mqtt'
 ---
 
-Credentials are never stored in the flows. Each application keeps one env file
-per environment, in its own folder:
+An environment is a name, `local`, `uat`, `production`, and behind the name
+one file per application:
 
     applications/<app>/env/<environment>.env
 
-The environment selected in the sidebar footer is the one every run uses, and
-the *Applications* page lets you edit those files — variable by variable, or as
-raw text — without leaving the UI.
+The file is plain `KEY=value` lines. A method reads them as `ctx.env`, so
+`BASE_URL`, a token, a database connection string, and whatever else that
+application needs to reach that instance, go there. Credentials are never
+written in a flow: the same flow runs against `uat` or `production` by
+picking a different environment in the top bar.
 
-### Which environments exist, and what a flow needs
+## Which environments exist
 
-The environments you can pick are the union of what the applications declare:
-one application with an `env/uat.env` is enough for **uat** to be on the list.
-No application has to keep an env file for an environment it has nothing to do
-with — with a few hundred applications, that would mean writing a few hundred
-files before running anything.
+The list in the top bar is the union of what the applications declare: one
+application with an `env/uat.env`, or an `env/uat.env.example`, is enough for
+**uat** to be on it. No application has to keep a file for an environment it
+has nothing to do with.
 
-What is checked instead is the flow you are running. When a run is triggered —
-from the UI, from a folder view or from the CLI — the applications *that flow's
-steps use* must each have their `env/<environment>.env`. Only those: everything
-else in the context is left alone. If one is missing the run is refused before
-it starts, naming the files to create:
+What is checked is the flow being run. When a run starts, from the UI, from a
+folder view or from the CLI, each application *that flow's steps use* must
+have its `env/<environment>.env`. Only those. If one is missing, the run is
+refused before it starts, naming the files to create, and the flow page shows
+the same warning as soon as the document and the selected environment
+disagree. A step that is turned off is not counted.
 
-    Missing environment file for "uat": payments
-    (applications/payments/env/uat.env). Only the applications a flow uses
-    need one — create it from the Environment variables card on the home
-    page, or import a teammate's export there.
+## Editing the files
 
-The flow page says the same thing before you press Run, as soon as the flow and
-the selected environment disagree.
+- **The application page**, *Environments* tab: every env file of the
+  application, editable variable by variable.
+- **The application page**, *Source* view: the same files as raw text,
+  comments included. A file that does not exist yet opens ready to be
+  created, and writing the first `env/<name>.env` is how a brand new
+  environment is declared.
+- **The Environment variables card** on the home page shows, for the selected
+  environment, which applications have their file and which do not, and
+  offers **Create N missing files from templates**: every missing file that
+  has a committed `.env.example` next to it is created from it, as it is,
+  leaving you the secrets to fill in.
 
-### Templates: `.env.example`
+## Templates: `.env.example`
 
-Because env files hold secrets, they stay out of git — which used to mean a
-new tester had to write every one of them by hand. Commit a template next to
-where each env file belongs instead:
+Env files hold secrets, so they stay out of git. Commit a template next to
+where each one belongs instead:
 
     applications/<app>/env/<environment>.env.example
 
-A template carries the variable **names** (values empty or safe defaults),
-so it is the committed contract of what that environment needs. An
-environment declared only by templates already shows up in the selector.
+A template carries the variable **names**, with empty values or safe
+defaults. It is the committed contract of what that environment needs, it
+declares the environment in the selector on its own, and it is what *Create
+missing files* copies. Keep it in step with the real file when a variable is
+added.
 
-### Handing the values over
+## Handing the values to a colleague
 
 A template says which variables an environment needs; it does not say what to
-put in them. The **Environment variables** screen — opened from the card of
-that name on the home page — is how that part travels, without anybody
-dictating a token over a call. It has a sidebar of its own, with one section
-for each half of the job.
+put in them. The **Environment variables** screen, opened from the card on
+the home page, moves the values themselves.
 
-**Export** opens a tree — application, then environment, then variable — with
-a checkbox at each of the three levels. Tick whatever the other person needs
-and you get one YAML document to copy:
+**Export** opens a tree, application, then environment, then variable, with a
+checkbox at each level. Tick what the other person needs and you get one YAML
+document to copy:
 
-```yaml
-version: 1
-applications:
-  payments:
-    uat:
-      API_URL: https://uat.payments.example
-      API_TOKEN: 5f3e-…
-```
+    version: 1
+    applications:
+      payments:
+        uat:
+          API_URL: https://uat.payments.example
+          API_TOKEN: 5f3e-…
 
-**Import** takes that document back. As it is pasted, the section shows
-exactly what it would do before doing it: which env files it would create,
-which variables it would add, and which existing values it would overwrite.
-Nothing is written until you press *Import*.
+**Import** takes that document back. As it is pasted, the screen shows what
+it would do before doing it: which env files it would create, which variables
+it would add, which existing values it would overwrite. Nothing is written
+until you press *Import*. An import fills env files in and never invents
+applications: one the document names that this context does not have is
+reported and skipped. Files that already exist keep everything the document
+does not name, comments and order included.
 
-An import fills env files in; it never invents applications. An application
-the document names that this context does not have is reported and skipped —
-as is a name that could not be a file, or a value that is not one. Files that
-already exist keep everything the document does not name, comments and order
-included: importing `API_TOKEN` does not disturb the `DATABASE_URL` sitting
-two lines below it.
+The document carries **real values**. Share it the way you would share a
+password, and keep it out of git.
 
-The document carries **real values**, secrets included. Share it the way you
-would share a password, and keep it out of git.
+## Handing the values to a pipeline
 
-### Importing from the command line
+The same document is what a CI/CD job, or a machine nobody has set up yet,
+gets its values from:
 
-The same document can be handed to the CLI, which is how a pipeline — or a
-machine nobody has set up yet — gets its values without anyone opening the UI:
+    lab34-flows --context . --import-env env.yaml --view smoke --env uat
 
-    lab34-flows --context ~/lab34-flows --import-env env.yaml
+`--import-env` writes the document into the context's env files **first**,
+then the flows run and find the files they need already there. On its own it
+imports and exits; `--dry-run` prints what it would write, writes nothing and
+runs nothing. Store the document as a secret of your CI system and write it
+to a file right before the command; [Command line](/help/cli) has a complete
+pipeline example.
 
-On its own that imports and stops. Give it a run as well and the variables are
-written **first**, so the flows find the env files they need already there:
+## The root `.env` is something else
 
-    lab34-flows --context ~/lab34-flows --import-env env.yaml --view smoke --env uat
+At the root of the context, next to the applications, the tool keeps one
+`.env` of its own for the secrets of the integrations configured in Settings:
+`SHAREPOINT_CLIENT_SECRET` and `FLOWS_BROKER_PASSWORD`. It is added to the
+context's `.gitignore` automatically. It has nothing to do with the
+environments a flow runs against.
 
-It writes what the *Import* section writes, and prints the same three things
-the plan shows: the files it created or updated, the entries it left out, and
-the totals. `--dry-run` prints that report having written nothing, and runs no
-flow. The **Command line** article has the whole reference.
+## Variables the built-in helpers read
 
-### Files that need no document
+| Helper | Variables |
+|-|-|
+| `httpClient` | `BASE_URL`, prefixed to every path a method requests. |
+| `pgClient` | `DATABASE_CONNECTION_STRING`, or `PGUSER`, `PGPASSWORD`, `PGHOST`, `PGPORT`, `PGDATABASE`; `PGQUERY_TIMEOUT`, `PGLOCK_TIMEOUT`, `PGCLIENT_ENCODING`, `PGOPTIONS`; SSL with `PGSSL_ENABLED`, `PGSSL_REJECT_UNAUTHORIZED`, `PGSSL_CA`, `PGSSL_CERT`, `PGSSL_KEY`. The connection string wins when both are present. |
+| `mqttClient` | `MQTT_HOST`, and optionally `MQTT_PORT`, `MQTT_PROTOCOL`, `MQTT_CLIENT_ID`, `MQTT_USERNAME`, `MQTT_PASSWORD`, `MQTT_KEY`, `MQTT_CERT`, `MQTT_CA`, `MQTT_REJECT_UNAUTHORIZED`, `MQTT_QOS`. |
 
-Some of them nobody has to be asked for. **Create N missing files from
-templates**, on the home page card, writes every `env/<environment>.env` that
-has a committed `.env.example` next to it, copying the template as it is. You
-are then left filling in the secrets.
-
-Any single file can also be written by hand from the *Applications* page,
-Source view — including one that does not exist yet, so the editor opens ready
-to create it. That is also how a brand new environment is declared: write the
-first `env/<name>.env` and the name is on the selector.
-
-### PostgreSQL
-
-The PostgreSQL client accepts either a connection string or individual
-parameters:
-
-    DATABASE_CONNECTION_STRING=postgres://user:password@host:5432/database
-
-    # …or
-    PGUSER=myuser
-    PGPASSWORD=mypassword
-    PGHOST=localhost
-    PGPORT=5432
-    PGDATABASE=mydatabase
-    PGQUERY_TIMEOUT=30000
-
-`DATABASE_CONNECTION_STRING` wins when both are present. SSL is configured with
-`PGSSL_ENABLED`, `PGSSL_REJECT_UNAUTHORIZED`, `PGSSL_CA`, `PGSSL_CERT` and
-`PGSSL_KEY`.
+Your own methods read anything else through `ctx.env`.

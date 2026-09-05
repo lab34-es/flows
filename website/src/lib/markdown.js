@@ -1,4 +1,5 @@
 import { Marked } from 'marked';
+import { withBase } from './help.js';
 
 /**
  * Callout types, in the GitHub / Obsidian `> [!NOTE]` syntax. The app renders
@@ -53,6 +54,15 @@ const marked = new Marked({
         escapeHtml(title),
         `</p>${body}</div>`,
       ].join('');
+    },
+    // Articles link to each other the way the app does, as `/help/<id>`; here
+    // the same article is `/docs/<id>/`. The token is rewritten and left to
+    // the default renderer.
+    link(token) {
+      const match = /^\/help\/([^/#?]+)\/?(#.*)?$/.exec(token.href || '');
+      if (!match) return false;
+      token.href = withBase(`/docs/${match[1]}/${match[2] || ''}`);
+      return false;
     },
   },
 });

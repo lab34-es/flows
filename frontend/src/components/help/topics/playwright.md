@@ -1,6 +1,6 @@
 ---
-category: integrations
-order: 3
+category: flows
+order: 7
 icon: globe
 title: 'Browser automation (Playwright)'
 summary: 'Drive a web application from a flow. Experimental.'
@@ -52,9 +52,10 @@ only the one you need. On a bare Linux box (CI, a container) the browsers also
 need system libraries: `npx playwright install --with-deps chromium` installs
 those too, and needs root.
 
-The application's `envs/*.env` decide the browser configuration: which browser,
-launch options (headless, slowMo…) and context options (viewport, locale,
-credentials…).
+The YAML file decides the browser: `browserType` (`chromium`, `firefox` or
+`webkit`, chromium by default), `device` (a key of Playwright's device list,
+such as `Desktop Chrome`) and `launchOptions` such as `headless`. The
+seeded `browser` application's `playwright.signIn.yaml` is a complete example.
 
 ### Sessions
 
@@ -195,7 +196,7 @@ memory:
   shop_bearer_token: "{{ body.token }}"
 ```
 
-See *Passing data between steps* for what that mapping can read.
+See [Passing data between steps](/help/memory) for what that mapping can read.
 
 A harvested value is reported to the terminal and persisted with the test run,
 like any other response body. Name the keys accordingly: the reporter masks a
@@ -204,5 +205,5 @@ value whose key contains `token`, `password`, `secret` or `authorization`.
 This part is **experimental**: the set of available methods lives with the
 Playwright helper. The seeded `browser` example application shows a complete
 automation end to end -- it serves its own page on localhost, so it runs with
-no internet and no account anywhere, and `flows/examples/04-browser-and-scraping.md`
-drives it.
+no internet and no account anywhere, and the example flow
+`04 · Browser, scraping and memory` drives it.

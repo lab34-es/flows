@@ -1,6 +1,6 @@
 ---
-category: reference
-order: 1
+category: organizing
+order: 2
 icon: code
 title: 'Filters and formulas'
 summary: 'What a view keeps, and what a formula computes.'
@@ -20,7 +20,8 @@ keywords:
 
 A view's **filters** decide which flows it lists. A **formula** works out a
 column from the others. They are two different things: a filter is picked, a
-formula is written.
+formula is written. What a view is, and where it lives, is in
+[Organizing flows](/help/organizing).
 
 ## Filters
 
