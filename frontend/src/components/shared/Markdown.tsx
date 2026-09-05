@@ -57,6 +57,20 @@ export function Markdown({ children, className }: { children?: any; className?: 
               </a>
             );
           },
+          // A screenshot of the tool (`/help-images/<name>.webp`) follows the
+          // theme: the light capture in light mode, the dark one in dark mode.
+          // The files live in public/help-images, one pair per name.
+          img({ node: _node, src, alt, ...props }) {
+            const shot = /^\/help-images\/([\w-]+)\.webp$/.exec(String(src || ''));
+            if (!shot) return <img src={src} alt={alt} {...props} />;
+            const base = `/help-images/${shot[1]}`;
+            return (
+              <span className="help-shot">
+                <img src={`${base}-light.webp`} alt={alt} loading="lazy" className="dark:hidden" />
+                <img src={`${base}-dark.webp`} alt={alt} loading="lazy" className="hidden dark:block" />
+              </span>
+            );
+          },
           // remark-callouts turns `> [!NOTE]` blockquotes into divs carrying
           // the callout type; every other div renders as-is.
           div({ children: divChildren, node: _node, ...props }) {

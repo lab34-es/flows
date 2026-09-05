@@ -55,6 +55,8 @@ Open [http://localhost:3001](http://localhost:3001). In the top bar, pick the
 **local** environment: the example applications declare it, so every demo
 runs against it.
 
+![The home page: the flows and applications of the context, and the environment picked in the top bar](/help-images/home.webp)
+
 From the sidebar, open **01 · Welcome** and press **Run**. The steps execute
 in the order they appear in the document, and the request, response,
 assertions and timings of each one appear right below its block, like a

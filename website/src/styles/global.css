@@ -1317,6 +1317,27 @@ code {
   padding: 0.6rem 1rem 0.6rem 0;
   vertical-align: top;
 }
+/* A screenshot of the tool inside an article: the capture of the current theme */
+.fl-doc-shot {
+  display: block;
+  margin: 22px 0;
+}
+.fl-doc-shot img {
+  width: 100%;
+}
+.fl-doc-shot .fl-shot-light {
+  display: block;
+}
+.fl-doc-shot .fl-shot-dark {
+  display: none;
+}
+.dark .fl-doc-shot .fl-shot-light {
+  display: none;
+}
+.dark .fl-doc-shot .fl-shot-dark {
+  display: block;
+}
+
 .fl-prose img {
   max-width: 100%;
   height: auto;

@@ -27,6 +27,16 @@ const CALLOUTS = {
   },
 };
 
+// The screenshots the articles embed live with the app, in
+// frontend/public/help-images, where the app serves them as /help-images/…;
+// here Vite emits them as assets. One light and one dark capture per name.
+const SHOTS = import.meta.glob('../../../frontend/public/help-images/*.webp', {
+  eager: true,
+  import: 'default',
+  query: '?url',
+});
+const shotUrl = (file) => SHOTS[`../../../frontend/public/help-images/${file}`];
+
 // The marker opens the quote and may carry a custom title on the same line.
 const MARKER = new RegExp(`^\\[!(${Object.keys(CALLOUTS).join('|')})\\][ \\t]*([^\\n]*)(?:\\n|$)`, 'i');
 
@@ -53,6 +63,22 @@ const marked = new Marked({
         `<svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icon}</svg>`,
         escapeHtml(title),
         `</p>${body}</div>`,
+      ].join('');
+    },
+    // `![alt](/help-images/<name>.webp)` is a screenshot of the tool: both
+    // captures are emitted and the stylesheet shows the one of the theme.
+    image(token) {
+      const match = /^\/help-images\/([\w-]+)\.webp$/.exec(token.href || '');
+      if (!match) return false;
+      const light = shotUrl(`${match[1]}-light.webp`);
+      const dark = shotUrl(`${match[1]}-dark.webp`);
+      if (!light || !dark) return false;
+      const alt = escapeHtml(token.text || '');
+      return [
+        '<span class="fl-doc-shot">',
+        `<img class="fl-shot-light" src="${light}" alt="${alt}" loading="lazy">`,
+        `<img class="fl-shot-dark" src="${dark}" alt="${alt}" loading="lazy">`,
+        '</span>',
       ].join('');
     },
     // Articles link to each other the way the app does, as `/help/<id>`; here

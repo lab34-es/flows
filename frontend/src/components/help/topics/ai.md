@@ -76,6 +76,8 @@ happens next, and a second dialog asks what it should test:
 > Create a post on jsonplaceholder with a random title, check it comes back
 > with a 201, then fetch a post that does not exist and expect a 404.
 
+![The file is created, then a dialog asks what the flow should test](/help-images/ai-create.webp)
+
 Name the applications and the outcomes you care about, the unhappy path
 included. What comes back is a Markdown flow using the applications you
 actually have. It is validated before being saved: it has to parse, contain
@@ -90,6 +92,8 @@ toggle. Describe the change, "also cover the unhappy path", "explain each
 section", "use the new refund method instead", and the whole document is
 rewritten. The result lands in the editor as an **unsaved** change, so you
 can read it, and reload the page to throw it away, before it is saved.
+
+![Edit with AI: describe the change and the document is rewritten, left unsaved for review](/help-images/ai-edit.webp)
 
 The wand rewrites the whole document, it does not patch it: everything in
 the flow travels to the model and comes back. Check the parts you did not ask

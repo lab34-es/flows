@@ -69,10 +69,33 @@ simple.
 
 Click a folder in the sidebar and every flow below it, **subfolders
 included**, is listed as a table: one row per flow, one column per property.
-The toolbar searches, picks the columns and their order, sorts and filters.
-Those settings are **views**, saved in a single `views.yaml` at the root of
-the context, in the shape [Obsidian Bases](https://help.obsidian.md/bases)
-uses:
+The tabs above the table are the **views**. The toolbar searches, picks the
+columns and their order, sorts and filters, and what you set up is saved into
+the view you are on.
+
+![A folder as a table: three views as tabs, one column per property, and the toolbar that searches, sorts and filters](/help-images/folder.webp)
+
+- **Properties** picks the columns and their order. Renaming one here writes
+  a display name that every view follows. A property holding an object
+  offers its fields as columns of their own, `xray.testKey` for instance.
+- **Sort** stacks several clauses: the first that separates two flows wins.
+- **Filter** decides which flows the view keeps: a property, an operator and
+  a value, picked from dropdowns rather than typed, so a filter cannot be a
+  syntax error. Groups combine with *all*, *any* or *none*, and nest. The
+  operators, and how they read, are in
+  [Filters and formulas](/help/view-expressions).
+- **⋯ › Formulas** adds columns worked out from the others.
+- **Run all** executes the flows the view is showing, as one test run.
+- **CLI** writes the command that runs this same view from a terminal.
+
+A view is **not tied to a folder**: every view is a tab on every folder, and
+applies to whichever folder is open. Which one a folder was last opened with
+is remembered in your browser.
+
+Underneath, the views are one file, `views.yaml` at the root of the context,
+in the shape [Obsidian Bases](https://help.obsidian.md/bases) uses. It holds
+no folder references, so it is safe to commit and travels with the
+repository:
 
     properties:
       note.owner:
@@ -92,24 +115,6 @@ uses:
         sort:
           - property: note.priority
             direction: DESC
-
-A view is **not tied to a folder**: every view is a tab on every folder, and
-applies to whichever folder is open. Which one a folder was last opened with
-is remembered in your browser, so `views.yaml` holds no folder references and
-is safe to commit.
-
-- **Properties** picks the columns and their order. Renaming one here writes
-  a `displayName` that every view follows. A property holding an object
-  offers its fields as columns of their own, `note.xray.testKey`.
-- **Sort** stacks several clauses: the first that separates two flows wins.
-- **Filter** decides which flows the view keeps: a property, an operator and
-  a value, picked from dropdowns rather than typed, so a filter cannot be a
-  syntax error. Groups combine with *all*, *any* or *none*, and nest. The
-  operators, and how they read, are in
-  [Filters and formulas](/help/view-expressions).
-- **⋯ › Formulas** adds columns worked out from the others.
-- **Run all** executes the flows the view is showing, as one test run.
-- **CLI** writes the command that runs this same view from a terminal.
 
 ## Views are what a pipeline runs
 

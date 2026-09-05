@@ -1,6 +1,6 @@
 ---
-category: concepts
-order: 2
+category: start
+order: 3
 icon: folder
 title: 'The context folder'
 summary: 'The one folder everything lives in: its layout, what to commit, and the git panel that pulls, commits and pushes it.'

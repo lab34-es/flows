@@ -3,23 +3,12 @@ category: flows
 order: 1
 icon: file
 title: 'The flow document'
-summary: 'A flow is a Markdown file: its frontmatter properties, the prose and callouts around the steps, the steps themselves, and the editor you write it in.'
+summary: 'A flow is a document you write like a note, where every step is a cell that runs. The editor, the properties, the prose and the steps.'
 keywords:
   - 'flow'
-  - 'markdown'
   - 'document'
-  - 'frontmatter'
-  - 'title'
-  - 'description'
-  - 'properties'
-  - 'tags'
-  - 'owner'
-  - 'prose'
-  - 'comments'
-  - 'callout'
-  - 'note'
-  - 'warning'
-  - 'tip'
+  - 'notebook'
+  - 'cell'
   - 'editor'
   - 'document view'
   - 'source'
@@ -32,116 +21,32 @@ keywords:
   - 'redo'
   - 'keyboard'
   - 'shortcut'
+  - 'markdown'
+  - 'frontmatter'
+  - 'title'
+  - 'description'
+  - 'properties'
+  - 'tags'
+  - 'owner'
+  - 'prose'
+  - 'comments'
+  - 'callout'
+  - 'note'
+  - 'warning'
+  - 'tip'
   - 'run'
   - 'enabled'
 ---
 
-A flow is a Markdown file, `.md` or `.markdown`, under `flows/` in the context
-folder. It has three ingredients: an optional **frontmatter** block at the
-top, **prose** anywhere, and **step blocks**, which are the only part that
-executes.
+A flow is what you see below: a document with headings and prose, and among
+them **steps**, each one a cell that runs against a real system and shows its
+request, response and assertions right under it. You write it the way you
+would write a note, in the **Document** view. What is saved underneath is a
+Markdown file, `.md` or `.markdown`, under `flows/` in the context folder.
 
-    ---
-    title: Fraud detection
-    description: A payment above the limit is held for review
-    owner: ana
-    tags: [smoke, payments]
-    ---
+![A flow in the Document view after a run: each step is a cell, with its result under it](/help-images/flow.webp)
 
-    # Fraud detection
-
-    The invoice endpoint must refuse to answer for a flagged customer.
-
-    > [!WARNING]
-    > This flow creates a real customer in the environment it runs against.
-
-    ```step
-    application: accounting
-    method: getInvoice
-    parameters:
-      params:
-        customerId: "{{ randomInt0_100 }}"
-    test:
-      status: 404
-    ```
-
-## Frontmatter: the properties
-
-Every key of the frontmatter is a **property**. A handful mean something to
-the tool, everything else is yours to invent.
-
-| Property | Meaning |
-|-|-|
-| `title` | The document's heading. Without one, the first `#` heading is used. |
-| `description` | The standfirst under the title. |
-| `latentApplications` | MQTT clients to connect before the flow starts. See [Latent applications](/help/latent-applications). |
-| `xray` | The Jira test this flow maps to, as `xray: { testKey: ABC-1234 }`. See [Jira / Xray](/help/xray). |
-| `version` | The runner version. Leave it out. |
-| anything else | `owner`, `tags`, `priority`, `reviewed`, `due`… whatever your team filters and sorts by. |
-
-Nothing declares a property's type: it is whatever its value is. A number
-sorts numerically, `true` / `false` renders as a checkbox, a list renders as
-chips and an ISO date sorts chronologically. A property can hold an object,
-and its fields are addressed with a dot, `xray.testKey`.
-
-The **Document** view renders the properties as a list you can edit in place:
-click a value to change it, a name to rename it, and **Add property** for a
-new one. `title` and `description` are shown above the list, as the heading
-and the standfirst, rather than as two more rows.
-
-Properties are what folder tables filter and sort on. See
-[Organizing flows](/help/organizing).
-
-## Prose: everything around the steps
-
-Everything that is not a step block is documentation, rendered as such. Use
-it to say what the scenario covers, what has to be true before it runs and
-what to look at when it fails. It is standard Markdown with the GitHub
-extensions: headings, emphasis, lists, links (opened in a new tab), images
-scaled to the document width, inline code, fenced code blocks highlighted by
-language, pipe tables and `---` separators.
-
-A fenced block tagged `js`, `bash` or anything other than `step` is a code
-sample, not a step: only `step` blocks execute.
-
-A blockquote that opens with a `[!TYPE]` marker is rendered as a **callout**,
-the syntax GitHub and Obsidian use:
-
-    > [!TIP] Run it against staging first
-    > The cancellation is real. Point the environment at staging
-    > until the assertions are stable.
-
-Which renders as:
-
-> [!TIP] Run it against staging first
-> The cancellation is real. Point the environment at staging
-> until the assertions are stable.
-
-Five types are available: `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`
-and `[!CAUTION]`. The body may span as many lines and blocks as you need, and
-a title on the marker line replaces the default one. A blockquote without a
-marker stays a plain quote.
-
-The same renderer draws application READMEs and method descriptions, so all
-of this works there too.
-
-## Steps
-
-A step is a fenced code block tagged `step`, whose content is YAML: the
-application and method to call, the parameters to send, the assertions on the
-response, and a few switches. Steps execute in the order they appear in the
-document, and the request, response, assertions and timings of each one
-appear right below its block once it has run.
-
-Every key is described in [Step blocks](/help/step-blocks). The parts a step
-builds on have pages of their own: [Assertions](/help/tests),
-[Passing data between steps](/help/memory), and [Replacers](/help/replacers)
-for values that change on every run.
-
-The switch in the top-right corner of a step cell turns it off: the step
-stays in the document with `enabled: false`, and the run walks past it.
-
-## The editor
+## Writing it
 
 The **Document** view is where a flow is written. It is not a preview: click
 any paragraph, heading, list or step and that block shows its Markdown right
@@ -186,11 +91,99 @@ the same `> [!TIP]` block you would have typed by hand.
 | Escape | Leaves the block without leaving the document. |
 
 A step is edited as its YAML, inside its own cell: the header, the assertions
-and the execution output stay where they are while you type.
+and the execution output stay where they are while you type. The switch in
+the top-right corner of a step cell turns it off: the step stays in the
+document and the run walks past it.
 
 **The magic wand**, next to the Document / Source toggle, rewrites the
 document from a description of the change. See
 [Writing flows with AI](/help/ai).
+
+## What the document holds
+
+Three ingredients: **properties** at the top, **prose** anywhere, and
+**steps**, the only part that executes. The Source tab shows them as text,
+which is also what a teammate sees in a pull request:
+
+    ---
+    title: Fraud detection
+    description: A payment above the limit is held for review
+    owner: ana
+    tags: [smoke, payments]
+    ---
+
+    # Fraud detection
+
+    The invoice endpoint must refuse to answer for a flagged customer.
+
+    > [!WARNING]
+    > This flow creates a real customer in the environment it runs against.
+
+    ```step
+    application: accounting
+    method: getInvoice
+    parameters:
+      params:
+        customerId: "{{ randomInt0_100 }}"
+    test:
+      status: 404
+    ```
+
+### Properties
+
+The Document view shows the properties as a list under the title: click a
+value to change it, a name to rename it, and **Add property** for a new one.
+Every key of the frontmatter is a property. A handful mean something to the
+tool, everything else is yours to invent.
+
+| Property | Meaning |
+|-|-|
+| `title` | The document's heading. Without one, the first `#` heading is used. |
+| `description` | The standfirst under the title. |
+| `latentApplications` | MQTT clients to connect before the flow starts. See [Latent applications](/help/latent-applications). |
+| `xray` | The Jira test this flow maps to, as `xray: { testKey: ABC-1234 }`. See [Jira / Xray](/help/xray). |
+| `version` | The runner version. Leave it out. |
+| anything else | `owner`, `tags`, `priority`, `reviewed`, `due`… whatever your team filters and sorts by. |
+
+Nothing declares a property's type: it is whatever its value is. A number
+sorts numerically, `true` / `false` renders as a checkbox, a list renders as
+chips and an ISO date sorts chronologically. A property can hold an object,
+and its fields are addressed with a dot, `xray.testKey`. Properties are what
+folder tables filter and sort on; see [Organizing flows](/help/organizing).
+
+### Prose: everything around the steps
+
+Everything that is not a step is documentation, rendered as such. Use it to
+say what the scenario covers, what has to be true before it runs and what to
+look at when it fails. Headings, emphasis, lists, links, images, tables and
+code samples all work, and the `/` menu inserts each of them. A code sample
+tagged `js`, `bash` or anything other than `step` is prose too: only steps
+execute.
+
+A **callout** makes a note or a warning stand out. The `/` menu inserts one,
+and in Markdown it is a blockquote opening with a `[!TYPE]` marker, the
+syntax GitHub and Obsidian use:
+
+> [!TIP] Run it against staging first
+> The cancellation is real. Point the environment at staging
+> until the assertions are stable.
+
+Five types are available: `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`
+and `[!CAUTION]`. The body may span as many lines and blocks as you need, and
+a title on the marker line replaces the default one. The same renderer draws
+application READMEs and method descriptions, so all of this works there too.
+
+### Steps
+
+A step names an application and one of its methods, the parameters to send,
+and what the response must look like. Steps execute in the order they appear
+in the document, and the request, response, assertions and timings of each one
+appear right below its cell once it has run.
+
+Every key a step accepts is described in [Step blocks](/help/step-blocks).
+The parts a step builds on have pages of their own: [Assertions](/help/tests),
+[Passing data between steps](/help/memory), and [Replacers](/help/replacers)
+for values that change on every run.
 
 ## Running it
 

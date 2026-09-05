@@ -258,6 +258,14 @@
   @apply max-w-full rounded-lg;
 }
 
+/* A screenshot of the tool inside a help article */
+.markdown-body .help-shot {
+  @apply my-4 block;
+}
+.markdown-body .help-shot img {
+  @apply w-full rounded-lg border;
+}
+
 /* ------------------------------------------------------------------ */
 /* The editable Document view: rendered Markdown you can type into      */
 /* ------------------------------------------------------------------ */

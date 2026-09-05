@@ -17,8 +17,8 @@
   <a href="https://github.com/lab34-es/flows/issues">Issues</a>
 </p>
 
-<a href="website/src/assets/screenshots/flow-light.png">
-  <img src="website/src/assets/screenshots/flow-light.png" alt="A flow after a run" width="900">
+<a href="frontend/public/help-images/flow-light.webp">
+  <img src="frontend/public/help-images/flow-light.webp" alt="A flow after a run" width="900">
 </a>
 
 </div>
@@ -66,7 +66,7 @@ test:
 
 | Home | Folder | AI create | AI edit | Settings |
 | --- | --- | --- | --- | --- |
-| [![Home](website/src/assets/screenshots/home-light.png)](website/src/assets/screenshots/home-light.png) | [![A folder as a table](website/src/assets/screenshots/folder-light.png)](website/src/assets/screenshots/folder-light.png) | [![Create a flow with AI](website/src/assets/screenshots/ai-create-light.png)](website/src/assets/screenshots/ai-create-light.png) | [![Edit a flow with AI](website/src/assets/screenshots/ai-edit-light.png)](website/src/assets/screenshots/ai-edit-light.png) | [![Settings](website/src/assets/screenshots/settings-light.png)](website/src/assets/screenshots/settings-light.png) |
+| [![Home](frontend/public/help-images/home-light.webp)](frontend/public/help-images/home-light.webp) | [![A folder as a table](frontend/public/help-images/folder-light.webp)](frontend/public/help-images/folder-light.webp) | [![Create a flow with AI](frontend/public/help-images/ai-create-light.webp)](frontend/public/help-images/ai-create-light.webp) | [![Edit a flow with AI](frontend/public/help-images/ai-edit-light.webp)](frontend/public/help-images/ai-edit-light.webp) | [![Settings](frontend/public/help-images/settings-light.webp)](frontend/public/help-images/settings-light.webp) |
 
 ## Features
 

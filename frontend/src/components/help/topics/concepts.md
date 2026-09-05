@@ -1,6 +1,6 @@
 ---
-category: concepts
-order: 1
+category: start
+order: 2
 icon: layout
 title: 'Concepts'
 summary: 'Flows, applications and environments: the three things every other page is about, and how they fit together.'

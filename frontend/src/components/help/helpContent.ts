@@ -39,7 +39,6 @@ export type HelpTopic = {
 
 export const HELP_CATEGORIES: HelpCategory[] = [
   { id: 'start', label: 'Getting started' },
-  { id: 'concepts', label: 'Concepts' },
   { id: 'flows', label: 'Flows' },
   { id: 'applications', label: 'Applications' },
   { id: 'environments', label: 'Environments' },
