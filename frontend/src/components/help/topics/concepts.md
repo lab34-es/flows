@@ -23,11 +23,12 @@ Three nouns carry the whole tool. A **flow** says what to test. An
 instance of that system, with which credentials. Everything else is a
 container for those three, or a record of running them.
 
-    flows/checkout/refund.md          the flow: prose + steps
-      └─ step: payments.refund   ──▶  applications/payments/index.ts   the application: methods
-                                        └─ env/uat.env               the environment: BASE_URL, API_TOKEN
-                                              └─▶ https://uat.payments.example
-    test-runs/2026-08-20_14-30-05-uat/     what happened, kept as files
+    flows/checkout/refund.md              the flow: prose + steps
+      └─ step: payments.refund
+          └─▶ applications/payments/index.ts   the application
+                └─ env/uat.env                 the environment
+                    └─▶ https://uat.payments.example
+    test-runs/2026-08-20_14-30-05-uat/    what happened, as files
 
 ## Flows
 
