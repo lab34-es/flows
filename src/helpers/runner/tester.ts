@@ -175,7 +175,7 @@ export const test = async (flow, test, contents): Promise<TestReport> => {
 
 /**
  * Make sure all test applications are started.
- * @param {*} flow 
+ * @param {*} flow
  */
 export const getReady = async (flow) => {
   if (!flow.latentApplications) {
@@ -188,5 +188,34 @@ export const getReady = async (flow) => {
     flow.latentApplications[index].code = require(`../../latentApplications/${application}`);
     await flow.latentApplications[index].code.start(flow, testApplication);
     index++;
+  }
+};
+
+/**
+ * Stop every latent application the flow started.
+ *
+ * A listener belongs to the run that declared it. Left connected, it would
+ * keep a Kafka consumer in its group and an MQTT client subscribed after the
+ * flow was over -- and the next run declaring the same client would be handed
+ * it back, subscriptions, messages and all, so a message the previous run
+ * caused could pass an assertion of this one.
+ *
+ * Never throws: it runs whether the flow passed or failed, and what went wrong
+ * with the flow is what the run has to report, not a listener that would not
+ * hang up.
+ *
+ * @param {*} flow
+ */
+export const shutdown = async (flow) => {
+  for (const latent of flow.latentApplications || []) {
+    if (!latent.code || typeof latent.code.stop !== 'function') {
+      continue;
+    }
+
+    try {
+      await latent.code.stop(latent.client);
+    } catch (error) {
+      console.error(`Could not stop the ${latent.application} client '${latent.client}':`, error);
+    }
   }
 };

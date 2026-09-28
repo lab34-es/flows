@@ -246,3 +246,42 @@ describe('tester.getReady', () => {
     start.mockRestore();
   });
 });
+
+describe('tester.shutdown', () => {
+  test('stops every latent application the flow started, by its client', async () => {
+    const mqtt = { stop: jest.fn() };
+    const kafka = { stop: jest.fn().mockResolvedValue(undefined) };
+    const flow = {
+      latentApplications: [
+        { application: 'mqtt', client: 'devices', code: mqtt },
+        { application: 'kafka', client: 'orders', code: kafka }
+      ]
+    };
+
+    await tester.shutdown(flow);
+
+    expect(mqtt.stop).toHaveBeenCalledWith('devices');
+    expect(kafka.stop).toHaveBeenCalledWith('orders');
+  });
+
+  test('skips what never got as far as being loaded, and a flow with none', async () => {
+    await expect(tester.shutdown({ latentApplications: [{ application: 'kafka', client: 'c' }] })).resolves.toBeUndefined();
+    await expect(tester.shutdown({ latentApplications: [{ application: 'x', code: {} }] })).resolves.toBeUndefined();
+    await expect(tester.shutdown({})).resolves.toBeUndefined();
+  });
+
+  test('a listener that will not hang up is logged, and the others are still stopped', async () => {
+    const stuck = { stop: jest.fn().mockRejectedValue(new Error('broker gone')) };
+    const next = { stop: jest.fn() };
+
+    await expect(tester.shutdown({
+      latentApplications: [
+        { application: 'kafka', client: 'a', code: stuck },
+        { application: 'mqtt', client: 'b', code: next }
+      ]
+    })).resolves.toBeUndefined();
+
+    expect(console.error).toHaveBeenCalledWith("Could not stop the kafka client 'a':", expect.any(Error));
+    expect(next.stop).toHaveBeenCalledWith('b');
+  });
+});

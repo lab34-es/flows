@@ -13,6 +13,7 @@ import * as flows from './helpers/flows';
 import * as httpClient from './helpers/httpClient';
 import * as httpServer from './helpers/httpServer';
 import * as inputs from './helpers/inputs';
+import * as kafkaClient from './helpers/kafkaClient';
 import * as mimicFiles from './helpers/mimicFiles';
 import * as mqttClient from './helpers/mqttClient';
 import * as pgClient from './helpers/pgClient';
@@ -28,6 +29,7 @@ import * as validate from './helpers/validate';
 export type { DescribedError } from './helpers/errors';
 export type { InputRequest, TextOptions } from './helpers/inputs';
 export type { PublishOptions } from './helpers/mqttClient';
+export type { PublishOptions as KafkaPublishOptions } from './helpers/kafkaClient';
 
 export type {
   Context,
@@ -51,6 +53,7 @@ export {
   httpClient,
   httpServer,
   inputs,
+  kafkaClient,
   mimicFiles,
   mqttClient,
   pgClient,

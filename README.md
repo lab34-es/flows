@@ -26,9 +26,9 @@
 ---
 
 Ronsel is a tool for testing end-to-end flows and behaviours across the systems
-you actually run: HTTP APIs, MQTT topics, PostgreSQL databases and web
-applications. You can run flow from the web UI while you are writing it, from
-the CLI on your machine, and unattended in your CI/CD pipelines.
+you actually run: HTTP APIs, MQTT topics, Kafka events, PostgreSQL databases
+and web applications. You can run flow from the web UI while you are writing
+it, from the CLI on your machine, and unattended in your CI/CD pipelines.
 
 A flow is a **Markdown document**. You write whatever you want — headings,
 prose, notes — and mark the executable parts as ` ```step ` code blocks. Run
@@ -80,8 +80,9 @@ test:
   expressions, and reuse the same flows in CI/CD through the CLI.
 - **Mimic dependencies.** Fake what a dependency answers so failure scenarios
   can be reproduced locally.
-- **Multi-protocol.** HTTP APIs, MQTT (including asynchronous, out-of-band
-  assertions), PostgreSQL and browser automation via Playwright.
+- **Multi-protocol.** HTTP APIs, MQTT and Kafka (publishing, and asserting on
+  what arrives asynchronously, out of band), PostgreSQL and browser automation
+  via Playwright.
 - **Random data on every run.** A large set of replacers for ids, dates and
   fake data.
 - **Secrets stay out of the repo.** One env file per application per
@@ -91,7 +92,9 @@ test:
 - **Onboarding in one paste.** Export whichever applications, environments and
   variables a teammate needs as a single YAML document; importing it creates
   the env files they are missing and fills in the rest.
-- **Batteries included.** Example applications and flows are seeded on first run.
+- **Batteries included.** Example applications and flows are seeded on first
+  run — MQTT and Kafka ones among them, which need a local broker (one
+  `docker run` each, in the flows themselves).
 
 ## Install
 

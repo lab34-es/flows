@@ -464,6 +464,10 @@ const processor = async (flow, opts) => {
     // The caller decides what a failure means: the CLI exits with it, the
     // API path swallows it -- but both only after the run was recorded
     throw error;
+  } finally {
+    // Whatever listened for the flow stops with it, however it ended -- and
+    // before the lock is released, so the next run starts with none of it
+    await tester.shutdown(flow);
   }
 };
 
