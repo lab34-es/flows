@@ -15,8 +15,6 @@ import * as applications from './helpers/applications';
  *   node cli.js --view <view> --env <environment> [--folder <folder>]
  *   node cli.js --import-env <path-to-yaml> [--view <view> --env <environment>]
  *   node cli.js --capabilities
- *   node cli.js --agent --agent-id <name> --broker <url> --username <user> --password <secret>
- *   node cli.js --remote <agent> --file <path> --env <environment>
  *
  * Named nothing to run, the command starts the web UI: somebody who did not
  * ask for a flow is here to look at them.
@@ -53,8 +51,6 @@ import * as applications from './helpers/applications';
  *                  nothing
  *   --capabilities List all available capabilities of the context
  *   --env          Environment to run the flow in (required for --file/--view)
- *   --agent        Run as an agent: wait on the broker for flows to run here
- *   --remote       Run --file or --view on the named agent instead of here
  *   --debug        Print debug information including environment variables
  *   --version      Print the installed version and exit
  *   --help         Show this help message
@@ -116,9 +112,6 @@ Usage:
   ronsel --file <path-to-flow-file> --env <environment> [--debug] [--help]
   ronsel --view <view> --env <environment> [--folder <folder>]
   ronsel --import-env <path-to-yaml> [--view <view> --env <environment>]
-  ronsel --agent --agent-id <name> [--broker <url> --username <user> --password <secret>]
-  ronsel --remote <agent> --file <path-to-flow-file> --env <environment>
-  ronsel --remote <agent> --view <view> --env <environment>
 
 Told nothing to run, ronsel starts the web UI on the context -- which is the
 whole of the second form above.
@@ -165,17 +158,6 @@ Options:
                   an address, on that one. Either way it says so at start
   --no-open       Do not open the browser. It is not opened anyway when
                   nobody is watching the terminal, or when CI is set
-  --agent         Run as an agent: connect to the MQTT broker under
-                  --agent-id and run, in this context, the flows other
-                  machines send. The agent's public key is printed at start
-  --remote        Run --file or --view on the named agent rather than on this
-                  machine: the commit this context is on and the env files the
-                  flows use travel to it, and its results land in this
-                  context's test-runs
-  --broker        MQTT broker URL (mqtts://host:port or wss://host/path).
-                  Stored in config/remote.json the first time, with --username;
-                  --password goes to the context's .env. FLOWS_BROKER_URL,
-                  FLOWS_BROKER_USERNAME and FLOWS_BROKER_PASSWORD work too
   --no-install    With "start", write the files and skip the npm install --
                   useful when the folder is installed by something else
   --install-browsers
@@ -215,9 +197,6 @@ Examples:
   ronsel --context my/context/folder --import-env env.yaml --view smoke --env uat
   ronsel --context my/context/folder --import-env env.yaml --dry-run
   ronsel --context my/context/folder --capabilities
-  ronsel --context ~/flows-agent --agent --agent-id agent-ourense --broker mqtts://mqtt.example:443 --username agent-ourense --password s3cret
-  ronsel --remote agent-ourense --file flows/my-flow.md --env production
-  ronsel --remote agent-ourense --view smoke --env uat
   `);
   process.exit(0);
 }
@@ -292,13 +271,6 @@ function parseArguments() {
     dryRun: argv.dryRun || argv['dry-run'] || false,
     ai: argv.ai || null, // Removed: kept only to show a helpful error
     capabilities: argv.capabilities || false,
-    // Remote execution: this machine as an agent, or a run sent to one
-    agent: argv.agent || false,
-    agentId: argv.agentId || argv['agent-id'] || null,
-    remote: typeof argv.remote === 'string' ? argv.remote : null,
-    broker: typeof argv.broker === 'string' ? argv.broker : null,
-    username: typeof argv.username === 'string' ? argv.username : null,
-    password: typeof argv.password === 'string' ? argv.password : null,
     env: argv.env || null,
     context: argv.context || null,
     // Where the UI listens, and whether a browser is opened on it. The port
@@ -606,133 +578,6 @@ async function startProject(args) {
 }
 
 /**
- * Run as an agent: sit on the broker and run the flows other machines send.
- *
- * Nothing about the flows themselves changes on this side -- they run through
- * the same runner, from this context. What the agent adds is the connection
- * and a name.
- *
- * @param {Object} args - { agentId, broker, username, password }
- */
-async function startAgent(args) {
-  const remoteConfig = require('./helpers/remote/config');
-  const brokerHelper = require('./helpers/remote/broker');
-  const agent = require('./helpers/remote/agent');
-
-  cli.logo(packageJson.version);
-
-  let identity;
-  let settings;
-  try {
-    identity = await remoteConfig.agentIdentity(args.agentId);
-    settings = await remoteConfig.brokerSettings({
-      url: args.broker, username: args.username, password: args.password
-    });
-  }
-  catch (error) {
-    exitWithError(error.message);
-    return;
-  }
-
-  await bootstrap.ensureTypeScriptConfig();
-  await applications.loadAll();
-
-  console.log(`Agent:       ${identity.id}`);
-  console.log(`Broker:      ${settings.url}${settings.username ? ` as ${settings.username}` : ''}`);
-  console.log(`Context:     ${await paths.contextRoot()}`);
-  console.log(`Public key:  ${identity.publicKey}`);
-  console.log(`Fingerprint: ${identity.fingerprint}`);
-
-  let connection;
-  try {
-    connection = await brokerHelper.connect({
-      url: settings.url,
-      username: settings.username,
-      password: settings.password,
-      clientId: `flows-agent-${identity.id}`,
-      will: agent.will(identity.id)
-    });
-  }
-  catch (error) {
-    exitWithError(error.message);
-    return;
-  }
-
-  const running = await agent.start({ identity, connection });
-  console.log('\nWaiting for jobs. Ctrl+C to stop.');
-
-  const stop = async () => {
-    console.log('\nStopping...');
-    await running.stop();
-    process.exit(0);
-  };
-
-  process.once('SIGINT', stop);
-  process.once('SIGTERM', stop);
-}
-
-/**
- * Run a flow, or a view, on an agent instead of here.
- *
- * @param {Object} args - { remote, file, view, folder, env, broker, username, password }
- */
-async function runRemote(args) {
-  const remoteConfig = require('./helpers/remote/config');
-  const client = require('./helpers/remote/client');
-  const terminal = require('./helpers/remote/terminal');
-
-  cli.logo(packageJson.version);
-
-  if (args.broker || args.username || args.password) {
-    try {
-      await remoteConfig.brokerSettings({ url: args.broker, username: args.username, password: args.password });
-    }
-    catch (error) {
-      exitWithError(error.message);
-      return;
-    }
-  }
-
-  console.log(`Agent:       ${args.remote}`);
-  console.log(`Environment: ${args.env}`);
-  console.log(args.file ? `Flow:        ${args.file}` : `View:        ${args.view || '(first view)'}`);
-  console.log('');
-
-  let result;
-  try {
-    result = await client.run({
-      agent: args.remote,
-      environment: args.env,
-      file: args.file || undefined,
-      view: args.file ? undefined : args.view,
-      folder: args.folder,
-      onEvent: (event, payload) => {
-        const line = terminal.describe(event, payload);
-        if (line) { console.log(line); }
-      },
-      onInput: terminal.prompt
-    });
-  }
-  catch (error) {
-    exitWithError(error.message);
-    return;
-  }
-
-  result.warnings.forEach(warning => console.warn(`Warning: ${warning}`));
-
-  const { testRun } = result;
-  const passed = (testRun.flows || []).filter(flow => flow.status === 'passed');
-  const failed = (testRun.flows || []).filter(flow => flow.status !== 'passed');
-
-  console.log(`\n${'═'.repeat(60)}`);
-  console.log(`${args.remote}: ${passed.length} passed, ${failed.length} failed`);
-  failed.forEach(flow => console.log(`  failed: ${flow.file}${flow.error ? ` — ${flow.error}` : ''}`));
-  console.log(`Recorded as test run ${testRun.id}`);
-
-  process.exit(testRun.status === 'passed' ? 0 : 1);
-}
-
-/**
  * Settle on the directory this run works in.
  *
  * `--context` names it outright. Without it the directory the command was run
@@ -843,21 +688,6 @@ async function main() {
     // List capabilities
     await flows.listCapabilities();
     process.exit(0);
-  } else if (args.agent) {
-    // Wait on the broker for flows to run here
-    await startAgent(args);
-  } else if (args.remote) {
-    // Run somewhere else, and watch from here
-    if (!args.env) {
-      exitWithError('No environment specified. Use --env <environment>');
-      return;
-    }
-    if (!args.file && args.view === null) {
-      exitWithError('Name what to run on the agent: --file <path-to-flow-file> or --view <view>');
-      return;
-    }
-
-    await runRemote(args);
   } else if (args.view !== null) {
     // Run a whole view: every flow its filters match
     if (!args.env) {
