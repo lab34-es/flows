@@ -81,12 +81,13 @@ test:
 - **Mimic dependencies.** Fake what a dependency answers so failure scenarios
   can be reproduced locally.
 - **Multi-protocol.** HTTP APIs, MQTT and Kafka (publishing, and asserting on
-  what arrives asynchronously, out of band), PostgreSQL and browser automation
-  via Playwright.
+  what arrives asynchronously, out of band — Avro included, through a schema
+  registry), PostgreSQL and browser automation via Playwright.
 - **Random data on every run.** A large set of replacers for ids, dates and
   fake data.
 - **Secrets stay out of the repo.** One env file per application per
-  environment, kept in your context folder. An environment exists as soon as
+  environment, kept in your context folder — MQTT and Kafka listeners included,
+  which take their broker and credentials from an application's env file. An environment exists as soon as
   one application declares it, and a run only asks for the files of the
   applications its flow actually uses.
 - **Onboarding in one paste.** Export whichever applications, environments and

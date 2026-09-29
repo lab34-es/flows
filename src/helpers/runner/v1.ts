@@ -255,7 +255,7 @@ const processor = async (flow, opts) => {
 
     mimicdApplications = await mimicing.load(plannedSteps);
 
-    await tester.getReady(flow);
+    await tester.getReady(flow, environment);
 
     // Add an "id" to each step
     flow.steps = buildSteps(steps);

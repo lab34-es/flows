@@ -33,7 +33,7 @@
  */
 import createDebug from 'debug';
 
-import { connectionOptions, library, reason } from './kafkaConnection';
+import { connectionOptions, library, reason, settingsFromEnv } from './kafkaConnection';
 import type { ConnectionSettings } from './kafkaConnection';
 
 const debug = createDebug('ronsel:helpers:kafkaClient');
@@ -66,18 +66,7 @@ const settings = (ctx): ConnectionSettings => {
     throw new Error('KAFKA_BROKERS is not set: the application has no cluster to publish to');
   }
 
-  return {
-    brokers: env.KAFKA_BROKERS,
-    clientId: env.KAFKA_CLIENT_ID,
-    ssl: env.KAFKA_SSL === 'true',
-    ca: env.KAFKA_CA,
-    cert: env.KAFKA_CERT,
-    key: env.KAFKA_KEY,
-    rejectUnauthorized: env.KAFKA_REJECT_UNAUTHORIZED === 'false' ? false : undefined,
-    sasl: env.KAFKA_USERNAME || env.KAFKA_SASL_MECHANISM
-      ? { mechanism: env.KAFKA_SASL_MECHANISM, username: env.KAFKA_USERNAME, password: env.KAFKA_PASSWORD }
-      : undefined
-  };
+  return settingsFromEnv(env);
 };
 
 /** The message as bytes: JSON, unless it already is bytes or an encoder says otherwise. */

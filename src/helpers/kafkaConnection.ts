@@ -49,7 +49,47 @@ export interface ConnectionSettings {
     username?: string;
     password?: string;
   };
+  /**
+   * Where the Avro schemas of the messages live, for a listener to decode
+   * them: any registry that speaks Confluent's API (Confluent, Apicurio,
+   * Karapace, Redpanda). Publishing does not need it.
+   */
+  schemaRegistry?: {
+    url: string;
+    username?: string;
+    password?: string;
+  };
 }
+
+/**
+ * A cluster as an application's env file describes it: the `KAFKA_*`
+ * variables. `kafkaClient` publishes with it, and a listener whose
+ * `connection` names the application listens with it -- so the brokers, and
+ * the credentials to them, are written once, in the env file of the
+ * environment they belong to.
+ *
+ * @param {Object} env - The parsed env file.
+ * @returns {ConnectionSettings}
+ */
+export const settingsFromEnv = (env: Record<string, string> = {}): ConnectionSettings => ({
+  brokers: env.KAFKA_BROKERS,
+  clientId: env.KAFKA_CLIENT_ID,
+  ssl: env.KAFKA_SSL === 'true',
+  ca: env.KAFKA_CA,
+  cert: env.KAFKA_CERT,
+  key: env.KAFKA_KEY,
+  rejectUnauthorized: env.KAFKA_REJECT_UNAUTHORIZED === 'false' ? false : undefined,
+  sasl: env.KAFKA_USERNAME || env.KAFKA_SASL_MECHANISM
+    ? { mechanism: env.KAFKA_SASL_MECHANISM, username: env.KAFKA_USERNAME, password: env.KAFKA_PASSWORD }
+    : undefined,
+  schemaRegistry: env.KAFKA_SCHEMA_REGISTRY_URL
+    ? {
+      url: env.KAFKA_SCHEMA_REGISTRY_URL,
+      username: env.KAFKA_SCHEMA_REGISTRY_USERNAME,
+      password: env.KAFKA_SCHEMA_REGISTRY_PASSWORD
+    }
+    : undefined
+});
 
 /** The part of the client options that says where the cluster is. */
 export interface ConnectionOptions {

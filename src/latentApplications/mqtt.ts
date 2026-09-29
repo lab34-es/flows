@@ -11,27 +11,53 @@ import mqtt from 'mqtt';
 import fs from 'fs';
 
 import * as latent from '../helpers/latent';
+import * as mqttConnection from '../helpers/mqttConnection';
 
 const instances = {};
 
+/**
+ * The options to connect with: what the env file of the application named by
+ * `connection` says, if it names one, and then whatever the flow wrote itself.
+ *
+ * The client id is always the listener's own `client`, never the env file's
+ * `MQTT_CLIENT_ID`: that one belongs to the application publishing, and a
+ * broker drops whichever of two clients with the same id connected first.
+ */
+const options = (details): Record<string, any> => {
+  const { client: id, env } = details;
+  const connection = typeof details.connection === 'object' && details.connection ? details.connection : {};
+  const fromEnv = env ? mqttConnection.fromEnv(env) : {};
+
+  const connectionOpts: Record<string, any> = {
+    ...fromEnv,
+    clientId: id,
+    protocol: connection.protocol || fromEnv.protocol || 'mqtt'
+  };
+
+  if (connection.host) {connectionOpts.host = connection.host;}
+  if (connection.port) {connectionOpts.port = connection.port;}
+  if (connection.username) {connectionOpts.username = connection.username;}
+  if (connection.password) {connectionOpts.password = connection.password;}
+  if (connection.rejectUnauthorized === false) {connectionOpts.rejectUnauthorized = false;}
+
+  if (connection.key) {connectionOpts.key = fs.readFileSync(connection.key);}
+  if (connection.cert) {connectionOpts.cert = fs.readFileSync(connection.cert);}
+  if (connection.ca) {connectionOpts.ca = fs.readFileSync(connection.ca);}
+
+  return connectionOpts;
+};
+
 const connect = (flow, details) => {
   return new Promise((resolve, reject) => {
-    const { client: id, connection } = details;
+    const connectionOpts = options(details);
 
-    const connectionOpts: Record<string, any> = {
-      host: connection.host,
-      clientId: id,
-      protocol: connection.protocol || 'mqtt'
-    };
-
-    if (connection.port) {connectionOpts.port = connection.port;}
-    if (connection.username) {connectionOpts.username = connection.username;}
-    if (connection.password) {connectionOpts.password = connection.password;}
-    if (connection.rejectUnauthorized === false) {connectionOpts.rejectUnauthorized = false;}
-
-    if (connection.key) {connectionOpts.key = fs.readFileSync(connection.key);}
-    if (connection.cert) {connectionOpts.cert = fs.readFileSync(connection.cert);}
-    if (connection.ca) {connectionOpts.ca = fs.readFileSync(connection.ca);}
+    if (!connectionOpts.host) {
+      reject(new Error(
+        `MQTT client '${details.client}' has no broker to connect to: ` +
+        'name its host under "connection", or the application whose MQTT_HOST it uses'
+      ));
+      return;
+    }
 
     const client = mqtt.connect(connectionOpts);
 

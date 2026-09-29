@@ -42,6 +42,8 @@ jest.mock('@platformatic/kafka', () => {
   };
 });
 
+import avsc from 'avsc';
+
 import * as latentKafka from '../../src/latentApplications/kafka';
 
 const connection = { brokers: ['localhost:9092'] };
@@ -383,6 +385,122 @@ describe('kafka.test - waiting, and failing', () => {
       .toHaveLength(1);
     await expect(latentKafka.test({}, { client: 'orders', test: [{ topic: 'shop.orders', key: 'order-13000' }] }, {})).resolves.toEqual([]);
     await expect(latentKafka.test({}, { client: 'orders', test: [{ topic: 'shop.orders', key: 'order-0' }] }, {})).resolves.toHaveLength(1);
+  });
+});
+
+describe('kafka.start - a connection taken from an application', () => {
+  afterEach(() => latentKafka.stop('shop'));
+
+  test('the cluster and credentials come from its env file', async () => {
+    await latentKafka.start({}, {
+      client: 'shop',
+      connection: 'orders',
+      env: { KAFKA_BROKERS: 'kafka.staging:9093', KAFKA_SASL_MECHANISM: 'SCRAM-SHA-512', KAFKA_USERNAME: 'u', KAFKA_PASSWORD: 'p' },
+      subscribe: ['shop.orders']
+    });
+
+    expect(lastConsumer().options).toEqual(expect.objectContaining({
+      bootstrapBrokers: ['kafka.staging:9093'],
+      sasl: { mechanism: 'SCRAM-SHA-512', username: 'u', password: 'p' }
+    }));
+  });
+
+  test('what the flow writes wins over the env file', async () => {
+    await latentKafka.start({}, {
+      client: 'shop',
+      connection: { application: 'orders', brokers: ['localhost:9092'], groupId: 'ignored-here' },
+      groupId: 'qa-ronsel',
+      env: { KAFKA_BROKERS: 'kafka.staging:9093' },
+      subscribe: ['shop.orders']
+    });
+
+    expect(lastConsumer().options).toEqual(expect.objectContaining({ bootstrapBrokers: ['localhost:9092'], groupId: 'qa-ronsel' }));
+  });
+
+  test('an env file with no brokers says so, naming the listener', async () => {
+    await expect(latentKafka.start({}, { client: 'shop', connection: 'orders', env: {}, subscribe: ['shop.orders'] }))
+      .rejects.toThrow("Kafka client 'shop' could not listen to shop.orders: No Kafka brokers configured");
+  });
+});
+
+describe('kafka - Avro', () => {
+  const SCHEMA: any = { type: 'record', name: 'OrderPlaced', fields: [{ name: 'orderId', type: 'string' }, { name: 'total', type: 'double' }] };
+
+  /** The Confluent wire format: a zero, the schema id, the Avro bytes. */
+  const framed = (id: number, value: any) => {
+    const header = Buffer.alloc(5);
+    header.writeInt32BE(id, 1);
+    return Buffer.concat([header, avsc.Type.forSchema(SCHEMA).toBuffer(value)]);
+  };
+
+  let fetch: jest.SpyInstance;
+
+  beforeEach(async () => {
+    fetch = jest.spyOn(global, 'fetch').mockImplementation(async (url: any) => {
+      if (String(url).endsWith('/schemas/ids/3')) {
+        return { ok: true, json: async () => ({ schema: JSON.stringify(SCHEMA) }) } as any;
+      }
+      return { ok: false, status: 404 } as any;
+    });
+
+    await latentKafka.start({}, {
+      client: 'shop',
+      connection: 'orders',
+      env: { KAFKA_BROKERS: 'localhost:9092', KAFKA_SCHEMA_REGISTRY_URL: 'http://registry:8081' },
+      subscribe: ['shop.orders']
+    });
+  });
+
+  afterEach(() => latentKafka.stop('shop'));
+
+  /** Deliver, and wait for what the registry has to say about it. */
+  const deliver = async (...messages: Record<string, any>[]) => {
+    messages.forEach(message => lastConsumer().stream.emit('data', wire(message)));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setImmediate(resolve));
+  };
+
+  test('an Avro message is asserted on and remembered like a JSON one, and a JSON one still is', async () => {
+    await deliver(
+      { key: Buffer.from('ord-1'), value: framed(3, { orderId: 'ord-1', total: 29 }) },
+      { key: Buffer.from('ord-2'), value: Buffer.from(JSON.stringify({ orderId: 'ord-2', total: 12 })) }
+    );
+    const flow: any = { memory: {} };
+
+    await expect(latentKafka.test(flow, {
+      client: 'shop',
+      test: [
+        { topic: 'shop.orders', key: 'ord-1', message: { total: 29 }, memory: { total: '{{ message.total }}' } },
+        { topic: 'shop.orders', key: 'ord-2', message: { total: 12 } }
+      ],
+      retry: { attempts: 3, delay: 0.01 }
+    }, {})).resolves.toEqual([]);
+
+    expect(flow.memory.total).toBe(29);
+    expect(fetch).toHaveBeenCalledWith('http://registry:8081/schemas/ids/3', expect.anything());
+  });
+
+  test('an Avro key is decoded too', async () => {
+    const KEY: any = { type: 'record', name: 'OrderKey', fields: [{ name: 'id', type: 'string' }] };
+    fetch.mockImplementation(async () => ({ ok: true, json: async () => ({ schema: JSON.stringify(KEY) }) }) as any);
+    const header = Buffer.alloc(5);
+    header.writeInt32BE(4, 1);
+
+    await deliver({ key: Buffer.concat([header, avsc.Type.forSchema(KEY).toBuffer({ id: 'ord-9' })]) });
+
+    await expect(latentKafka.test({}, {
+      client: 'shop', test: [{ topic: 'shop.orders', key: '$expr: value.id === "ord-9"' }], retry: { attempts: 3, delay: 0.01 }
+    }, {})).resolves.toEqual([]);
+  });
+
+  test('a schema the registry does not know keeps the message, as text, and says why once', async () => {
+    await deliver({ key: Buffer.from('ord-5'), value: framed(5, { orderId: 'ord-5', total: 1 }) }, { key: Buffer.from('ord-6'), value: framed(5, { orderId: 'ord-6', total: 1 }) });
+
+    await expect(latentKafka.test({}, {
+      client: 'shop', test: [{ topic: 'shop.orders', key: 'ord-5', message: '$expr: typeof value === "string"' }]
+    }, {})).resolves.toEqual([]);
+
+    expect((console.error as jest.Mock).mock.calls.filter(([line]) => String(line).includes('could not decode an Avro message'))).toHaveLength(1);
   });
 });
 

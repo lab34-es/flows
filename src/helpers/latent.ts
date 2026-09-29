@@ -184,3 +184,40 @@ export const check = (
 
   look();
 });
+
+/**
+ * Which application's env file a listener takes its connection from, if any.
+ *
+ * A flow names the broker or the cluster once, in an application it already
+ * has -- `connection: orders` -- instead of writing a host, and credentials,
+ * into the flow. The environment the flow runs against then decides which
+ * env file of that application is read, so one flow runs against every
+ * environment, and no secret ever lives in it.
+ *
+ * @param {*} connection - The frontmatter entry's `connection`: an
+ *   application name, an object naming one as `application`, or an object
+ *   that is the whole connection.
+ * @returns {string|null}
+ */
+export const connectionSource = (connection): string | null => {
+  if (typeof connection === 'string') { return connection.trim() || null; }
+  if (connection && typeof connection === 'object' && typeof connection.application === 'string') {
+    return connection.application.trim() || null;
+  }
+  return null;
+};
+
+/**
+ * The connection fields the flow wrote itself, which win over what the env
+ * file says: `connection: { application: orders, groupId: qa }` changes one
+ * thing and keeps the rest.
+ *
+ * @param {*} connection
+ * @returns {Object}
+ */
+export const connectionOverrides = (connection): Record<string, any> => {
+  if (!connection || typeof connection !== 'object') { return {}; }
+
+  const { application: _application, ...overrides } = connection;
+  return overrides;
+};

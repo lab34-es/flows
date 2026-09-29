@@ -52,6 +52,11 @@ JSDoc blocks of `index.ts`) for the full input / output reference.
 that asks for TLS or credentials, such as Confluent Cloud, Amazon MSK or
 Aiven.
 
+The example flow's listener reads these same variables (`connection:
+orders`), plus `KAFKA_SCHEMA_REGISTRY_URL` (and `_USERNAME`, `_PASSWORD`) to
+decode Avro messages — so a cluster is written in one place only, per
+environment.
+
 ## The flow
 
 `flows/examples/06-kafka-orders.md` runs all three, end to end.

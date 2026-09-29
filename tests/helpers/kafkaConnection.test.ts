@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-import { connectionOptions, reason } from '../../src/helpers/kafkaConnection';
+import { connectionOptions, reason, settingsFromEnv } from '../../src/helpers/kafkaConnection';
 
 describe('kafkaConnection.connectionOptions', () => {
   test('brokers are a list or one comma-separated string, trimmed', () => {
@@ -46,5 +46,32 @@ describe('kafkaConnection.reason', () => {
     expect(reason('refused')).toBe('refused');
     expect(reason({ errors: [{}] })).toBe('[object Object]');
     expect(reason(new AggregateError([{ cause: null }], 'outer'))).toBe('outer');
+  });
+});
+
+describe('kafkaConnection.settingsFromEnv', () => {
+  test('the KAFKA_* variables of an env file, schema registry included', () => {
+    expect(settingsFromEnv({
+      KAFKA_BROKERS: 'a:9092',
+      KAFKA_SSL: 'true',
+      KAFKA_SASL_MECHANISM: 'SCRAM-SHA-512',
+      KAFKA_USERNAME: 'u',
+      KAFKA_PASSWORD: 'p',
+      KAFKA_REJECT_UNAUTHORIZED: 'false',
+      KAFKA_SCHEMA_REGISTRY_URL: 'http://registry:8081',
+      KAFKA_SCHEMA_REGISTRY_USERNAME: 'ru',
+      KAFKA_SCHEMA_REGISTRY_PASSWORD: 'rp'
+    })).toEqual(expect.objectContaining({
+      brokers: 'a:9092',
+      ssl: true,
+      rejectUnauthorized: false,
+      sasl: { mechanism: 'SCRAM-SHA-512', username: 'u', password: 'p' },
+      schemaRegistry: { url: 'http://registry:8081', username: 'ru', password: 'rp' }
+    }));
+  });
+
+  test('nothing configured is nothing asked for', () => {
+    expect(settingsFromEnv())
+      .toEqual(expect.objectContaining({ ssl: false, sasl: undefined, schemaRegistry: undefined }));
   });
 });

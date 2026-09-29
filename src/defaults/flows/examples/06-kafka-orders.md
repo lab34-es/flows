@@ -4,9 +4,7 @@ description: An API call whose effect is an event, asserted by key and headers, 
 latentApplications:
   - application: kafka
     client: shop
-    connection:
-      brokers:
-        - localhost:9092
+    connection: orders
     subscribe:
       - topic: ronsel.examples.orders
       - topic: ronsel.examples.payments
@@ -39,13 +37,24 @@ event published to its topics until the flow is over.
 latentApplications:
   - application: kafka
     client: shop
-    connection:
-      brokers:
-        - localhost:9092
+    connection: orders
     subscribe:
       - topic: ronsel.examples.orders
       - topic: ronsel.examples.payments
 ```
+
+`connection: orders` says where the cluster is without saying it here: the
+listener connects the way the `orders` application does, with the `KAFKA_*`
+variables of its env file for the environment the flow runs against —
+brokers, SASL credentials, TLS, and the schema registry that decodes Avro
+messages. Add a `staging.env` to `orders` and this very flow runs against
+staging, with no broker and no password ever written in it. A field written
+here still wins: `connection: { application: orders, groupId: qa-ronsel }`.
+
+Messages in Avro — the Confluent wire format — are decoded with the schema
+the registry holds for them, when `KAFKA_SCHEMA_REGISTRY_URL` is set; JSON
+and text are read as they are. Both can share a topic, and a step asserts on
+either the same way.
 
 It only ever sees what is published *after* the flow started — it is there
 to observe what the steps cause, not to replay the topic's history. It

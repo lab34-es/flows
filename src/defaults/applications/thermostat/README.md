@@ -46,8 +46,11 @@ input / output reference of each method.
 `MQTT_KEY`, `MQTT_CERT`, `MQTT_CA`, `MQTT_REJECT_UNAUTHORIZED`, `MQTT_QOS` —
 for a broker that asks for credentials or certificates, such as AWS IoT.
 
+The example flow's listener reads these same variables (`connection:
+thermostat`), so a broker is written in one place only, per environment.
+
 No Docker? A public test broker works too: set `MQTT_HOST` to
-`broker.hivemq.com` here, and `host` in the frontmatter of the flow.
+`broker.hivemq.com`.
 
 ## The flow
 

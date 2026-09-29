@@ -1,3 +1,9 @@
+jest.mock('yargs-parser', () => () => ({}));
+jest.mock('../../src/helpers/paths');
+
+import fs from 'fs';
+
+import * as paths from '../../src/helpers/paths';
 import * as tester from '../../src/helpers/runner/tester';
 
 describe('tester.test - status assertions', () => {
@@ -244,6 +250,50 @@ describe('tester.getReady', () => {
     expect(flow.latentApplications[0].code).toBeDefined();
     expect(start).toHaveBeenCalledWith(flow, flow.latentApplications[0]);
     start.mockRestore();
+  });
+
+  describe('a connection taken from an application', () => {
+    let start: jest.SpyInstance;
+
+    beforeEach(() => {
+      (paths.contextDir as jest.Mock).mockImplementation(async (parts: string[]) => `/ctx/${parts.join('/')}`);
+      start = jest.spyOn(require('../../src/latentApplications/kafka'), 'start').mockResolvedValue(undefined);
+    });
+
+    afterEach(() => start.mockRestore());
+
+    test('reads that application\'s env file for the environment the flow runs against', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      const read = jest.spyOn(fs, 'readFileSync').mockReturnValue('KAFKA_BROKERS=b:9092\nKAFKA_PASSWORD=s3cret\n' as any);
+      const flow: any = {
+        latentApplications: [
+          { application: 'kafka', client: 'shop', connection: 'orders' },
+          { application: 'kafka', client: 'audit', connection: { application: 'orders', groupId: 'qa' } }
+        ]
+      };
+
+      await tester.getReady(flow, 'staging');
+
+      expect(read).toHaveBeenCalledWith('/ctx/applications/orders/env/staging.env');
+      expect(flow.latentApplications[0].env).toEqual({ KAFKA_BROKERS: 'b:9092', KAFKA_PASSWORD: 's3cret' });
+      expect(flow.latentApplications[1].env).toEqual({ KAFKA_BROKERS: 'b:9092', KAFKA_PASSWORD: 's3cret' });
+      expect(start).toHaveBeenCalledTimes(2);
+    });
+
+    test('an application with no env file for the environment stops the flow before it starts', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+      const flow: any = { latentApplications: [{ application: 'kafka', client: 'shop', connection: 'orders' }] };
+
+      await expect(tester.getReady(flow, 'prod'))
+        .rejects.toThrow("The kafka client 'shop' connects the way 'orders' does, but applications/orders/env/prod.env does not exist");
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    test('without an environment there is no env file to read', async () => {
+      const flow: any = { latentApplications: [{ application: 'kafka', client: 'shop', connection: 'orders' }] };
+
+      await expect(tester.getReady(flow)).rejects.toThrow('applications/orders/env/<environment>.env does not exist');
+    });
   });
 });
 

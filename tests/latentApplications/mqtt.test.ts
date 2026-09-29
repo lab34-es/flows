@@ -115,6 +115,51 @@ describe('mqtt.start', () => {
   });
 });
 
+describe('mqtt.start - a connection taken from an application', () => {
+  test('the broker and credentials come from its env file, the client id never does', async () => {
+    await latentMqtt.start({}, {
+      client: 'devices',
+      connection: 'thermostat',
+      env: { MQTT_HOST: 'broker.prod', MQTT_PORT: '8883', MQTT_PROTOCOL: 'mqtts', MQTT_USERNAME: 'u', MQTT_PASSWORD: 'p', MQTT_CLIENT_ID: 'the-publisher' }
+    });
+
+    expect((mqtt.connect as jest.Mock).mock.calls[0][0]).toEqual(expect.objectContaining({
+      host: 'broker.prod', port: 8883, protocol: 'mqtts', username: 'u', password: 'p', clientId: 'devices'
+    }));
+    latentMqtt.stop('devices');
+  });
+
+  test('what the flow writes wins over the env file', async () => {
+    await latentMqtt.start({}, {
+      client: 'devices',
+      connection: { application: 'thermostat', host: 'localhost', port: 1884 },
+      env: { MQTT_HOST: 'broker.prod', MQTT_PORT: '8883', MQTT_CERT: '/c.pem' }
+    }).catch(() => undefined);
+
+    // MQTT_CERT is read off disk, and this one does not exist
+    expect(mqtt.connect).not.toHaveBeenCalled();
+
+    const read = jest.spyOn(fs, 'readFileSync').mockReturnValue('PEM' as any);
+    await latentMqtt.start({}, {
+      client: 'devices',
+      connection: { application: 'thermostat', host: 'localhost', port: 1884, protocol: 'mqtt' },
+      env: { MQTT_HOST: 'broker.prod', MQTT_PORT: '8883', MQTT_CERT: '/c.pem' }
+    });
+
+    expect((mqtt.connect as jest.Mock).mock.calls[0][0]).toEqual(expect.objectContaining({
+      host: 'localhost', port: 1884, protocol: 'mqtt', cert: 'PEM'
+    }));
+    read.mockRestore();
+    latentMqtt.stop('devices');
+  });
+
+  test('a listener with no broker anywhere says so, and connects to nothing', async () => {
+    await expect(latentMqtt.start({}, { client: 'devices', connection: 'thermostat', env: {} }))
+      .rejects.toThrow("MQTT client 'devices' has no broker to connect to");
+    expect(mqtt.connect).not.toHaveBeenCalled();
+  });
+});
+
 describe('mqtt.test', () => {
   beforeEach(async () => {
     await latentMqtt.start({}, { client: 'tester', connection: { host: 'b' } });

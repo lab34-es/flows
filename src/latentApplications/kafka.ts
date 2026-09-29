@@ -12,10 +12,19 @@
  *     latentApplications:
  *       - application: kafka
  *         client: orders
- *         connection:
- *           brokers: [localhost:9092]
+ *         connection: shop
  *         subscribe:
  *           - topic: shop.orders
+ *
+ * `connection: shop` reads the cluster -- brokers, credentials, schema
+ * registry -- from the `KAFKA_*` variables of the `shop` application, in the
+ * env file of whichever environment the flow runs against. The cluster can
+ * be written in the flow instead (`connection: { brokers: [...] }`), and
+ * `connection: { application: shop, groupId: ... }` overrides a field of it.
+ *
+ * Messages in the Confluent wire format are decoded with the Avro schema the
+ * registry holds for them, when one is configured; everything else is read
+ * as JSON, or as text. Both can arrive on the same topic.
  *
  * A listener only ever sees what is published *after* the flow started: it is
  * there to observe what the steps cause, and a topic's history is somebody
@@ -26,8 +35,9 @@
 import createDebug from 'debug';
 import { v4 as uuidv4 } from 'uuid';
 
+import * as avro from '../helpers/avro';
 import * as latent from '../helpers/latent';
-import { connectionOptions, library, reason } from '../helpers/kafkaConnection';
+import { connectionOptions, library, reason, settingsFromEnv } from '../helpers/kafkaConnection';
 import type { ConnectionSettings } from '../helpers/kafkaConnection';
 
 const debug = createDebug('ronsel:latentApplications:kafka');
@@ -55,6 +65,8 @@ interface Instance {
   trimmed: boolean;
   /** What broke the listener after it had started, if anything did. */
   failure: Error | null;
+  /** The messages still being decoded, in the order they arrived. */
+  pending: Promise<void>;
 }
 
 const instances: Record<string, Instance> = {};
@@ -81,26 +93,55 @@ const subscriptions = (subscribe): string[] => {
 /** Bytes as text, keeping the difference between no value and an empty one. */
 const text = (value): string | null => (value === undefined || value === null ? null : value.toString());
 
-/** A message off the wire, as an assertion reads it. */
-const receive = (message): Received => ({
+/**
+ * A message off the wire, as an assertion reads it. Key and value arrive as
+ * text, or parsed JSON -- unless `decoded` says what they are, which is how an
+ * Avro message arrives.
+ */
+const receive = (message, decoded: { key?: any; value?: any } = {}): Received => ({
   topic: message.topic,
   partition: message.partition,
   offset: Number(message.offset),
-  key: text(message.key),
+  key: decoded.key !== undefined ? decoded.key : text(message.key),
   headers: Object.fromEntries(
     [...(message.headers || new Map())].map(([name, value]) => [String(name), text(value)])
   ),
   timestamp: Number(message.timestamp),
-  message: latent.decode(message.value),
+  message: decoded.value !== undefined ? decoded.value : latent.decode(message.value),
   date: new Date()
 });
+
+/**
+ * A message whose key or value may be Avro, decoded with the schema the
+ * registry holds for it. What cannot be decoded -- a registry that is down,
+ * a schema it does not know -- is read as anything else would be, and said
+ * once, rather than dropping a message a step may be waiting for.
+ */
+const receiveAvro = async (id: string, decoder, message, reported: Set<string>): Promise<Received> => {
+  const decode = async (bytes) => {
+    if (!avro.framed(bytes)) { return undefined; }
+
+    try {
+      return await decoder.decode(bytes);
+    } catch (error) {
+      const problem = reason(error);
+      if (!reported.has(problem)) {
+        reported.add(problem);
+        console.error(`Kafka client '${id}' could not decode an Avro message, and kept it as text: ${problem}`);
+      }
+      return undefined;
+    }
+  };
+
+  return receive(message, { key: await decode(message.key), value: await decode(message.value) });
+};
 
 /**
  * Keep a message, dropping the oldest ones in a batch once there are too many,
  * rather than one per message -- and saying so once, not once per batch.
  */
-const keep = (id: string, instance: Instance, message) => {
-  instance.messages.push(receive(message));
+const keep = (id: string, instance: Instance, received: Received) => {
+  instance.messages.push(received);
 
   if (instance.messages.length > MAX_MESSAGES + MAX_MESSAGES / 10) {
     instance.messages.splice(0, instance.messages.length - MAX_MESSAGES);
@@ -147,7 +188,14 @@ const start = async (flow, details) => {
   }
 
   const kafka = library();
-  const instance: Instance = { consumer: null, stream: null, messages: [], trimmed: false, failure: null };
+  const instance: Instance = {
+    consumer: null,
+    stream: null,
+    messages: [],
+    trimmed: false,
+    failure: null,
+    pending: Promise.resolve()
+  };
 
   // A consumer that cannot rejoin its group says so with an 'error' event,
   // and an event nobody listens to would crash the process -- the whole
@@ -164,8 +212,18 @@ const start = async (flow, details) => {
   let consumer;
 
   try {
+    // The env file of the application `connection` names, if it names one,
+    // and then whatever the flow wrote itself
+    const settings: ConnectionSettings = {
+      ...(details.env ? settingsFromEnv(details.env) : {}),
+      ...latent.connectionOverrides(details.connection)
+    };
+
+    const decoder = settings.schemaRegistry?.url ? avro.registry(settings.schemaRegistry) : null;
+    const reported = new Set<string>();
+
     const options = {
-      ...connectionOptions(details.connection as ConnectionSettings),
+      ...connectionOptions(settings),
       // A group of its own, so no service consuming the same topics has a
       // single message taken away from it
       groupId: details.groupId || `ronsel-${id}-${uuidv4()}`,
@@ -208,7 +266,17 @@ const start = async (flow, details) => {
       stream = await consume();
     }
 
-    stream.on('data', (message) => keep(id, instance, message));
+    stream.on('data', (message) => {
+      if (!decoder) {
+        keep(id, instance, receive(message));
+        return;
+      }
+
+      // Decoding may wait on the registry; messages still keep their order
+      instance.pending = instance.pending
+        .then(() => receiveAvro(id, decoder, message, reported))
+        .then(received => keep(id, instance, received));
+    });
     stream.on('error', broken(stream));
 
     instance.consumer = consumer;
@@ -266,7 +334,8 @@ const asText = (value) => (typeof value === 'number' || typeof value === 'boolea
  *   both out to match on the topic, key and headers alone.
  *
  * A matched message's `memory` mapping reads `topic`, `partition`, `offset`,
- * `key`, `headers`, `timestamp` and `message` (also as `value`).
+ * `key`, `headers`, `timestamp` and `message` (also as `value`). An Avro
+ * message reads exactly like a JSON one: it has been decoded by then.
  *
  * @returns {Promise<Object[]>} What never arrived: an empty list is a pass.
  */

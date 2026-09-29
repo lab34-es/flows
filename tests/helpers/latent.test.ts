@@ -82,3 +82,20 @@ describe('latent.check', () => {
     expect(flow.memory).toEqual({ id: 'o-1' });
   });
 });
+
+describe('latent.connectionSource and connectionOverrides', () => {
+  test('an application is named on its own, or inside the connection', () => {
+    expect(latent.connectionSource('orders')).toBe('orders');
+    expect(latent.connectionSource({ application: ' orders ', groupId: 'qa' })).toBe('orders');
+    expect(latent.connectionSource({ brokers: ['a:1'] })).toBeNull();
+    expect(latent.connectionSource('  ')).toBeNull();
+    expect(latent.connectionSource(undefined)).toBeNull();
+  });
+
+  test('what the flow wrote itself, without the application it named', () => {
+    expect(latent.connectionOverrides({ application: 'orders', groupId: 'qa' })).toEqual({ groupId: 'qa' });
+    expect(latent.connectionOverrides({ brokers: ['a:1'] })).toEqual({ brokers: ['a:1'] });
+    expect(latent.connectionOverrides('orders')).toEqual({});
+    expect(latent.connectionOverrides(null)).toEqual({});
+  });
+});

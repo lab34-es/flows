@@ -1,3 +1,9 @@
+import fs from 'fs';
+import dotenv from 'dotenv';
+
+import * as latent from '../latent';
+import * as paths from '../paths';
+
 /**
  * Compares the expected status with the actual status.
  *
@@ -174,10 +180,43 @@ export const test = async (flow, test, contents): Promise<TestReport> => {
 };
 
 /**
- * Make sure all test applications are started.
- * @param {*} flow
+ * The env file a listener reads its connection from, for the environment the
+ * flow runs against.
+ *
+ * @param {Object} testApplication - The frontmatter entry.
+ * @param {string} source - The application named by its `connection`.
+ * @param {string} [environment]
+ * @returns {Promise<Object>} The parsed env file.
+ * @throws {Error} Before the first step, when there is no such file.
  */
-export const getReady = async (flow) => {
+const environmentOf = async (testApplication, source: string, environment?: string) => {
+  const { application, client } = testApplication;
+  const relative = `applications/${source}/env/${environment || '<environment>'}.env`;
+  const file = environment
+    ? await paths.contextDir(['applications', source, 'env', `${environment}.env`])
+    : null;
+
+  if (!file || !fs.existsSync(file)) {
+    throw new Error(
+      `The ${application} client '${client}' connects the way '${source}' does, ` +
+      `but ${relative} does not exist`
+    );
+  }
+
+  return dotenv.parse(fs.readFileSync(file));
+};
+
+/**
+ * Make sure all test applications are started.
+ *
+ * A listener whose `connection` names an application gets that application's
+ * env file for this environment as `env`, which is where it reads its broker
+ * and its credentials from -- see `latent.connectionSource`.
+ *
+ * @param {*} flow
+ * @param {string} [environment] - What the flow runs against.
+ */
+export const getReady = async (flow, environment?: string) => {
   if (!flow.latentApplications) {
     flow.latentApplications = [];
   }
@@ -185,6 +224,12 @@ export const getReady = async (flow) => {
   let index = 0;
   for (const testApplication of flow.latentApplications) {
     const { application } = testApplication;
+    const source = latent.connectionSource(testApplication.connection);
+
+    if (source) {
+      testApplication.env = await environmentOf(testApplication, source, environment);
+    }
+
     flow.latentApplications[index].code = require(`../../latentApplications/${application}`);
     await flow.latentApplications[index].code.start(flow, testApplication);
     index++;

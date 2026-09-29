@@ -4,9 +4,7 @@ description: Publish as a device, assert on what arrives out of band, and keep i
 latentApplications:
   - application: mqtt
     client: thermostats
-    connection:
-      host: localhost
-      port: 1883
+    connection: thermostat
     subscribe:
       - topic: ronsel/examples/thermostats/#
 ---
@@ -38,14 +36,20 @@ everything it hears until the flow is over.
 latentApplications:
   - application: mqtt
     client: thermostats
-    connection:
-      host: localhost
-      port: 1883
+    connection: thermostat
     subscribe:
       - topic: ronsel/examples/thermostats/#
 ```
 
 `#` stands for every level below it: every device, every channel.
+
+`connection: thermostat` says where the broker is without saying it here: the
+listener connects the way the `thermostat` application does, with the
+`MQTT_*` variables of its env file for the environment the flow runs
+against. Point `local.env` at your laptop's broker and a `staging.env` at the
+real one, credentials included, and this very flow runs against either — no
+host and no password ever written in it. A field written here still wins:
+`connection: { application: thermostat, port: 1884 }`.
 
 ## 1. The cloud sends a command
 
