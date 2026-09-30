@@ -192,6 +192,17 @@ const isResultInfo = (info) => {
   return tokens.some(token => RESULT_TOKENS.includes(token));
 };
 
+const CLOSE_FENCE_RE = /^ {0,3}(`{3,}|~{3,})\s*$/;
+
+/**
+ * Whether `line` closes a block opened by `fence`: the same character, at
+ * least as long, nothing but whitespace after it (CommonMark).
+ */
+const isClosingFence = (line: string, fence: string) => {
+  const close = (line.match(CLOSE_FENCE_RE) || [])[1] || '';
+  return close[0] === fence[0] && close.length >= fence.length;
+};
+
 /**
  * Split a markdown body into ordered segments of markdown content and step
  * blocks. Fenced code blocks that are not steps stay inside the markdown
@@ -238,12 +249,9 @@ const splitSegments = (body, lineOffset = 0) => {
       continue;
     }
 
-    // Find the closing fence: same character, at least same length,
-    // nothing but whitespace after it.
-    const closeRe = new RegExp(`^ {0,3}${fence[0]}{${fence.length},}\\s*$`);
     let closeIdx = -1;
     for (let j = i + 1; j < lines.length; j++) {
-      if (closeRe.test(lines[j])) {
+      if (isClosingFence(lines[j], fence)) {
         closeIdx = j;
         break;
       }
@@ -471,10 +479,9 @@ const scanBlocks = (lines): ScannedBlock[] => {
     // Info strings of backtick fences cannot contain backticks (CommonMark)
     if (fence[0] === '`' && info.includes('`')) { continue; }
 
-    const closeRe = new RegExp(`^ {0,3}${fence[0]}{${fence.length},}\\s*$`);
     let closeIdx = -1;
     for (let j = i + 1; j < lines.length; j++) {
-      if (closeRe.test(lines[j])) {
+      if (isClosingFence(lines[j], fence)) {
         closeIdx = j;
         break;
       }
