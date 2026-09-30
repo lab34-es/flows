@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.0.0](https://github.com/lab34-es/ronsel/compare/v2.1.0...v3.0.0) (2026-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* ronsel start only seeds the examples into an empty folder ([#60](https://github.com/lab34-es/ronsel/issues/60))
+
+### Features
+
+* add Kafka support with latent application and client helper ([#65](https://github.com/lab34-es/ronsel/issues/65)) ([94d14fd](https://github.com/lab34-es/ronsel/commit/94d14fd077fc5e3afb4c3ea4d6c9a5e5a1345846))
+* ronsel start only seeds the examples into an empty folder ([#60](https://github.com/lab34-es/ronsel/issues/60)) ([f23fef4](https://github.com/lab34-es/ronsel/commit/f23fef40853d87b42720c69348c161a598aea6cd))
+
 ## [2.1.0](https://github.com/lab34-es/ronsel/compare/v2.0.0...v2.1.0) (2026-09-20)
 
 
