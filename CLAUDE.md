@@ -182,6 +182,7 @@ npm run frontend         # UI only, Vite HMR on :3000
 npm run build            # src/ -> dist/, plus the bundled examples
 npm test                 # jest
 npm run coverage:badge   # refresh .github/badges/coverage.svg
+npm run e2e              # ronsel runs its own flows against dist/ (build first)
 ```
 
 There is no folder of the tool's in the home directory. Everything a run reads
@@ -219,3 +220,12 @@ what lands and what ships. CI enforces coverage of `src/`
 above 80% on statements, branches, functions and
 lines; coverage is collected from all of `src/`, not just what tests import, so
 new files need tests to land.
+
+CI also makes ronsel run its own flows: the `e2e` job builds `dist/` and runs
+the view `cicd-pr-ronsel` of `e2e/views.yaml` through `scripts/e2e.js`. The
+context is `e2e/` -- the `ronsel-cli` application spawns `dist/cli.js`, the
+`ronsel-api` one talks to a `dist/api.js` the script starts on an empty
+scratch folder -- and the flows live under `e2e/flows/cicd-pr`, where any new
+one is picked up by the view. They are ronsel testing ronsel, not the bundled
+examples: a flow there asserts on what the CLI prints and how it exits, and on
+what the API answers. `release` depends on this job like on every other gate.

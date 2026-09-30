@@ -290,6 +290,7 @@ npm test                 # jest
 npm run test:coverage    # jest with the coverage gate
 npm run coverage:badge   # refresh .github/badges/coverage.svg
 npm run audit:ci         # fail if any critical advisory is present
+npm run e2e              # ronsel runs its own flows (build first)
 ```
 
 The frontend has its own config: `npm run lint|typecheck|build --prefix frontend`.
@@ -307,6 +308,7 @@ unless all of it passes:
 | Coverage | statements, branches, functions and lines of `src/` all **above 80%** |
 | Audit | `npm audit` finds **no critical** advisory in the root or frontend tree |
 | Build | `dist/` compiles and `node dist/cli.js --help` runs; the frontend builds |
+| Own flows | ronsel runs the view `cicd-pr-ronsel` of [`e2e/views.yaml`](e2e/views.yaml) against its own compiled CLI and API, and every flow passes |
 
 The threshold lives in [`jest.config.js`](jest.config.js) (`coverageThreshold`),
 so the number is defined once and CI simply runs `npm run test:coverage`.
@@ -314,6 +316,23 @@ Coverage is collected from *all* of `src/`, not only the files a test happens to
 import. The release runs on the same gates: the `release` and `publish` jobs of
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) depend on all of them,
 so nothing ships from a red master.
+
+### Ronsel tests itself
+
+[`e2e/`](e2e/) is a context like any other -- applications, flows and a
+`views.yaml` -- except that the applications under test are ronsel's own
+command line and HTTP API. `ronsel-cli` spawns `dist/cli.js` the way a person
+or a pipeline runs it and brings back the exit code and the output;
+`ronsel-api` sends requests to a running `dist/api.js`. The flows under
+`e2e/flows/cicd-pr` assert on what comes back: the version, the refusals, a
+flow run from the command line, the catalogue the UI reads, a document saved
+and run through the API, and a failing flow recorded as failed.
+
+`npm run e2e` starts the API on an empty scratch folder, which ronsel
+furnishes with its bundled examples on first start, runs the view with the
+CLI and exits with the view's result. It reads `dist/`, so `npm run build`
+comes first. A new flow joins the gate by living under `e2e/flows/cicd-pr`;
+another view of `e2e/views.yaml` runs with `npm run e2e -- --view <name>`.
 
 ### Dependency pinning
 

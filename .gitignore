@@ -28,3 +28,10 @@ flows-tester-darwin-arm64/**
 tester-win32-x64/**
 
 .DS_Store
+
+# What a run of ronsel's own flows (npm run e2e) writes into the e2e/
+# context: the runs it records, and the tsconfig ronsel refreshes on every
+# start, whose paths are absolute and machine-local
+e2e/test-runs/**
+e2e/tsconfig.json
+e2e/.env

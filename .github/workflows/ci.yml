@@ -10,6 +10,8 @@
 #     live in one place rather than being restated here)
 #   - npm audit reports no critical vulnerability, in either package tree
 #   - the package and the frontend both build
+#   - ronsel runs its own flows: the view "cicd-pr-ronsel" of e2e/views.yaml,
+#     which drives the compiled CLI and API with ronsel itself, passes
 #   - the pull request title is a conventional commit
 #
 # That last one is not cosmetics. The repository squash-merges, so the title
@@ -201,6 +203,43 @@ jobs:
       - name: Check the CLI starts from the compiled output
         run: node dist/cli.js --help
 
+  e2e:
+    name: Ronsel runs its own flows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The flows test the compiled package -- dist/cli.js spawned as a
+      # person would, dist/api.js answering over HTTP -- so this is a build of
+      # its own rather than a download of the one above: what is tested is
+      # what a checkout produces, with nothing in between.
+      - name: Build the package
+        run: npm run build
+
+      # scripts/e2e.js starts the API on an empty scratch context, runs the
+      # view "cicd-pr-ronsel" of e2e/views.yaml with the CLI, and exits with
+      # the view's result. A flow lands in the view by living under
+      # e2e/flows/cicd-pr; nothing here has to change for a new one.
+      - name: Run the view cicd-pr-ronsel with ronsel
+        run: npm run e2e
+
+      - name: Upload the recorded run
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-test-runs
+          path: e2e/test-runs/
+          retention-days: 14
+          if-no-files-found: ignore
+
   pr-title:
     name: Conventional commit in the title
     if: github.event_name == 'pull_request'
@@ -279,7 +318,7 @@ jobs:
 
   release:
     name: Keep the release pull request up to date
-    needs: [quality, frontend, audit, build]
+    needs: [quality, frontend, audit, build, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
@@ -324,7 +363,7 @@ jobs:
       # Check out the tag, not the branch: what ships is exactly what
       # release-please tagged, even if master has moved on since.
       #
-      # The gates ran against this commit already -- release needs all four of
+      # The gates ran against this commit already -- release needs all five of
       # them, and publish needs release -- so there is nothing left to re-verify
       # here.
       - uses: actions/checkout@v7

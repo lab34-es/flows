@@ -1,0 +1,19 @@
+# The views of ronsel's own flows. `ronsel --view <name>` runs everything a
+# view matches, as one test run, and exits non-zero when any flow fails --
+# which is what CI hangs on.
+views:
+  # Every pull request runs this one; see the `e2e` job of
+  # .github/workflows/ci.yml. A flow lands in it by living under
+  # flows/cicd-pr, so a new flow is picked up without touching the workflow.
+  - type: table
+    name: cicd-pr-ronsel
+    filters:
+      conjunction: and
+      conditions:
+        - property: file
+          operator: inFolder
+          value: cicd-pr
+    order: [file.name, note.title, note.description, flow.steps]
+    sort:
+      - property: file.name
+        direction: ASC
