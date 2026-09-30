@@ -25,10 +25,11 @@
  * publishes a handful of messages over a run, and a socket left open would
  * hold the process after the last step.
  */
-import fs from 'fs';
 import mqtt from 'mqtt';
 import createDebug from 'debug';
 import { v4 as uuidv4 } from 'uuid';
+
+import { fromEnv } from './mqttConnection';
 
 const debug = createDebug('ronsel:helpers:mqttClient');
 
@@ -47,10 +48,8 @@ export interface PublishOptions {
 }
 
 /**
- * The connection options, read off the application's environment.
- *
- * TLS material is read from disk here rather than passed as text, which is
- * what lets an env file name a certificate the way AWS IoT hands it out.
+ * The connection options, read off the application's environment -- see
+ * `mqttConnection` -- as a client of its own.
  */
 const options = (ctx): mqtt.IClientOptions => {
   const env = ctx.env || {};
@@ -59,25 +58,10 @@ const options = (ctx): mqtt.IClientOptions => {
     throw new Error('MQTT_HOST is not set: the application has no broker to publish to');
   }
 
-  const tls = env.MQTT_CERT || env.MQTT_KEY;
-
-  const opts: Record<string, any> = {
-    host: env.MQTT_HOST,
-    protocol: env.MQTT_PROTOCOL || (tls ? 'mqtts' : 'mqtt'),
+  return {
+    ...fromEnv(env),
     clientId: env.MQTT_CLIENT_ID || `ronsel-${uuidv4()}`
-  };
-
-  if (env.MQTT_PORT) { opts.port = parseInt(env.MQTT_PORT, 10); }
-  if (env.MQTT_USERNAME) { opts.username = env.MQTT_USERNAME; }
-  if (env.MQTT_PASSWORD) { opts.password = env.MQTT_PASSWORD; }
-
-  if (env.MQTT_KEY) { opts.key = fs.readFileSync(env.MQTT_KEY); }
-  if (env.MQTT_CERT) { opts.cert = fs.readFileSync(env.MQTT_CERT); }
-  if (env.MQTT_CA) { opts.ca = fs.readFileSync(env.MQTT_CA); }
-
-  if (env.MQTT_REJECT_UNAUTHORIZED === 'false') { opts.rejectUnauthorized = false; }
-
-  return opts as mqtt.IClientOptions;
+  } as mqtt.IClientOptions;
 };
 
 /**

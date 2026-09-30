@@ -410,6 +410,37 @@ describe('v1.run - step retries', () => {
   });
 });
 
+describe('v1.run - latent applications', () => {
+  test('are stopped once the flow has passed', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(flow.execution.status).toBe('passed');
+    expect(tester.shutdown).toHaveBeenCalledWith(flow);
+  });
+
+  test('are stopped when the flow failed, too', async () => {
+    calculatorAdd.mockRejectedValue(new Error('boom'));
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(flow.execution.status).toBe('error');
+    expect(tester.shutdown).toHaveBeenCalledWith(flow);
+  });
+
+  test('are stopped when one of them could not start', async () => {
+    (tester.getReady as jest.Mock).mockRejectedValue(new Error('Kafka client orders could not listen'));
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(calculatorAdd).not.toHaveBeenCalled();
+    expect(tester.shutdown).toHaveBeenCalledWith(flow);
+  });
+});
+
 describe('v1.run - test assertions', () => {
   test('a passing assertion marks the step passed', async () => {
     const flow = flowWith({ application: 'calculator', method: 'add', test: { status: 200 } });

@@ -1,3 +1,9 @@
+jest.mock('yargs-parser', () => () => ({}));
+jest.mock('../../src/helpers/paths');
+
+import fs from 'fs';
+
+import * as paths from '../../src/helpers/paths';
 import * as tester from '../../src/helpers/runner/tester';
 
 describe('tester.test - status assertions', () => {
@@ -244,5 +250,88 @@ describe('tester.getReady', () => {
     expect(flow.latentApplications[0].code).toBeDefined();
     expect(start).toHaveBeenCalledWith(flow, flow.latentApplications[0]);
     start.mockRestore();
+  });
+
+  describe('a connection taken from an application', () => {
+    let start: jest.SpyInstance;
+
+    beforeEach(() => {
+      (paths.contextDir as jest.Mock).mockImplementation(async (parts: string[]) => `/ctx/${parts.join('/')}`);
+      start = jest.spyOn(require('../../src/latentApplications/kafka'), 'start').mockResolvedValue(undefined);
+    });
+
+    afterEach(() => start.mockRestore());
+
+    test('reads that application\'s env file for the environment the flow runs against', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      const read = jest.spyOn(fs, 'readFileSync').mockReturnValue('KAFKA_BROKERS=b:9092\nKAFKA_PASSWORD=s3cret\n' as any);
+      const flow: any = {
+        latentApplications: [
+          { application: 'kafka', client: 'shop', connection: 'orders' },
+          { application: 'kafka', client: 'audit', connection: { application: 'orders', groupId: 'qa' } }
+        ]
+      };
+
+      await tester.getReady(flow, 'staging');
+
+      expect(read).toHaveBeenCalledWith('/ctx/applications/orders/env/staging.env');
+      expect(flow.latentApplications[0].env).toEqual({ KAFKA_BROKERS: 'b:9092', KAFKA_PASSWORD: 's3cret' });
+      expect(flow.latentApplications[1].env).toEqual({ KAFKA_BROKERS: 'b:9092', KAFKA_PASSWORD: 's3cret' });
+      expect(start).toHaveBeenCalledTimes(2);
+    });
+
+    test('an application with no env file for the environment stops the flow before it starts', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+      const flow: any = { latentApplications: [{ application: 'kafka', client: 'shop', connection: 'orders' }] };
+
+      await expect(tester.getReady(flow, 'prod'))
+        .rejects.toThrow("The kafka client 'shop' connects the way 'orders' does, but applications/orders/env/prod.env does not exist");
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    test('without an environment there is no env file to read', async () => {
+      const flow: any = { latentApplications: [{ application: 'kafka', client: 'shop', connection: 'orders' }] };
+
+      await expect(tester.getReady(flow)).rejects.toThrow('applications/orders/env/<environment>.env does not exist');
+    });
+  });
+});
+
+describe('tester.shutdown', () => {
+  test('stops every latent application the flow started, by its client', async () => {
+    const mqtt = { stop: jest.fn() };
+    const kafka = { stop: jest.fn().mockResolvedValue(undefined) };
+    const flow = {
+      latentApplications: [
+        { application: 'mqtt', client: 'devices', code: mqtt },
+        { application: 'kafka', client: 'orders', code: kafka }
+      ]
+    };
+
+    await tester.shutdown(flow);
+
+    expect(mqtt.stop).toHaveBeenCalledWith('devices');
+    expect(kafka.stop).toHaveBeenCalledWith('orders');
+  });
+
+  test('skips what never got as far as being loaded, and a flow with none', async () => {
+    await expect(tester.shutdown({ latentApplications: [{ application: 'kafka', client: 'c' }] })).resolves.toBeUndefined();
+    await expect(tester.shutdown({ latentApplications: [{ application: 'x', code: {} }] })).resolves.toBeUndefined();
+    await expect(tester.shutdown({})).resolves.toBeUndefined();
+  });
+
+  test('a listener that will not hang up is logged, and the others are still stopped', async () => {
+    const stuck = { stop: jest.fn().mockRejectedValue(new Error('broker gone')) };
+    const next = { stop: jest.fn() };
+
+    await expect(tester.shutdown({
+      latentApplications: [
+        { application: 'kafka', client: 'a', code: stuck },
+        { application: 'mqtt', client: 'b', code: next }
+      ]
+    })).resolves.toBeUndefined();
+
+    expect(console.error).toHaveBeenCalledWith("Could not stop the kafka client 'a':", expect.any(Error));
+    expect(next.stop).toHaveBeenCalledWith('b');
   });
 });
