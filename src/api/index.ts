@@ -10,7 +10,6 @@ import defineRoutes from './routes';
 import * as ioHelper from '../helpers/io';
 import * as netHelper from '../helpers/net';
 import * as bootstrap from '../helpers/bootstrap';
-import * as relay from '../helpers/remote/relay';
 
 // Built by `start`, once the address is known: the origins it allows are the
 // ones the chosen port makes true. Kept here so `stop` can close it
@@ -57,10 +56,6 @@ export const start = async (
 
   // Seed bundled example applications and flows on first run
   await bootstrap.ensureDefaults();
-
-  // Listen for remote agents, when a broker is configured. A broker that is
-  // down must not keep the UI from starting: the Settings screen says why
-  relay.start(socketIO).catch(ex => console.error('Could not start listening for agents:', ex.message));
 
   // Same-origin and curl-style requests carry no Origin header and pass;
   // cross-origin browser requests are only allowed from the tool's own UIs

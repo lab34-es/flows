@@ -5,12 +5,11 @@
 // but jest's module system does not — mock it out.
 jest.mock('yargs-parser', () => () => ({}));
 
-// Starting the API must not furnish a context directory, nor dial a broker
+// Starting the API must not furnish a context directory
 jest.mock('../../src/helpers/bootstrap', () => ({
   ensureDefaults: jest.fn(async () => {}),
   ensureTypeScriptConfig: jest.fn(async () => {})
 }));
-jest.mock('../../src/helpers/remote/relay', () => ({ start: jest.fn(async () => {}) }));
 
 import http from 'node:http';
 import net from 'node:net';

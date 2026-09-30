@@ -2,7 +2,6 @@ import express from 'express';
 const router = express.Router();
 
 import * as testRuns from '../../helpers/testRuns';
-import * as relay from '../../helpers/remote/relay';
 
 const sendError = (res, error, status = 400) => {
   const message = (error && error.message) || String(error);
@@ -18,27 +17,14 @@ router.get('/', (req, res) => {
 
 // Start a test run over a folder view: the flows the view's filters matched,
 // executed one by one. { environment, folder, view, files }
-// Add { agent } to run them on that agent instead of here
 router.post('/', (req, res) => {
-  const { agent } = req.body || {};
-
-  const started = agent
-    ? relay.startFolderRun({
-      agent,
-      files: req.body.files,
-      folder: req.body.folder,
-      view: req.body.view,
-      environment: req.body.environment
-    })
-    : testRuns.startFolderRun({
-      files: req.body.files,
-      folder: req.body.folder,
-      view: req.body.view,
-      environment: req.body.environment,
-      io: req.app.get('io')
-    });
-
-  started
+  testRuns.startFolderRun({
+    files: req.body.files,
+    folder: req.body.folder,
+    view: req.body.view,
+    environment: req.body.environment,
+    io: req.app.get('io')
+  })
     .then(run => res.send({ run }))
     .catch(error => sendError(res, error));
 });

@@ -60,7 +60,7 @@ export function FolderPage() {
   const navigate = useNavigate();
   const folder = searchParams.get('path') || '';
 
-  const { environment, agent } = useAppState();
+  const { environment } = useAppState();
   const { anyRunning } = useExecutions();
 
   const [doc, setDoc] = useState<any>(null);
@@ -282,7 +282,6 @@ export function FolderPage() {
         folder,
         view: activeView?.name,
         files: rows.map((row) => row.relativePath),
-        ...(agent ? { agent } : {}),
       });
       navigate(testRunUrl(response.data.run.id));
     } catch (ex) {
@@ -402,7 +401,7 @@ export function FolderPage() {
               ? 'Select an environment in the sidebar first'
               : `Run the ${rows.length} flow${rows.length === 1 ? '' : 's'} this view shows on “${environment}”`}
           >
-            <Play /> Run all{environment ? ` · ${environment}` : ''}{agent ? ` · ${agent}` : ''}
+            <Play /> Run all{environment ? ` · ${environment}` : ''}
           </Button>
 
           <CliCommandDialog
