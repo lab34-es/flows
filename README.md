@@ -91,19 +91,20 @@ test:
 - **Onboarding in one paste.** Export whichever applications, environments and
   variables a teammate needs as a single YAML document; importing it creates
   the env files they are missing and fills in the rest.
-- **Batteries included.** Example applications and flows are seeded on first run.
+- **Batteries included.** Example applications and flows are seeded on the
+  first run in an empty folder.
 
 ## Install
 
 Requires Node.js `>= 24.0.0` (the current active LTS line).
 
 ```bash
-npx ronsel start   # in the folder the flows should live in
+npx ronsel start   # in an empty folder, where the flows should live
 ```
 
 That turns the folder into a project: a context with the example flows and
-applications, and a `package.json` that depends on ronsel and carries the
-command as a script. From then on -- for you, and for anybody who clones the
+applications -- those because the folder was empty -- and a `package.json` that
+depends on ronsel and carries the command as a script. From then on -- for you, and for anybody who clones the
 folder -- the whole thing is:
 
 ```bash
@@ -151,10 +152,13 @@ ronsel --help
 
 `ronsel start` is the first command: it furnishes the folder, writes the
 `package.json` that pins this version and carries `npm run ronsel`, runs
-`npm install` and then starts the UI. Everything it writes is additive -- an
-existing `package.json` keeps its formatting and every key it had, and the
-examples are seeded once and never restored. `--no-install` writes the files
-and leaves the install to somebody else.
+`npm install` and then starts the UI. The example flows and applications are
+copied in only when the folder was empty; a folder that already holds anything
+gets `flows/`, `applications/`, the generated `tsconfig.json` and the project
+files, and no examples. It says which of the two happened. Everything it writes
+is additive -- an existing `package.json` keeps its formatting and every key it
+had, and the examples, once in, are never restored. `--no-install` writes the
+files and leaves the install to somebody else.
 
 It also looks for Playwright's browsers, which are not part of `npm install`,
 and offers to download the one the examples use. The download runs in the

@@ -125,12 +125,14 @@ whole of the second form above.
 
 Commands:
   start           Make this directory a project of its own. It becomes a
-                  context -- flows, applications and, if it was empty, the
-                  examples -- and gets a package.json that depends on this
-                  exact version of the tool and carries the command as a
-                  script. npm install runs, and the UI starts. From then on
-                  the whole thing is "npm run ronsel", for anybody who clones
-                  the folder, with nothing installed globally
+                  context -- flows and applications -- and gets a package.json
+                  that depends on this exact version of the tool and carries
+                  the command as a script. The example flows and applications
+                  are copied in only when the directory was empty; one that
+                  already holds anything gets the folders and the files and
+                  nothing else. npm install runs, and the UI starts. From then
+                  on the whole thing is "npm run ronsel", for anybody who
+                  clones the folder, with nothing installed globally
 
 Options:
   --file          Path to the flow definition file (.md markdown flow)
@@ -513,7 +515,8 @@ async function startServer(args: Record<string, any> = {}) {
  *
  * Everything it writes is additive. An existing package.json keeps its
  * formatting and every key it had; a `ronsel` script that is already there is
- * reported and left alone; the examples are seeded once and never restored.
+ * reported and left alone; the examples go in only when the directory was
+ * empty, and once in they are never restored.
  *
  * @param {Object} args - { context, install }
  */
@@ -547,7 +550,7 @@ async function startProject(args) {
 
   console.log(`Project: ${directory}`);
 
-  // The folders, the tsconfig and -- first time only -- the examples
+  // The folders, the tsconfig and -- in an empty directory only -- the examples
   await bootstrap.initialise();
 
   let manifest;

@@ -174,14 +174,21 @@ const ensureTypeScriptConfig = async () => {
 };
 
 /**
- * Furnish the context directory: the folders, the tsconfig and the
- * bundled examples.
+ * Furnish the context directory: the folders, the tsconfig and -- only when
+ * the caller says so -- the bundled examples.
+ *
+ * `examples` is the caller's to decide, and has to be decided before this runs:
+ * the first thing here is to create flows/ and applications/, which is by
+ * itself enough to make any directory non-empty, so the question can no longer
+ * be asked from in here.
  *
  * Copies are conservative: an example is only copied when its destination does
  * not exist yet, and the whole seeding is skipped once the marker is there, so
  * a folder somebody has since pruned is never refilled behind their back.
+ *
+ * @param {Object} options - { examples } whether to lay down the examples
  */
-const seed = async () => {
+const seed = async ({ examples }: { examples: boolean }) => {
   // Make sure the base folders exist
   const applicationsDir = await paths.contextDir(['applications']);
   const flowsDir = await paths.contextDir(['flows']);
@@ -190,6 +197,12 @@ const seed = async () => {
 
   // Refreshed every start, unlike the examples below
   await ensureTypeScriptConfig();
+
+  // Nothing below this line runs, the marker included. The marker says "the
+  // examples have been laid down here", and writing it where they have not
+  // would be a lie that also blocks a legitimate seeding later -- if this
+  // folder is ever emptied again, it should still be able to get them.
+  if (!examples) { return; }
 
   const markerPath = await paths.contextDir(['.examples-seeded']);
 
@@ -257,7 +270,7 @@ const ensureDefaults = async () => {
       return;
     }
 
-    await seed();
+    await seed({ examples: true });
   }
   catch (ex) {
     // Seeding must never prevent the tool from starting
@@ -266,17 +279,34 @@ const ensureDefaults = async () => {
 };
 
 /**
- * Furnish the directory whether or not it is empty.
+ * Furnish the directory `ronsel start` was pointed at.
  *
- * This is what `ronsel start` does, and the difference from `ensureDefaults` is
- * the whole point of that command: somebody typed it to say "make this folder
- * mine", which answers the question the emptiness rule exists to avoid asking.
- * Seeding still happens once and only once, so running it again in a folder
- * that is already a context adds the missing scaffolding and nothing else.
+ * The examples follow the same rule they do everywhere else: they go into an
+ * empty directory and into no other. `start` says "make this folder run itself"
+ * -- it does not say "pour example flows on top of what is already here", and a
+ * folder with work in it is the one place that would be a mess rather than a
+ * starting point.
+ *
+ * What it does regardless is additive and welcome anywhere: flows/ and
+ * applications/ if they are missing, and the generated tsconfig refreshed so
+ * editor support follows the installation. A directory that already held
+ * something still comes out a working context, just its own one.
+ *
+ * The emptiness is settled here, once, before `seed` writes anything: the
+ * folders it creates would make any directory look non-empty from then on.
  */
 const initialise = async () => {
   try {
-    await seed();
+    const root = await paths.contextDir([]);
+    const empty = isEmptyDirectory(root);
+
+    await seed({ examples: empty });
+
+    // Which of the two happened is never left to be guessed from the absence
+    // of "Seeded ..." lines
+    console.log(empty
+      ? 'The folder was empty: the example applications and flows are in it.'
+      : 'The folder already held files: no examples seeded, the rest is set up.');
   }
   catch (ex) {
     console.error('Could not seed default examples:', ex.message);
