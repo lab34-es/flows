@@ -12,13 +12,25 @@
  * vsce runs the "vscode:prepublish" script first, which bundles the extension
  * minified. The dependencies are inside the bundle, so vsce is told not to
  * look for them.
+ *
+ * The README is shown by the Extensions view and the Marketplace, away from
+ * the repository, so vsce turns its relative links into addresses on GitHub.
+ * Left to guess, it takes them as relative to the root of the repository, but
+ * the README sits in editors/vscode -- and its screenshots, shared with the
+ * root README, in .github/screenshots. It is told where the README really is.
  */
 const { execFileSync } = require('child_process');
 const path = require('path');
 
 const { version } = require('../../../package.json');
+const { repository } = require('../package.json');
+
 const extension = path.join(__dirname, '..');
 const out = path.join(extension, `ronsel-${version}.vsix`);
+
+// https://github.com/<owner>/<repository>, and the folder the README is in
+const github = repository.url.replace(/^git\+/, '').replace(/\.git$/, '');
+const at = (kind) => `${github}/${kind}/HEAD/${repository.directory}`;
 
 execFileSync(process.execPath, [
   path.join(extension, 'node_modules', '@vscode', 'vsce', 'vsce'),
@@ -26,5 +38,7 @@ execFileSync(process.execPath, [
   '--no-update-package-json',
   '--no-git-tag-version',
   '--no-dependencies',
+  '--baseContentUrl', at('blob'),
+  '--baseImagesUrl', at('raw'),
   '--out', out
 ], { cwd: extension, stdio: 'inherit' });

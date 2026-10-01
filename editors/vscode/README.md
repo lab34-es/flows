@@ -8,6 +8,8 @@ Flows are Markdown documents whose executable parts are ` ```step ` blocks.
 This extension shows them the way VS Code shows tests -- because that is what
 they are.
 
+![A flow run in VS Code: a check on the step that passed, a cross and the expected value on the one that failed, the Testing view on the left and the run in the Ronsel panel](../../.github/screenshots/vscode-run.webp)
+
 ## What you get
 
 - **A play button on every flow.** In the gutter next to the flow's title, in
@@ -36,12 +38,18 @@ they are.
 - **The web UI, one command away.** *Ronsel: Open Web UI* starts it on the
   flows folder, in a terminal.
 
+| A step asking for a value | Debug Flow |
+| --- | --- |
+| ![A step of a running flow asking for a barcode in an input box](../../.github/screenshots/vscode-input.webp) | ![A flow run under the debugger, stopped on a breakpoint in an application's code](../../.github/screenshots/vscode-debug.webp) |
+
 ## Flows of another repository
 
 Working on a service whose flows live in a repository of their own? Add that
 folder with **Ronsel: Add Flows Folder...** (or list it in `ronsel.contexts`)
 and its flows show up in the Testing view next to this workspace's, ready to
 run against the code you are changing.
+
+![The flows of another repository in the Testing view, next to the workspace's, and a run of one of them](../../.github/screenshots/vscode-contexts.webp)
 
 ## Requirements
 

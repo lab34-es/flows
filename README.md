@@ -276,9 +276,17 @@ in **Test Results**. Every run, wherever it was started from, is listed in the
 bar; steps that ask for a value ask in an input box; *Debug Flow* runs with the
 debugger attached.
 
+<a href=".github/screenshots/vscode-run.webp">
+  <img src=".github/screenshots/vscode-run.webp" alt="A flow run in VS Code: a check on the step that passed, a cross and the expected value on the one that failed, the Testing view on the left and the run in the Ronsel panel" width="900">
+</a>
+
 Flows kept in a repository of their own can be run from any other one: add
 their folder with **Ronsel: Add Flows Folder...** (the `ronsel.contexts`
 setting) and they show up next to the workspace's.
+
+| Flows of another repository | A step asking for a value | Debug Flow |
+| --- | --- | --- |
+| [![The flows of another repository in the Testing view, next to the workspace's, and a run of one of them](.github/screenshots/vscode-contexts.webp)](.github/screenshots/vscode-contexts.webp) | [![A step of a running flow asking for a barcode in an input box](.github/screenshots/vscode-input.webp)](.github/screenshots/vscode-input.webp) | [![A flow run under the debugger, stopped on a breakpoint in an application's code](.github/screenshots/vscode-debug.webp)](.github/screenshots/vscode-debug.webp) |
 
 It runs the ronsel each flows folder depends on, as `ronsel --ipc`: the run
 reports every step to the editor over the process's IPC channel, and is
