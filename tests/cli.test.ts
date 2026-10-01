@@ -57,6 +57,13 @@ jest.mock('../src/helpers/remote/agent', () => ({
   will: jest.fn(() => ({ topic: 'flows/agents/a1/status', payload: {}, retain: true }))
 }));
 jest.mock('../src/helpers/remote/client', () => ({ run: jest.fn() }));
+// What an editor talks to. Whether the process has a channel at all is the
+// case's to say: a jest worker has one of its own
+jest.mock('../src/helpers/ipc', () => ({
+  channel: jest.fn(),
+  run: jest.fn(),
+  flush: jest.fn().mockResolvedValue(undefined)
+}));
 jest.mock('../src/helpers/remote/terminal', () => ({
   describe: jest.fn((event) => (event === 'remote:job' ? '  agent: line' : null)),
   prompt: jest.fn()
@@ -93,6 +100,7 @@ import * as remoteBroker from '../src/helpers/remote/broker';
 import * as remoteAgent from '../src/helpers/remote/agent';
 import * as remoteClient from '../src/helpers/remote/client';
 import * as remoteTerminal from '../src/helpers/remote/terminal';
+import * as ipc from '../src/helpers/ipc';
 
 /** Import cli.ts fresh and let its async main() settle. */
 const runCli = async () => {
@@ -607,6 +615,77 @@ describe('cli --file', () => {
     await runCli();
 
     expect(errored()).toContain('Error running flow');
+  });
+});
+
+describe('cli --file, more than once', () => {
+  test('is refused: one flow per run, several are a view', async () => {
+    ARGV = { file: ['flows/a.md', 'flows/b.md'], env: 'local' };
+
+    await runCli();
+
+    expect(errored()).toContain('--file names one flow');
+    expect(runner.run).not.toHaveBeenCalled();
+  });
+});
+
+describe('cli --ipc', () => {
+  const LINK = { send: jest.fn(), onMessage: jest.fn(), onDisconnect: jest.fn() };
+
+  beforeEach(() => {
+    (ipc.channel as jest.Mock).mockReturnValue(LINK);
+    (ipc.run as jest.Mock).mockResolvedValue(0);
+  });
+
+  test('hands every file named to the run, over the channel, and exits with its code', async () => {
+    ARGV = { ipc: true, file: ['flows/a.md', 'flows/b.md'], env: 'local', context: '/ctx' };
+    (ipc.run as jest.Mock).mockResolvedValue(1);
+
+    await runCli();
+
+    expect(ipc.run).toHaveBeenCalledWith({
+      files: ['flows/a.md', 'flows/b.md'],
+      view: null,
+      folder: '',
+      environment: 'local'
+    }, LINK);
+    expect(ipc.flush).toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(1);
+    // The classic run of a file never starts: the editor's run replaces it
+    expect(runner.run).not.toHaveBeenCalled();
+    expect(testRuns.single).not.toHaveBeenCalled();
+  });
+
+  test('runs a view too', async () => {
+    ARGV = { ipc: true, view: 'smoke-tests', folder: 'payments', env: 'uat' };
+
+    await runCli();
+
+    expect(ipc.run).toHaveBeenCalledWith(
+      { files: [], view: 'smoke-tests', folder: 'payments', environment: 'uat' },
+      LINK
+    );
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(testRuns.runViewFromCli).not.toHaveBeenCalled();
+  });
+
+  test('a file named once is a list of one', async () => {
+    ARGV = { ipc: true, file: 'flows/a.md', env: 'local' };
+
+    await runCli();
+
+    expect((ipc.run as jest.Mock).mock.calls[0][0].files).toEqual(['flows/a.md']);
+  });
+
+  test('is refused by a process nobody started with a channel', async () => {
+    ARGV = { ipc: true, file: 'flows/a.md', env: 'local' };
+    (ipc.channel as jest.Mock).mockReturnValue(null);
+
+    await runCli();
+
+    expect(errored()).toContain('IPC channel');
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(ipc.run).not.toHaveBeenCalled();
   });
 });
 

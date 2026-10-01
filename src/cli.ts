@@ -17,6 +17,7 @@ import * as applications from './helpers/applications';
  *   node cli.js --capabilities
  *   node cli.js --agent --agent-id <name> --broker <url> --username <user> --password <secret>
  *   node cli.js --remote <agent> --file <path> --env <environment>
+ *   node cli.js --ipc --file <path> [--file <path>...] --env <environment>
  *
  * Named nothing to run, the command starts the web UI: somebody who did not
  * ask for a flow is here to look at them.
@@ -55,6 +56,9 @@ import * as applications from './helpers/applications';
  *   --env          Environment to run the flow in (required for --file/--view)
  *   --agent        Run as an agent: wait on the broker for flows to run here
  *   --remote       Run --file or --view on the named agent instead of here
+ *   --ipc          Report the run to the program that started this process,
+ *                  over its IPC channel: how an editor runs flows. --file can
+ *                  be repeated, and every flow named runs as one test run
  *   --debug        Print debug information including environment variables
  *   --version      Print the installed version and exit
  *   --help         Show this help message
@@ -119,6 +123,7 @@ Usage:
   ronsel --agent --agent-id <name> [--broker <url> --username <user> --password <secret>]
   ronsel --remote <agent> --file <path-to-flow-file> --env <environment>
   ronsel --remote <agent> --view <view> --env <environment>
+  ronsel --ipc --file <path-to-flow-file> [--file <path>...] --env <environment>
 
 Told nothing to run, ronsel starts the web UI on the context -- which is the
 whole of the second form above.
@@ -174,6 +179,12 @@ Options:
                   machine: the commit this context is on and the env files the
                   flows use travel to it, and its results land in this
                   context's test-runs
+  --ipc           Report the run to the program that started this process,
+                  over its IPC channel, instead of only on the terminal: every
+                  step as it starts and ends, and the questions steps ask.
+                  This is how editors run flows (the VS Code extension), and
+                  it needs a process started with an IPC channel. --file can
+                  be repeated: every flow named runs, as one test run
   --broker        MQTT broker URL (mqtts://host:port or wss://host/path).
                   Stored in config/remote.json the first time, with --username;
                   --password goes to the context's .env. FLOWS_BROKER_URL,
@@ -220,6 +231,7 @@ Examples:
   ronsel --context ~/flows-agent --agent --agent-id agent-ourense --broker mqtts://mqtt.example:443 --username agent-ourense --password s3cret
   ronsel --remote agent-ourense --file flows/my-flow.md --env production
   ronsel --remote agent-ourense --view smoke --env uat
+  ronsel --context my/context/folder --ipc --file flows/a.md --file flows/b.md --env local
   `);
   process.exit(0);
 }
@@ -274,6 +286,12 @@ function parseArguments() {
   // down except for `start`, which is a thing to do rather than a thing to run
   const positional = (argv._ || []).map(value => String(value));
 
+  // yargs-parser gives a repeated flag back as a list. Only --ipc runs several
+  // files; everything else reads the first and is told about the rest
+  const files = ([] as unknown[]).concat(argv.file ?? [])
+    .filter(file => typeof file === 'string' && file !== '')
+    .map(String);
+
   return {
     command: positional[0] || null,
     // yargs-parser reads `--no-install` as install: false
@@ -284,7 +302,10 @@ function parseArguments() {
     installBrowsers: argv.installBrowsers === undefined
       ? argv['install-browsers']
       : argv.installBrowsers,
-    file: argv.file || null,
+    file: Array.isArray(argv.file) ? argv.file[0] : (argv.file || null),
+    files,
+    // Report to the program that started this process rather than to a person
+    ipc: Boolean(argv.ipc),
     // `--view` on its own means "the first view of views.yaml"
     view: argv.view === undefined ? null : (typeof argv.view === 'string' ? argv.view : ''),
     folder: typeof argv.folder === 'string' ? argv.folder : '',
@@ -736,6 +757,36 @@ async function runRemote(args) {
 }
 
 /**
+ * Run flows for the program that started this process -- an editor -- and
+ * report them over its IPC channel. See helpers/ipc.
+ *
+ * Everything the run has to say, a failure to start included, goes over the
+ * channel: the editor reads that, and shows the terminal output alongside.
+ * Only a missing channel is said here, since there is nobody else to say it to.
+ *
+ * @param {Object} args - { files, view, folder, env }
+ */
+async function runOverIpc(args) {
+  const ipc = require('./helpers/ipc');
+  const link = ipc.channel();
+
+  if (!link) {
+    exitWithError('--ipc reports to the program that started ronsel, and this one was not started with an IPC channel');
+    return;
+  }
+
+  const code = await ipc.run({
+    files: args.files,
+    view: args.view,
+    folder: args.folder,
+    environment: args.env
+  }, link);
+
+  await ipc.flush();
+  process.exit(code);
+}
+
+/**
  * Settle on the directory this run works in.
  *
  * `--context` names it outright. Without it the directory the command was run
@@ -836,7 +887,10 @@ async function main() {
   }
 
   // What was named to run -- and, when nothing was, the UI
-  if (args.ai) {
+  if (args.ipc) {
+    // An editor is driving: it reads the run off the channel, not the terminal
+    await runOverIpc(args);
+  } else if (args.ai) {
     exitWithError(
       'Generating flows with AI is no longer available from the CLI. ' +
       'Start the UI with "ronsel" and use the "Create using AI" ' +
@@ -874,7 +928,13 @@ async function main() {
     if (!args.env) {
       exitWithError('No environment specified. Use --env <environment>');
     }
-    
+
+    // One flow per run here: several, as one test run, is what a view is for
+    if (args.files.length > 1) {
+      exitWithError('--file names one flow. To run several as one test run, save them as a view and use --view');
+      return;
+    }
+
     // Validate file path
     const flowFilePath = await validateFilePath(args.file);
     // Parse the flow file
