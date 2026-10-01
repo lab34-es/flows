@@ -1,0 +1,13 @@
+{
+  /* The unit tests run under node's own test runner, outside of VS Code, so
+     they only ever reach src/core: nothing there may import 'vscode'. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "out",
+    "rootDir": ".",
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": ["src/core/**/*.ts", "test/**/*.ts"]
+}

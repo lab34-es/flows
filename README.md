@@ -74,6 +74,9 @@ test:
   versioned in your own git repository.
 - **Notebook-style web UI.** Live status per flow, folder views you can sort and
   filter, and per-step execution details.
+- **Runs from VS Code.** A play button on every flow, a check or a cross on every
+  step, and every execution in a panel next to the terminal -- for the flows of
+  the repository you are in, or of another one.
 - **Write flows with AI.** Describe a scenario and get a flow built from your own
   applications — with local Ollama, Google Gemini or Anthropic.
 - **Assertions built in.** Assert status and body, including JavaScript
@@ -260,6 +263,29 @@ changes, the way ssh treats a host key. The broker itself needs TLS, one user
 per machine and an ACL that confines each agent to `flows/agents/<name>/#`;
 any MQTT 5 broker does (EMQX, Mosquitto, HiveMQ).
 
+### In VS Code
+
+The extension in [`editors/vscode`](editors/vscode) shows flows the way VS Code
+shows tests. Every flows folder of the workspace -- any folder with `flows/` and
+`applications/`, as `ronsel start` makes it -- is in the **Testing** view, and
+each open flow gets a run button in its gutter and in the editor's title bar.
+When it runs, every ` ```step ` block gets its check or its cross, a failed
+assertion opens with what was expected next to what came, and the output lands
+in **Test Results**. Every run, wherever it was started from, is listed in the
+**Ronsel** panel next to the terminal. The environment is picked in the status
+bar; steps that ask for a value ask in an input box; *Debug Flow* runs with the
+debugger attached.
+
+Flows kept in a repository of their own can be run from any other one: add
+their folder with **Ronsel: Add Flows Folder...** (the `ronsel.contexts`
+setting) and they show up next to the workspace's.
+
+It runs the ronsel each flows folder depends on, as `ronsel --ipc`: the run
+reports every step to the editor over the process's IPC channel, and is
+recorded in `test-runs` like any other. Each release attaches the extension's
+`.vsix` to its [GitHub release](https://github.com/lab34-es/ronsel/releases);
+install it with **Extensions: Install from VSIX...**.
+
 ## Documentation
 
 The whole documentation is at **[ronsel.lab34.es/docs](https://ronsel.lab34.es/docs/)**,
@@ -292,7 +318,8 @@ npm run coverage:badge   # refresh .github/badges/coverage.svg
 npm run audit:ci         # fail if any critical advisory is present
 ```
 
-The frontend has its own config: `npm run lint|typecheck|build --prefix frontend`.
+The frontend has its own config: `npm run lint|typecheck|build --prefix frontend`,
+and so has the VS Code extension: `npm run lint|typecheck|test|package --prefix editors/vscode`.
 
 ### Quality gates
 
@@ -305,8 +332,9 @@ unless all of it passes:
 | Lint | `eslint` over `src/`, `tests/` and `frontend/src/`, clean |
 | Types | `tsc --noEmit` for the package and for the frontend, clean |
 | Coverage | statements, branches, functions and lines of `src/` all **above 80%** |
-| Audit | `npm audit` finds **no critical** advisory in the root or frontend tree |
+| Audit | `npm audit` finds **no critical** advisory in any of the three package trees |
 | Build | `dist/` compiles and `node dist/cli.js --help` runs; the frontend builds |
+| Extension | the VS Code extension lints, type checks, passes its tests and packages |
 
 The threshold lives in [`jest.config.js`](jest.config.js) (`coverageThreshold`),
 so the number is defined once and CI simply runs `npm run test:coverage`.

@@ -1,0 +1,7 @@
+{
+  // The example flows and applications ronsel start seeds into new projects
+  // are templates, not flows to run here: running them would write test-runs
+  // into the package's sources. The Ronsel extension leaves them out; work in
+  // .dev-context instead, as npm run dev does.
+  "ronsel.exclude": ["**/src/defaults/**"]
+}

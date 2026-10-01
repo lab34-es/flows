@@ -10,6 +10,14 @@
         "<node_internals>/**"
       ],
       "console": "integratedTerminal"
+    },
+    {
+      "type": "extensionHost",
+      "request": "launch",
+      "name": "Run the VS Code extension",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/editors/vscode"],
+      "outFiles": ["${workspaceFolder}/editors/vscode/dist/**/*.js"],
+      "preLaunchTask": "npm: build - editors/vscode"
     }
   ]
 }

@@ -1,0 +1,5 @@
+node_modules/
+# esbuild's bundle, the compiled tests and the packages vsce writes
+dist/
+out/
+*.vsix
