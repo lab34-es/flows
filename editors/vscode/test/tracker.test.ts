@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { failuresOf, resultOf, show, Tracker } from '../src/core/tracker';
+import { failuresOf, resultOf, show, summarize, Tracker } from '../src/core/tracker';
 import type { Sink } from '../src/core/tracker';
 
 /**
@@ -270,6 +270,18 @@ describe('resultOf', () => {
   test('an error without a message, or a step without an execution, is still an error', () => {
     assert.deepEqual(resultOf({ execution: { status: 'error' } }).failures, [{ message: 'The step failed' }]);
     assert.equal(resultOf({}).status, 'errored');
+  });
+});
+
+describe('summarize', () => {
+  test('says what was expected against what came, when it fits', () => {
+    assert.equal(summarize({ message: 'status: mismatch', expected: '200', actual: '404' }), 'status: mismatch: expected 200, got 404');
+  });
+
+  test('keeps to the message when the values do not fit on a line', () => {
+    assert.equal(summarize({ message: 'body: mismatch', expected: '{\n  "a": 1\n}', actual: '{}' }), 'body: mismatch');
+    assert.equal(summarize({ message: 'body: mismatch', expected: 'x'.repeat(41), actual: 'y' }), 'body: mismatch');
+    assert.equal(summarize({ message: 'Expression failed', actual: 'nobody' }), 'Expression failed');
   });
 });
 

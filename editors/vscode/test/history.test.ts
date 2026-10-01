@@ -126,12 +126,40 @@ describe('readSteps', () => {
     assert.deepEqual(readSteps(file), [
       { index: 0, label: 'Charge the card', status: 'passed', duration: 420, line: 6, resultLine: 12 },
       {
-        index: 1, label: 'ledger.post', status: 'error', duration: 1500,
+        index: 1, label: 'ledger.post', status: 'failed', duration: 1500,
         error: 'Test failed for step ledger-post', line: 20, resultLine: 25
       },
       { index: 2, label: 'ledger.close', status: 'skipped', line: 34, resultLine: 39 },
       { index: 3, label: 'ledger.audit', status: 'pending', line: 43 }
     ]);
+  });
+
+  test('a failed assertion reads as what was expected against what came', () => {
+    const file = path.join(context(), 'copy.md');
+    fs.writeFileSync(file, [
+      '```step', 'application: a', 'method: b', '```',
+      '```step-result',
+      'execution:',
+      '  status: error',
+      '  error: { name: TestFailed, message: Error executing step a-b }',
+      'testReport:',
+      '  hasErrors: true',
+      '  body:',
+      '    - { message: Value mismatch at result, expected: -24, actual: -25 }',
+      '```',
+      '```step', 'application: a', 'method: c', '```',
+      '```step-result',
+      'execution:',
+      '  status: error',
+      '  error: { name: Error, message: connect ECONNREFUSED }',
+      '```'
+    ].join('\n'));
+
+    const [assertion, thrown] = readSteps(file) || [];
+    assert.equal(assertion.status, 'failed');
+    assert.equal(assertion.error, 'body: Value mismatch at result: expected -24, got -25');
+    assert.equal(thrown.status, 'errored');
+    assert.equal(thrown.error, 'connect ECONNREFUSED');
   });
 
   test('is nothing when there is no copy to read', () => {

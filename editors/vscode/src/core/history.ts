@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { parseFlow } from './flowParser';
+import { resultOf, summarize } from './tracker';
 import type { RunSummary } from './tracker';
 
 /**
@@ -31,7 +32,7 @@ export interface RunRecord {
 export interface StepRecord {
   index: number;
   label: string;
-  /** passed, failed, error, skipped -- or pending, when the copy holds no result for it */
+  /** passed, failed, errored, skipped -- or pending, when the copy holds no result for it */
   status: string;
   /** Milliseconds */
   duration?: number;
@@ -111,23 +112,28 @@ export const readSteps = (file: string): StepRecord[] | null => {
 
   return parsed.steps.map(step => {
     const block = parsed.results.find(result => result.stepIndex === step.index);
-    const execution = (block && block.result && block.result.execution) || null;
-    const times = execution && execution.times;
-
-    const duration = times && typeof times.start === 'number' && typeof times.end === 'number'
-      ? times.end - times.start
-      : times && typeof times.duration === 'number' ? Math.round(times.duration * 1000) : undefined;
-
-    const error = execution && execution.error && execution.error.message;
-
-    return {
+    const stored = block && block.result && block.result.execution ? block.result : null;
+    const position = {
       index: step.index,
       label: step.label,
-      status: execution && execution.status ? String(execution.status) : 'pending',
-      ...(duration !== undefined ? { duration } : {}),
-      ...(error ? { error: String(error) } : {}),
       line: step.line,
       ...(block ? { resultLine: block.line } : {})
+    };
+
+    if (!stored || !stored.execution.status) {
+      return { ...position, status: 'pending' };
+    }
+
+    // Read the way a live run is read: an assertion that did not hold is a
+    // failure, whatever status the runner stored for it
+    const result = resultOf(stored);
+    const failure = result.failures[0];
+
+    return {
+      ...position,
+      status: result.status,
+      ...(result.duration !== undefined ? { duration: result.duration } : {}),
+      ...(failure ? { error: summarize(failure) } : {})
     };
   });
 };

@@ -146,6 +146,17 @@ export const failuresOf = (report: any): Failure[] => {
   return failures;
 };
 
+/**
+ * A failure in one line, for where a list has room for one: the assertion,
+ * and what was expected against what came when both fit on a line.
+ */
+export const summarize = (failure: Failure): string => {
+  const { message, expected, actual } = failure;
+  const short = (value?: string) => value !== undefined && !value.includes('\n') && value.length <= 40;
+
+  return short(expected) && short(actual) ? `${message}: expected ${expected}, got ${actual}` : message;
+};
+
 /** How long a step took, in milliseconds. The runner keeps seconds as well. */
 const durationOf = (execution: any): number | undefined => {
   const times = execution && execution.times;

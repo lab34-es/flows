@@ -8,7 +8,7 @@ import type { StepBlock } from './core/flowParser';
 import type { Install } from './core/install';
 import { launch } from './core/process';
 import type { Outcome, Running } from './core/process';
-import { Tracker } from './core/tracker';
+import { summarize, Tracker } from './core/tracker';
 import type { Failure, FlowResult, RunSummary, StepRef, StepResult } from './core/tracker';
 import type { Contexts, RonselContext } from './discovery';
 import type { Environments } from './environments';
@@ -519,7 +519,7 @@ export class Testing implements vscode.Disposable {
         live(file, ref.index, {
           status: result.status,
           ...(result.duration !== undefined ? { duration: result.duration } : {}),
-          ...(result.status === 'failed' || result.status === 'errored' ? { error: result.failures[0]?.message } : {})
+          ...(result.failures[0] ? { error: summarize(result.failures[0]) } : {})
         });
       },
       flowFinished: (file, result, reported) => {
