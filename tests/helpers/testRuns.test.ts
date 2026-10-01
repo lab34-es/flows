@@ -44,6 +44,7 @@ import * as markdownFlows from '../../src/helpers/markdownFlows';
 import * as bases from '../../src/helpers/bases';
 import * as runner from '../../src/helpers/runner/v1';
 import * as sharepoint from '../../src/helpers/sharepoint';
+import * as testRunReport from '../../src/helpers/testRunReport';
 
 const CONTEXT = mockContext;
 const RUNS_DIR = path.join(CONTEXT, 'test-runs');
@@ -240,6 +241,64 @@ describe('testRuns recording', () => {
     // The failure is still on the summary, only the copy was refused
     const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
     expect(summary.flows[0].status).toBe('failed');
+  });
+
+  test('abandon closes a run that will not finish, failing what had not', async () => {
+    const run = await testRuns.create({
+      trigger: 'cli', environment: 'local', flows: [{ file: 'a.md' }, { file: 'b.md' }, { file: 'c.md' }]
+    });
+    testRuns.flowFinished(run, 'a.md', { content: MARKDOWN, flow: executedFlow() });
+    testRuns.flowStarted(run, 'b.md');
+
+    testRuns.abandon(run, 'The run was cancelled', { 'b.md': MARKDOWN, 'c.md': MARKDOWN });
+
+    const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
+    expect(summary.status).toBe('failed');
+    expect(typeof summary.times.end).toBe('number');
+    expect(summary.flows.map(flow => flow.status)).toEqual(['passed', 'failed', 'failed']);
+    expect(summary.flows[1].error).toBe('The run was cancelled');
+    expect(summary.flows[2].error).toBe('The run was cancelled');
+    // Every flow it was asked to run has its copy, and the run its report
+    expect(fs.existsSync(path.join(RUNS_DIR, run.id, 'b.md'))).toBe(true);
+    expect(fs.existsSync(path.join(RUNS_DIR, run.id, 'c.md'))).toBe(true);
+    expect(fs.existsSync(path.join(RUNS_DIR, run.id, 'report.html'))).toBe(true);
+    // An upload is for a run that ran
+    expect(sharepoint.shouldUpload).not.toHaveBeenCalled();
+  });
+
+  test('abandon leaves a run that already finished alone', async () => {
+    const run = await testRuns.create({ trigger: 'cli', environment: 'local', flows: [{ file: 'a.md' }] });
+    testRuns.flowFinished(run, 'a.md', { content: MARKDOWN, flow: executedFlow() });
+    await testRuns.finalize(run);
+
+    testRuns.abandon(run, 'Too late');
+
+    const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
+    expect(summary.status).toBe('passed');
+    expect(summary.flows[0].error).toBeUndefined();
+  });
+
+  test('abandon without the documents still closes the run', async () => {
+    const run = await testRuns.create({ trigger: 'cli', environment: 'local', flows: [{ file: 'a.md' }] });
+
+    testRuns.abandon(run, 'Gone');
+
+    const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
+    expect(summary.status).toBe('failed');
+    expect(summary.flows[0]).toMatchObject({ status: 'failed', error: 'Gone' });
+    expect(fs.existsSync(path.join(RUNS_DIR, run.id, 'a.md'))).toBe(false);
+  });
+
+  test('abandon survives a report it could not write', async () => {
+    const run = await testRuns.create({ trigger: 'cli', environment: 'local', flows: [{ file: 'a.md' }] });
+    const write = jest.spyOn(testRunReport, 'write').mockImplementation(() => { throw new Error('disk full'); });
+
+    expect(() => testRuns.abandon(run, 'Cancelled')).not.toThrow();
+
+    expect(write).toHaveBeenCalled();
+    expect((console.error as jest.Mock).mock.calls.join(' ')).toContain('Could not write the report');
+    const summary = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, run.id, 'run.json'), 'utf8'));
+    expect(summary.status).toBe('failed');
   });
 
   test('discard removes the run folder', async () => {

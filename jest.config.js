@@ -33,8 +33,10 @@ module.exports = {
 
   // Claude Code keeps scratch worktrees under .claude/worktrees; without this
   // jest discovers their suites too and runs everything several times over.
-  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/\\.claude/'],
-  modulePathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/.claude/'],
+  // editors/ holds package trees of their own, with their own tests -- and a
+  // package.json named like this one, which jest would take for a duplicate.
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/\\.claude/', '<rootDir>/editors/'],
+  modulePathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/.claude/', '<rootDir>/editors/'],
 
   setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.ts'],
 

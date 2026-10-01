@@ -5,12 +5,14 @@ Guidance for Claude Code when working in this repository.
 ## What this is
 
 `ronsel` — a CLI and web UI for running E2E flows written as Markdown
-documents. Two package trees, each with its own `package.json`:
+documents, and a VS Code extension that runs them from the editor. Three
+package trees, each with its own `package.json`:
 
 | Tree | What it is | Ships to npm? |
 | --- | --- | --- |
 | `.` (root) | CLI, API, helpers. TypeScript → CommonJS in `dist/` | yes (`files: ["dist", …]`) |
 | `frontend/` | The web UI (React + Vite + Tailwind) | yes, folded into `dist/frontend` |
+| `editors/vscode/` | The VS Code extension (TypeScript, bundled by esbuild) | no: its `.vsix` is attached to each GitHub release |
 
 Every dependency is pinned exactly (`.npmrc` sets `save-exact=true`). Node
 version comes from `.nvmrc` everywhere — CI, `nvm use`.
@@ -43,7 +45,10 @@ Everything that shows a version still reads it from the root `package.json`:
 - the git tag: `v<version>`, exactly
 
 `frontend/package.json` stays at `0.0.0` on purpose — it is private and never
-published. Do not bump it; release-please does not touch it either.
+published. Do not bump it; release-please does not touch it either. The same
+goes for `editors/vscode/package.json`: the extension is released with the CLI
+it drives, and `editors/vscode/scripts/package.js` stamps the root version into
+the `.vsix` as it packages it, writing nothing back.
 
 ### The release, step by step
 
@@ -170,6 +175,44 @@ links in `AppSidebar.tsx` are what have to follow it.
 - **UI shows the old version.** It cannot any more — `publish` checks out the
   tag and `prepublishOnly` rebuilds the frontend from that tree, so the
   version Vite bakes in is the one being published.
+
+---
+
+## The VS Code extension
+
+`editors/vscode` makes flows tests, the way VS Code shows tests: the Testing
+view lists every context of the workspace (and those `ronsel.contexts` adds
+from elsewhere), every ` ```step ` block is a test item with the range of its
+block -- which is what puts a check or a cross in the gutter -- and runs land
+in an Executions view in the panel, read from the contexts' `test-runs`.
+
+It bundles nothing of ronsel. A run is one process of the ronsel the context
+depends on: `ronsel --context <ctx> --ipc --env <env> --file <flow>...`
+(`src/helpers/ipc.ts`). Over the IPC channel the CLI sends `hello`, then the
+very events the web UI's socket gets (`flowexecution:update`,
+`testrun:update`), then `done`; the editor answers inputs and sends `cancel`.
+That is a contract between two trees, so:
+
+- **The protocol is versioned.** `PROTOCOL` in `src/helpers/ipc.ts` and in
+  `editors/vscode/src/core/process.ts` move together, and only when a message
+  changes shape -- a new message or field is not a new protocol.
+- **The extension restates two rules of the package.** Which fences are steps,
+  and the ids the runner gives them (`buildSteps` in `runner/v1`), are
+  re-implemented in `editors/vscode/src/core/flowParser.ts`, because the editor
+  needs line numbers the package never computes. Changing either rule means
+  changing both, or the marks land on the wrong lines.
+- **Events are the UI's.** The extension reads them in
+  `editors/vscode/src/core/tracker.ts`; `test/run-events.json` there is a
+  recording of a real run, so a change to what the runner emits shows up as a
+  failing test of the extension.
+
+`src/core` holds everything that does not need VS Code and is unit tested with
+node's own runner (`npm test --prefix editors/vscode`); the files above it use
+the editor's API and are tried by hand: **Run the VS Code extension** in the
+root `.vscode/launch.json` opens an Extension Development Host with it loaded.
+CI's `extension` job gates it, and on a release the `vsix` job attaches the
+packaged `.vsix` to the GitHub release. Publishing to the Marketplace and to
+Open VSX is not set up: it needs the `lab34` publisher and its tokens.
 
 ---
 

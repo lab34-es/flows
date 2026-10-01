@@ -1,0 +1,760 @@
+[
+  {
+    "type": "hello",
+    "protocol": 1,
+    "version": "2.1.0",
+    "context": "/ctx"
+  },
+  {
+    "type": "event",
+    "event": "testrun:update",
+    "payload": {
+      "id": "2026-10-01_09-15-40-local",
+      "run": {
+        "id": "2026-10-01_09-15-40-local",
+        "trigger": "cli",
+        "environment": "local",
+        "status": "running",
+        "times": {
+          "start": 1790846140644
+        },
+        "flows": [
+          {
+            "file": "scratch/fail.md",
+            "title": "A failing flow",
+            "status": "pending"
+          },
+          {
+            "file": "examples/01-welcome.md",
+            "title": "Welcome to Markdown flows",
+            "status": "pending"
+          }
+        ]
+      },
+      "removed": false
+    }
+  },
+  {
+    "type": "event",
+    "event": "testrun:update",
+    "payload": {
+      "id": "2026-10-01_09-15-40-local",
+      "run": {
+        "id": "2026-10-01_09-15-40-local",
+        "trigger": "cli",
+        "environment": "local",
+        "status": "running",
+        "times": {
+          "start": 1790846140644
+        },
+        "flows": [
+          {
+            "file": "scratch/fail.md",
+            "title": "A failing flow",
+            "status": "running",
+            "times": {
+              "start": 1790846140646
+            }
+          },
+          {
+            "file": "examples/01-welcome.md",
+            "title": "Welcome to Markdown flows",
+            "status": "pending"
+          }
+        ]
+      },
+      "removed": false
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "99f0029b-cdc2-4c82-bf1a-96fc594f6e8b",
+      "topic": "execution",
+      "data": {
+        "id": "99f0029b-cdc2-4c82-bf1a-96fc594f6e8b",
+        "status": "running",
+        "times": {
+          "start": 1790846140679
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "99f0029b-cdc2-4c82-bf1a-96fc594f6e8b",
+      "topic": "step",
+      "data": {
+        "id": "calculator-add-0",
+        "data": {
+          "id": "calculator-add-0",
+          "stepIndex": 0,
+          "application": "calculator",
+          "method": "add",
+          "description": "Expect the wrong sum",
+          "execution": {
+            "times": {
+              "start": 1790846140701
+            },
+            "attempt": 0,
+            "status": "running"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "99f0029b-cdc2-4c82-bf1a-96fc594f6e8b",
+      "topic": "step",
+      "data": {
+        "id": "calculator-add-0",
+        "data": {
+          "id": "calculator-add-0",
+          "stepIndex": 0,
+          "application": "calculator",
+          "method": "add",
+          "description": "Expect the wrong sum",
+          "execution": {
+            "times": {
+              "start": 1790846140701,
+              "end": 1790846140715,
+              "duration": 0.014
+            },
+            "attempt": 0,
+            "status": "running"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "99f0029b-cdc2-4c82-bf1a-96fc594f6e8b",
+      "topic": "step",
+      "data": {
+        "id": "calculator-add-0",
+        "data": {
+          "id": "calculator-add-0",
+          "stepIndex": 0,
+          "application": "calculator",
+          "method": "add",
+          "description": "Expect the wrong sum",
+          "execution": {
+            "times": {
+              "start": 1790846140701,
+              "end": 1790846140715,
+              "duration": 0.014
+            },
+            "attempt": 0,
+            "status": "failed",
+            "error": {
+              "name": "TestFailed",
+              "message": "Test failed for step calculator-add-0",
+              "stepId": "calculator-add-0",
+              "code": 4
+            }
+          },
+          "testReport": {
+            "hasErrors": true,
+            "status": [],
+            "body": [
+              {
+                "message": "Value mismatch at result",
+                "expected": 5,
+                "actual": 4
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "99f0029b-cdc2-4c82-bf1a-96fc594f6e8b",
+      "topic": "step",
+      "data": {
+        "id": "calculator-add-0",
+        "data": {
+          "id": "calculator-add-0",
+          "stepIndex": 0,
+          "application": "calculator",
+          "method": "add",
+          "description": "Expect the wrong sum",
+          "execution": {
+            "times": {
+              "start": 1790846140701,
+              "end": 1790846140715,
+              "duration": 0.014
+            },
+            "attempt": 0,
+            "status": "error",
+            "error": {
+              "name": "TestFailed",
+              "message": "Error executing step calculator-add-0: Test failed for step calculator-add-0",
+              "code": 4,
+              "stepId": "calculator-add-0"
+            }
+          },
+          "testReport": {
+            "hasErrors": true,
+            "status": [],
+            "body": [
+              {
+                "message": "Value mismatch at result",
+                "expected": 5,
+                "actual": 4
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "99f0029b-cdc2-4c82-bf1a-96fc594f6e8b",
+      "topic": "execution",
+      "data": {
+        "id": "99f0029b-cdc2-4c82-bf1a-96fc594f6e8b",
+        "status": "error",
+        "times": {
+          "start": 1790846140679
+        },
+        "error": {
+          "name": "TestFailed",
+          "message": "Error executing step calculator-add-0: Test failed for step calculator-add-0",
+          "code": 4
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "testrun:update",
+    "payload": {
+      "id": "2026-10-01_09-15-40-local",
+      "run": {
+        "id": "2026-10-01_09-15-40-local",
+        "trigger": "cli",
+        "environment": "local",
+        "status": "running",
+        "times": {
+          "start": 1790846140644
+        },
+        "flows": [
+          {
+            "file": "scratch/fail.md",
+            "title": "A failing flow",
+            "status": "failed",
+            "times": {
+              "start": 1790846140679,
+              "end": 1790846140741,
+              "duration": 62
+            },
+            "steps": {
+              "total": 2,
+              "passed": 0,
+              "failed": 1
+            },
+            "error": "Error executing step calculator-add-0: Test failed for step calculator-add-0"
+          },
+          {
+            "file": "examples/01-welcome.md",
+            "title": "Welcome to Markdown flows",
+            "status": "pending"
+          }
+        ]
+      },
+      "removed": false
+    }
+  },
+  {
+    "type": "event",
+    "event": "testrun:update",
+    "payload": {
+      "id": "2026-10-01_09-15-40-local",
+      "run": {
+        "id": "2026-10-01_09-15-40-local",
+        "trigger": "cli",
+        "environment": "local",
+        "status": "running",
+        "times": {
+          "start": 1790846140644
+        },
+        "flows": [
+          {
+            "file": "scratch/fail.md",
+            "title": "A failing flow",
+            "status": "failed",
+            "times": {
+              "start": 1790846140679,
+              "end": 1790846140741,
+              "duration": 62
+            },
+            "steps": {
+              "total": 2,
+              "passed": 0,
+              "failed": 1
+            },
+            "error": "Error executing step calculator-add-0: Test failed for step calculator-add-0"
+          },
+          {
+            "file": "examples/01-welcome.md",
+            "title": "Welcome to Markdown flows",
+            "status": "running",
+            "times": {
+              "start": 1790846140759
+            }
+          }
+        ]
+      },
+      "removed": false
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "execution",
+      "data": {
+        "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+        "status": "running",
+        "times": {
+          "start": 1790846140765
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-add",
+        "data": {
+          "id": "calculator-add",
+          "stepIndex": 0,
+          "application": "calculator",
+          "method": "add",
+          "description": "Add 2 + 40",
+          "execution": {
+            "times": {
+              "start": 1790846140780
+            },
+            "attempt": 0,
+            "status": "running"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-add",
+        "data": {
+          "id": "calculator-add",
+          "stepIndex": 0,
+          "application": "calculator",
+          "method": "add",
+          "description": "Add 2 + 40",
+          "execution": {
+            "times": {
+              "start": 1790846140780,
+              "end": 1790846140782,
+              "duration": 0.002
+            },
+            "attempt": 0,
+            "status": "running"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-add",
+        "data": {
+          "id": "calculator-add",
+          "stepIndex": 0,
+          "application": "calculator",
+          "method": "add",
+          "description": "Add 2 + 40",
+          "execution": {
+            "times": {
+              "start": 1790846140780,
+              "end": 1790846140782,
+              "duration": 0.002
+            },
+            "attempt": 0,
+            "status": "passed"
+          },
+          "testReport": {
+            "hasErrors": false,
+            "status": [],
+            "body": []
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-multiply",
+        "data": {
+          "id": "calculator-multiply",
+          "stepIndex": 1,
+          "application": "calculator",
+          "method": "multiply",
+          "description": "Multiply the previous result by 2, using memory",
+          "execution": {
+            "times": {
+              "start": 1790846140786
+            },
+            "attempt": 0,
+            "status": "running"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-multiply",
+        "data": {
+          "id": "calculator-multiply",
+          "stepIndex": 1,
+          "application": "calculator",
+          "method": "multiply",
+          "description": "Multiply the previous result by 2, using memory",
+          "execution": {
+            "times": {
+              "start": 1790846140786,
+              "end": 1790846140793,
+              "duration": 0.007
+            },
+            "attempt": 0,
+            "status": "running"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-multiply",
+        "data": {
+          "id": "calculator-multiply",
+          "stepIndex": 1,
+          "application": "calculator",
+          "method": "multiply",
+          "description": "Multiply the previous result by 2, using memory",
+          "execution": {
+            "times": {
+              "start": 1790846140786,
+              "end": 1790846140793,
+              "duration": 0.007
+            },
+            "attempt": 0,
+            "status": "passed"
+          },
+          "testReport": {
+            "hasErrors": false,
+            "status": [],
+            "body": []
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-divide",
+        "data": {
+          "id": "calculator-divide",
+          "stepIndex": 2,
+          "application": "calculator",
+          "method": "divide",
+          "description": "Dividing by zero must fail with a DIVISION_BY_ZERO error",
+          "execution": {
+            "times": {
+              "start": 1790846140796
+            },
+            "attempt": 0,
+            "status": "running"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-divide",
+        "data": {
+          "id": "calculator-divide",
+          "stepIndex": 2,
+          "application": "calculator",
+          "method": "divide",
+          "description": "Dividing by zero must fail with a DIVISION_BY_ZERO error",
+          "execution": {
+            "times": {
+              "start": 1790846140796,
+              "end": 1790846140799,
+              "duration": 0.003
+            },
+            "attempt": 0,
+            "status": "running"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "step",
+      "data": {
+        "id": "calculator-divide",
+        "data": {
+          "id": "calculator-divide",
+          "stepIndex": 2,
+          "application": "calculator",
+          "method": "divide",
+          "description": "Dividing by zero must fail with a DIVISION_BY_ZERO error",
+          "execution": {
+            "times": {
+              "start": 1790846140796,
+              "end": 1790846140799,
+              "duration": 0.003
+            },
+            "attempt": 0,
+            "status": "passed"
+          },
+          "testReport": {
+            "hasErrors": false,
+            "status": [],
+            "body": []
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "flowexecution:update",
+    "payload": {
+      "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+      "topic": "execution",
+      "data": {
+        "id": "0e0badfa-8589-4364-afb4-1223216236ec",
+        "status": "passed",
+        "times": {
+          "start": 1790846140765,
+          "end": 1790846140801,
+          "duration": 36
+        }
+      }
+    }
+  },
+  {
+    "type": "event",
+    "event": "testrun:update",
+    "payload": {
+      "id": "2026-10-01_09-15-40-local",
+      "run": {
+        "id": "2026-10-01_09-15-40-local",
+        "trigger": "cli",
+        "environment": "local",
+        "status": "running",
+        "times": {
+          "start": 1790846140644
+        },
+        "flows": [
+          {
+            "file": "scratch/fail.md",
+            "title": "A failing flow",
+            "status": "failed",
+            "times": {
+              "start": 1790846140679,
+              "end": 1790846140741,
+              "duration": 62
+            },
+            "steps": {
+              "total": 2,
+              "passed": 0,
+              "failed": 1
+            },
+            "error": "Error executing step calculator-add-0: Test failed for step calculator-add-0"
+          },
+          {
+            "file": "examples/01-welcome.md",
+            "title": "Welcome to Markdown flows",
+            "status": "passed",
+            "times": {
+              "start": 1790846140765,
+              "end": 1790846140801,
+              "duration": 36
+            },
+            "steps": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0
+            }
+          }
+        ]
+      },
+      "removed": false
+    }
+  },
+  {
+    "type": "event",
+    "event": "testrun:update",
+    "payload": {
+      "id": "2026-10-01_09-15-40-local",
+      "run": {
+        "id": "2026-10-01_09-15-40-local",
+        "trigger": "cli",
+        "environment": "local",
+        "status": "failed",
+        "times": {
+          "start": 1790846140644,
+          "end": 1790846140810,
+          "duration": 166
+        },
+        "flows": [
+          {
+            "file": "scratch/fail.md",
+            "title": "A failing flow",
+            "status": "failed",
+            "times": {
+              "start": 1790846140679,
+              "end": 1790846140741,
+              "duration": 62
+            },
+            "steps": {
+              "total": 2,
+              "passed": 0,
+              "failed": 1
+            },
+            "error": "Error executing step calculator-add-0: Test failed for step calculator-add-0"
+          },
+          {
+            "file": "examples/01-welcome.md",
+            "title": "Welcome to Markdown flows",
+            "status": "passed",
+            "times": {
+              "start": 1790846140765,
+              "end": 1790846140801,
+              "duration": 36
+            },
+            "steps": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0
+            }
+          }
+        ]
+      },
+      "removed": false
+    }
+  },
+  {
+    "type": "done",
+    "run": {
+      "id": "2026-10-01_09-15-40-local",
+      "trigger": "cli",
+      "environment": "local",
+      "status": "failed",
+      "times": {
+        "start": 1790846140644,
+        "end": 1790846140810,
+        "duration": 166
+      },
+      "flows": [
+        {
+          "file": "scratch/fail.md",
+          "title": "A failing flow",
+          "status": "failed",
+          "times": {
+            "start": 1790846140679,
+            "end": 1790846140741,
+            "duration": 62
+          },
+          "steps": {
+            "total": 2,
+            "passed": 0,
+            "failed": 1
+          },
+          "error": "Error executing step calculator-add-0: Test failed for step calculator-add-0"
+        },
+        {
+          "file": "examples/01-welcome.md",
+          "title": "Welcome to Markdown flows",
+          "status": "passed",
+          "times": {
+            "start": 1790846140765,
+            "end": 1790846140801,
+            "duration": 36
+          },
+          "steps": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0
+          }
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,335 @@
+{
+  "name": "ronsel",
+  "displayName": "Ronsel",
+  "description": "Run Ronsel E2E flows from VS Code: a play button on every flow, a check or a cross on every step, and every execution in the panel.",
+  "version": "0.0.0",
+  "private": true,
+  "publisher": "lab34",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "homepage": "https://ronsel.lab34.es/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lab34-es/ronsel.git",
+    "directory": "editors/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/lab34-es/ronsel/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Testing"
+  ],
+  "keywords": [
+    "ronsel",
+    "e2e",
+    "end-to-end",
+    "flows",
+    "api testing",
+    "markdown"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Running a flow runs the code of the workspace's applications, and of the ronsel it has installed."
+    },
+    "virtualWorkspaces": false
+  },
+  "activationEvents": [
+    "workspaceContains:**/flows/**/*.md",
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ronsel.runFlow",
+        "title": "Run Flow",
+        "category": "Ronsel",
+        "icon": "$(play)"
+      },
+      {
+        "command": "ronsel.debugFlow",
+        "title": "Debug Flow",
+        "category": "Ronsel",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "ronsel.runView",
+        "title": "Run View...",
+        "category": "Ronsel",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "ronsel.selectEnvironment",
+        "title": "Select Environment...",
+        "category": "Ronsel",
+        "icon": "$(server-environment)"
+      },
+      {
+        "command": "ronsel.addContext",
+        "title": "Add Flows Folder...",
+        "category": "Ronsel",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "ronsel.refresh",
+        "title": "Refresh Flows",
+        "category": "Ronsel",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ronsel.openUI",
+        "title": "Open Web UI",
+        "category": "Ronsel",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "ronsel.showLog",
+        "title": "Show Log",
+        "category": "Ronsel",
+        "icon": "$(output)"
+      },
+      {
+        "command": "ronsel.executions.rerun",
+        "title": "Run Again",
+        "category": "Ronsel",
+        "icon": "$(debug-rerun)"
+      },
+      {
+        "command": "ronsel.executions.openReport",
+        "title": "Open Report",
+        "category": "Ronsel",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "ronsel.executions.revealFolder",
+        "title": "Reveal Run Folder",
+        "category": "Ronsel",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "ronsel.executions.open",
+        "title": "Open",
+        "category": "Ronsel"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "ronsel.runFlow",
+          "when": "ronsel.activeEditorIsFlow",
+          "group": "navigation@0"
+        },
+        {
+          "command": "ronsel.debugFlow",
+          "when": "ronsel.activeEditorIsFlow",
+          "group": "navigation@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "ronsel.runFlow",
+          "when": "resourcePath in ronsel.flowPaths",
+          "group": "ronsel@1"
+        },
+        {
+          "command": "ronsel.debugFlow",
+          "when": "resourcePath in ronsel.flowPaths",
+          "group": "ronsel@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "ronsel.executions.rerun",
+          "when": "false"
+        },
+        {
+          "command": "ronsel.executions.openReport",
+          "when": "false"
+        },
+        {
+          "command": "ronsel.executions.revealFolder",
+          "when": "false"
+        },
+        {
+          "command": "ronsel.executions.open",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "ronsel.selectEnvironment",
+          "when": "view == ronsel.executions",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ronsel.runView",
+          "when": "view == ronsel.executions",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ronsel.refresh",
+          "when": "view == ronsel.executions",
+          "group": "navigation@3"
+        },
+        {
+          "command": "ronsel.openUI",
+          "when": "view == ronsel.executions",
+          "group": "more@1"
+        },
+        {
+          "command": "ronsel.addContext",
+          "when": "view == ronsel.executions",
+          "group": "more@2"
+        },
+        {
+          "command": "ronsel.showLog",
+          "when": "view == ronsel.executions",
+          "group": "more@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ronsel.executions.rerun",
+          "when": "view == ronsel.executions && viewItem == run",
+          "group": "inline@1"
+        },
+        {
+          "command": "ronsel.executions.openReport",
+          "when": "view == ronsel.executions && viewItem == run",
+          "group": "inline@2"
+        },
+        {
+          "command": "ronsel.executions.rerun",
+          "when": "view == ronsel.executions && viewItem =~ /^run/",
+          "group": "1_run@1"
+        },
+        {
+          "command": "ronsel.executions.openReport",
+          "when": "view == ronsel.executions && viewItem == run",
+          "group": "1_run@2"
+        },
+        {
+          "command": "ronsel.executions.revealFolder",
+          "when": "view == ronsel.executions && viewItem =~ /^run/",
+          "group": "2_folder@1"
+        },
+        {
+          "command": "ronsel.executions.rerun",
+          "when": "view == ronsel.executions && viewItem == flow",
+          "group": "inline@1"
+        },
+        {
+          "command": "ronsel.executions.rerun",
+          "when": "view == ronsel.executions && viewItem == flow",
+          "group": "1_run@1"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "ronsel",
+          "title": "Ronsel",
+          "icon": "media/ronsel.svg"
+        }
+      ]
+    },
+    "views": {
+      "ronsel": [
+        {
+          "id": "ronsel.executions",
+          "name": "Executions",
+          "icon": "media/ronsel.svg",
+          "contextualTitle": "Ronsel"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "ronsel.executions",
+        "contents": "No flow has run here yet.\n[Run Flow](command:ronsel.runFlow)\nRun a flow with the play button of its editor, from the Testing view, or from here. Runs started from the CLI or the web UI show up too.",
+        "when": "ronsel.hasContexts"
+      },
+      {
+        "view": "ronsel.executions",
+        "contents": "No Ronsel flows in this workspace: a folder holding flows/ and applications/, as ronsel start makes one.\n[Add Flows Folder](command:ronsel.addContext)\nFlows kept in another repository can be added too, and run from here while you work on this one.",
+        "when": "!ronsel.hasContexts"
+      }
+    ],
+    "configuration": {
+      "title": "Ronsel",
+      "properties": {
+        "ronsel.contexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "machine-overridable",
+          "markdownDescription": "Folders holding flows to show next to this workspace's: any folder with a `flows` folder and an `applications` one (a ronsel context, as `ronsel start` makes it). Absolute, or relative to the first workspace folder. This is how flows kept in another repository are run while working on this one. The workspace itself is searched for them anyway."
+        },
+        "ronsel.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Glob patterns of folders the workspace search never takes for flows folders, e.g. `**/fixtures/**`. Folders named in `#ronsel.contexts#` are used whatever these say."
+        },
+        "ronsel.cliPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "The ronsel to run flows with: its `dist/cli.js`, or the folder of the package. Empty, it is looked for in the node_modules of the flows folder and of the workspace, then in a global install."
+        },
+        "ronsel.nodePath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "The Node.js executable flows run with. Empty, `node` is taken from the `PATH`. ronsel needs Node.js 24 or newer."
+        },
+        "ronsel.executions.limit": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "markdownDescription": "How many runs the Executions panel lists, newest first."
+        },
+        "ronsel.executions.revealOnRun": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the Executions panel, on the new run, when a flow is run from the editor."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node20 --sourcemap",
+    "watch": "npm run build -- --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "tsc -p tsconfig.test.json && node --test \"out/test/**/*.test.js\"",
+    "package": "node scripts/package.js",
+    "vscode:prepublish": "npm run build -- --minify"
+  },
+  "dependencies": {
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "20.19.43",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.8.1",
+    "globals": "17.11.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.67.0"
+  }
+}

@@ -8,8 +8,9 @@
 #   - coverage of src/ is above 80% on statements, branches, functions and
 #     lines (enforced by coverageThreshold in jest.config.js, so the numbers
 #     live in one place rather than being restated here)
-#   - npm audit reports no critical vulnerability, in either package tree
+#   - npm audit reports no critical vulnerability, in any package tree
 #   - the package and the frontend both build
+#   - the VS Code extension lints, type checks, passes its tests and packages
 #   - the pull request title is a conventional commit
 #
 # That last one is not cosmetics. The repository squash-merges, so the title
@@ -23,6 +24,8 @@
 #               date, and when that pull request is merged, tags the commit
 #               v<version> and creates the GitHub release
 #   - publish   fires only for that commit, and publishes it to npm
+#   - vsix      attaches the VS Code extension, packaged from that commit, to
+#               the GitHub release
 #
 # Both hang off every gate above, so nothing ships from a red master. And
 # because one process writes package.json, the lockfile and the tag, they
@@ -128,6 +131,50 @@ jobs:
       - name: Type check
         run: npm run typecheck --prefix frontend
 
+  extension:
+    name: VS Code extension
+    runs-on: ubuntu-latest
+    # Its own package tree, like the frontend: nothing of it is published to
+    # npm, and the CLI it drives is whatever ronsel the user's project has
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      # src/core -- the parser, the process and its protocol, the tracker --
+      # runs outside of VS Code, under node's own test runner
+      - name: Test
+        run: npm test
+
+      # Packaging is the build: it bundles the extension and checks the
+      # manifest. The .vsix is kept, so a pull request can be tried out with
+      # "Extensions: Install from VSIX..." before it lands
+      - name: Package
+        run: npm run package
+
+      - name: Upload the .vsix
+        uses: actions/upload-artifact@v7
+        with:
+          name: vscode-extension
+          path: editors/vscode/*.vsix
+          retention-days: 14
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest
@@ -147,6 +194,9 @@ jobs:
       - name: Audit (frontend)
         run: npm audit --audit-level=critical --prefix frontend
 
+      - name: Audit (VS Code extension)
+        run: npm audit --audit-level=critical --prefix editors/vscode
+
       - name: Report non-critical advisories
         if: always()
         run: |
@@ -155,7 +205,7 @@ jobs:
             echo
             echo "| Package tree | critical | high | moderate | low |"
             echo "| --- | --- | --- | --- | --- |"
-            for dir in . frontend; do
+            for dir in . frontend editors/vscode; do
               counts=$(npm audit --json --prefix "$dir" 2>/dev/null \
                 | node -e '
                   let raw = "";
@@ -279,7 +329,7 @@ jobs:
 
   release:
     name: Keep the release pull request up to date
-    needs: [quality, frontend, audit, build]
+    needs: [quality, frontend, extension, audit, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
@@ -359,3 +409,41 @@ jobs:
       # token exchange only at verbose level and otherwise falls through to a
       # bare ENEEDAUTH.
       - run: npm publish --access=public
+
+  vsix:
+    name: Attach the VS Code extension to the release
+    needs: [release]
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # uploading an asset to the GitHub release
+
+    # The extension ships with the CLI it drives: the .vsix is packaged from
+    # the tagged commit and carries the release's version, stamped from the
+    # root package.json by editors/vscode/scripts/package.js -- nobody types
+    # it, as for everything else. It is attached to the GitHub release, which
+    # is where "Extensions: Install from VSIX..." takes it from. Publishing to
+    # the Marketplace and Open VSX needs a publisher and its tokens, which the
+    # repository does not have yet.
+    #
+    # A job of its own, so that the npm publish never waits on it, nor fails
+    # with it.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - run: npm ci --prefix editors/vscode
+
+      - run: npm run package --prefix editors/vscode
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.release.outputs.tag }}" editors/vscode/*.vsix --clobber --repo "${GITHUB_REPOSITORY}"

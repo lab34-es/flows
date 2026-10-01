@@ -1,0 +1,24 @@
+{
+  /* What the editor and `npm run typecheck` use. The extension itself is
+     bundled by esbuild (npm run build), which strips the types; tsc only
+     checks them, and compiles the unit tests (tsconfig.test.json). */
+  "compilerOptions": {
+    /* VS Code 1.90, the oldest the extension supports, runs Node 20 */
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    "noEmit": true,
+    "types": ["node", "vscode"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

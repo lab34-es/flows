@@ -549,6 +549,43 @@ const finalize = async (run) => {
 export { finalize };
 
 /**
+ * Close a run that will not finish: whoever started it stopped it, or went
+ * away -- an editor's run (helpers/ipc) ends with its editor.
+ *
+ * Every flow still pending or running fails with the reason, its copy written
+ * without results as for a flow that could not run, and the run is closed as
+ * failed, report included. A run left "running" on disk would be shown as
+ * running for ever. Nothing is handed to the integrations: an upload is for a
+ * run that ran.
+ *
+ * @param {TestRun} run
+ * @param {string} reason - Why it stopped, recorded as each flow's error
+ * @param {Object} [contents] - The document of each flow, by file, so the
+ *   copies can be written
+ */
+const abandon = (run: TestRun, reason: string, contents: Record<string, string> = {}) => {
+  if (run.summary.status !== 'running') { return; }
+
+  run.summary.flows
+    .filter(flow => flow.status === 'pending' || flow.status === 'running')
+    .forEach(flow => flowFailed(run, flow.file, { content: contents[flow.file], error: new Error(reason) }));
+
+  run.summary.status = 'failed';
+  run.summary.times.end = Date.now();
+  run.summary.times.duration = run.summary.times.end - run.summary.times.start;
+  save(run);
+
+  try {
+    testRunReport.write(run.dir, run.summary);
+  }
+  catch (ex) {
+    console.error('Could not write the report of run %s:', run.id, ex);
+  }
+};
+
+export { abandon };
+
+/**
  * Throw away a run that never happened (the runner refused to start).
  * @param {TestRun} run
  */

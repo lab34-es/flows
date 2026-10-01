@@ -1,0 +1,8 @@
+# What the .vsix carries is the bundle, the media and the documents: the
+# sources, the tests and every dependency are already inside dist/extension.js
+**
+!dist/extension.js
+!media/**
+!package.json
+!README.md
+!LICENSE.md

@@ -8,6 +8,9 @@ module.exports = tseslint.config(
     ignores: [
       'node_modules/**',
       'frontend/**',
+      // The editor extensions are package trees of their own, linted by their
+      // own configuration (editors/vscode/eslint.config.js)
+      'editors/**',
       'dist/**',
       'build/**',
       'coverage/**',
